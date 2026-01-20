@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Calendar, Users, Clock, AlertCircle } from 'lucide-react';
+import { Calendar, Users, Clock } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { JobOrder, joStatusLabels } from '@/data/mockData';
 import { cn } from '@/lib/utils';
@@ -17,16 +17,16 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
     return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
   };
 
-  const getAgingClass = (days: number): string => {
-    if (days < 7) return 'aging-fresh';
-    if (days < 14) return 'aging-moderate';
-    return 'aging-urgent';
-  };
-
   const getAgingColor = (days: number): string => {
     if (days < 7) return 'text-green-600';
     if (days < 14) return 'text-orange-500';
     return 'text-red-500';
+  };
+
+  const getAgingDot = (days: number): string => {
+    if (days < 7) return 'bg-green-500';
+    if (days < 14) return 'bg-orange-500';
+    return 'bg-red-500';
   };
 
   return (
@@ -52,13 +52,20 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
           >
             {/* Header Row */}
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-muted-foreground">
-                {jo.joNumber}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground">
+                  {jo.joNumber}
+                </span>
+                {/* Aging Dot Indicator */}
+                <span 
+                  className={cn("w-2 h-2 rounded-full", getAgingDot(agingDays))} 
+                  title={`Open for ${agingDays} days`}
+                />
+              </div>
               <span className={cn(
                 'status-badge',
                 jo.status === 'in-progress' && 'bg-primary/10 text-primary',
-                jo.status === 'job-offer' && 'bg-warning/10 text-warning',
+                jo.status === 'fulfilled' && 'bg-primary text-primary-foreground',
                 jo.status === 'draft' && 'bg-muted text-muted-foreground'
               )}>
                 {joStatusLabels[jo.status]}

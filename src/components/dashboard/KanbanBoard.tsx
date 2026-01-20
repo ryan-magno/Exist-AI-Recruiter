@@ -10,7 +10,7 @@ import {
   useSensors,
   closestCenter,
 } from '@dnd-kit/core';
-import { Candidate, statusLabels } from '@/data/mockData';
+import { Candidate, pipelineStatusLabels, PipelineStatus } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanCard } from './KanbanCard';
@@ -20,17 +20,17 @@ interface KanbanBoardProps {
   candidates: Candidate[];
 }
 
-const columns: { id: Candidate['status']; title: string }[] = [
-  { id: 'new', title: 'New Match' },
-  { id: 'interview', title: 'Interview' },
+const columns: { id: PipelineStatus; title: string }[] = [
+  { id: 'new-match', title: 'New Match' },
+  { id: 'hr-interview', title: 'HR Interview' },
+  { id: 'tech-interview', title: 'Tech Interview' },
   { id: 'offer', title: 'Offer' },
   { id: 'hired', title: 'Hired' },
-  { id: 'pooled', title: 'Pooled' },
   { id: 'rejected', title: 'Rejected' },
 ];
 
 export function KanbanBoard({ candidates }: KanbanBoardProps) {
-  const { updateCandidateStatus } = useApp();
+  const { updateCandidatePipelineStatus } = useApp();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
 
@@ -52,19 +52,19 @@ export function KanbanBoard({ candidates }: KanbanBoardProps) {
 
     if (over && active.id !== over.id) {
       const candidateId = active.id as string;
-      const newStatus = over.id as Candidate['status'];
+      const newStatus = over.id as PipelineStatus;
       
       // Check if dropped on a column
       if (columns.some(col => col.id === newStatus)) {
-        updateCandidateStatus(candidateId, newStatus);
+        updateCandidatePipelineStatus(candidateId, newStatus);
       }
     }
   };
 
   const activeCandidate = candidates.find(c => c.id === activeId);
 
-  const getCandidatesForColumn = (status: Candidate['status']) => {
-    return candidates.filter(c => c.status === status);
+  const getCandidatesForColumn = (status: PipelineStatus) => {
+    return candidates.filter(c => c.pipelineStatus === status);
   };
 
   return (

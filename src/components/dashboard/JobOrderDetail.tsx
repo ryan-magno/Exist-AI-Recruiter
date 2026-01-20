@@ -1,4 +1,4 @@
-import { Calendar, Briefcase, Edit, XCircle } from 'lucide-react';
+import { Calendar, Briefcase, Edit, XCircle, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/context/AppContext';
 import { JobOrder, joStatusLabels } from '@/data/mockData';
@@ -11,12 +11,22 @@ interface JobOrderDetailProps {
 }
 
 export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
-  const { updateJobOrderStatus } = useApp();
+  const { updateJobOrderStatus, isFindingMatches, setIsFindingMatches } = useApp();
 
   const handleClose = () => {
     updateJobOrderStatus(jobOrder.id, 'closed');
     toast.success('Job Order closed', {
       description: `${jobOrder.joNumber} has been moved to archive.`
+    });
+  };
+
+  const handleFindBestMatch = async () => {
+    setIsFindingMatches(true);
+    // Simulate AI re-ranking
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    setIsFindingMatches(false);
+    toast.success('AI Match Complete', {
+      description: 'Candidates have been re-ranked based on latest criteria.'
     });
   };
 
@@ -31,11 +41,16 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
             <span className={cn(
               'status-badge',
               jobOrder.status === 'in-progress' && 'bg-primary/10 text-primary',
-              jobOrder.status === 'job-offer' && 'bg-warning/10 text-warning',
+              jobOrder.status === 'fulfilled' && 'bg-primary text-primary-foreground',
               jobOrder.status === 'draft' && 'bg-muted text-muted-foreground'
             )}>
               {joStatusLabels[jobOrder.status]}
             </span>
+            {jobOrder.hiredCount > 0 && (
+              <span className="text-xs text-muted-foreground">
+                Hired: {jobOrder.hiredCount}/{jobOrder.quantity}
+              </span>
+            )}
           </div>
           <h2 className="text-2xl font-bold text-foreground mb-2">
             {jobOrder.title}
@@ -53,6 +68,25 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button 
+            variant="default" 
+            size="sm" 
+            className="gap-1.5"
+            onClick={handleFindBestMatch}
+            disabled={isFindingMatches}
+          >
+            {isFindingMatches ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Finding...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Find Best Match
+              </>
+            )}
+          </Button>
           <Button variant="outline" size="sm" className="gap-1.5">
             <Edit className="w-4 h-4" />
             Edit JO
