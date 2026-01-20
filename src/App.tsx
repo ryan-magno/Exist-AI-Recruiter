@@ -9,6 +9,7 @@ import UploadPage from "./pages/UploadPage";
 import DashboardPage from "./pages/DashboardPage";
 import CreateJOPage from "./pages/CreateJOPage";
 import ArchivePage from "./pages/ArchivePage";
+import CandidatesPage from "./pages/CandidatesPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,11 +23,12 @@ const App = () => (
         <BrowserRouter>
           <AppLayout>
             <Routes>
-              <Route path="/" element={<Navigate to="/upload" replace />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/upload" element={<UploadPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/create-jo" element={<CreateJOPage />} />
               <Route path="/archive" element={<ArchivePage />} />
+              <Route path="/candidates" element={<CandidatesPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppLayout>

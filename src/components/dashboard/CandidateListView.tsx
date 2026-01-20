@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, MessageSquare, ChevronDown } from 'lucide-react';
+import { Mail, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -17,9 +17,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Candidate, statusLabels } from '@/data/mockData';
+import { Candidate, pipelineStatusLabels, pipelineStatusColors, PipelineStatus } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { CandidateModal } from '@/components/modals/CandidateModal';
+import { EmailModal } from '@/components/modals/EmailModal';
 import { cn } from '@/lib/utils';
 
 interface CandidateListViewProps {
@@ -27,8 +28,10 @@ interface CandidateListViewProps {
 }
 
 export function CandidateListView({ candidates }: CandidateListViewProps) {
-  const { updateCandidateStatus } = useApp();
+  const { updateCandidatePipelineStatus } = useApp();
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+  const [emailCandidate, setEmailCandidate] = useState<Candidate | null>(null);
+  const [initialTab, setInitialTab] = useState<string>('profile');
 
   const sortedCandidates = [...candidates].sort((a, b) => b.matchScore - a.matchScore);
 
@@ -36,6 +39,16 @@ export function CandidateListView({ candidates }: CandidateListViewProps) {
     if (score >= 90) return 'match-score-high';
     if (score >= 75) return 'match-score-medium';
     return 'match-score-low';
+  };
+
+  const handleOpenNotes = (candidate: Candidate) => {
+    setInitialTab('notes');
+    setSelectedCandidate(candidate);
+  };
+
+  const handleOpenProfile = (candidate: Candidate) => {
+    setInitialTab('profile');
+    setSelectedCandidate(candidate);
   };
 
   return (
@@ -58,7 +71,7 @@ export function CandidateListView({ candidates }: CandidateListViewProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
                 className="cursor-pointer hover:bg-muted/30 transition-colors"
-                onClick={() => setSelectedCandidate(candidate)}
+                onClick={() => handleOpenProfile(candidate)}
               >
                 <TableCell>
                   <span className={cn('status-badge font-semibold', getScoreClass(candidate.matchScore))}>
@@ -73,14 +86,14 @@ export function CandidateListView({ candidates }: CandidateListViewProps) {
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <Select
-                    value={candidate.status}
-                    onValueChange={(value) => updateCandidateStatus(candidate.id, value as Candidate['status'])}
+                    value={candidate.pipelineStatus}
+                    onValueChange={(value) => updateCandidatePipelineStatus(candidate.id, value as PipelineStatus)}
                   >
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger className={cn("h-8 text-xs", pipelineStatusColors[candidate.pipelineStatus])}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(statusLabels).map(([value, label]) => (
+                      {Object.entries(pipelineStatusLabels).map(([value, label]) => (
                         <SelectItem key={value} value={value}>
                           {label}
                         </SelectItem>
@@ -90,10 +103,20 @@ export function CandidateListView({ candidates }: CandidateListViewProps) {
                 </TableCell>
                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-end gap-1">
-                    <Button size="icon" variant="ghost" className="h-8 w-8">
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      className="h-8 w-8"
+                      onClick={() => setEmailCandidate(candidate)}
+                    >
                       <Mail className="w-4 h-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8">
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      className="h-8 w-8"
+                      onClick={() => handleOpenNotes(candidate)}
+                    >
                       <MessageSquare className="w-4 h-4" />
                     </Button>
                   </div>
@@ -106,7 +129,14 @@ export function CandidateListView({ candidates }: CandidateListViewProps) {
 
       <CandidateModal 
         candidate={selectedCandidate} 
-        onClose={() => setSelectedCandidate(null)} 
+        onClose={() => setSelectedCandidate(null)}
+        initialTab={initialTab}
+      />
+      
+      <EmailModal
+        open={!!emailCandidate}
+        onClose={() => setEmailCandidate(null)}
+        candidate={emailCandidate}
       />
     </>
   );
