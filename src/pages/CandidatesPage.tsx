@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Mail, MessageSquare, Search, X, Eye, Filter } from 'lucide-react';
+import { Users, Mail, MessageSquare, Search, X, Eye, Filter, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApp } from '@/context/AppContext';
-import { pipelineStatusLabels, pipelineStatusColors, shortlistLabels, PipelineStatus, ShortlistDecision } from '@/data/mockData';
+import { pipelineStatusLabels, pipelineStatusColors, PipelineStatus, techInterviewLabels, techInterviewColors, TechInterviewResult } from '@/data/mockData';
 import { CandidateModal } from '@/components/modals/CandidateModal';
 import { EmailModal } from '@/components/modals/EmailModal';
 import { cn } from '@/lib/utils';
@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router-dom';
 
 export default function CandidatesPage() {
   const navigate = useNavigate();
-  const { getAllCandidates, updateCandidatePipelineStatus, jobOrders, isVectorized, setSelectedJoId } = useApp();
+  const { getAllCandidates, updateCandidatePipelineStatus, updateCandidateTechInterviewResult, deleteCandidate, jobOrders, isVectorized, setSelectedJoId } = useApp();
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
   const [emailCandidate, setEmailCandidate] = useState<any>(null);
   const [initialTab, setInitialTab] = useState('profile');
@@ -22,32 +22,27 @@ export default function CandidatesPage() {
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [pipelineFilter, setPipelineFilter] = useState<string>('all');
-  const [shortlistFilter, setShortlistFilter] = useState<string>('all');
   const [joFilter, setJoFilter] = useState<string>('all');
   
   const candidates = getAllCandidates();
 
+  // Sort by score (highest first) and filter
   const filteredCandidates = useMemo(() => {
-    return candidates.filter(candidate => {
-      // Search filter
-      const searchLower = searchQuery.toLowerCase();
-      const matchesSearch = !searchQuery || 
-        candidate.name.toLowerCase().includes(searchLower) ||
-        candidate.positionApplied.toLowerCase().includes(searchLower) ||
-        candidate.skills.some(skill => skill.toLowerCase().includes(searchLower));
-      
-      // Pipeline status filter
-      const matchesPipeline = pipelineFilter === 'all' || candidate.pipelineStatus === pipelineFilter;
-      
-      // Shortlist filter
-      const matchesShortlist = shortlistFilter === 'all' || candidate.shortlistDecision === shortlistFilter;
-      
-      // JO filter
-      const matchesJo = joFilter === 'all' || candidate.assignedJoId === joFilter;
-      
-      return matchesSearch && matchesPipeline && matchesShortlist && matchesJo;
-    });
-  }, [candidates, searchQuery, pipelineFilter, shortlistFilter, joFilter]);
+    return candidates
+      .filter(candidate => {
+        const searchLower = searchQuery.toLowerCase();
+        const matchesSearch = !searchQuery || 
+          candidate.name.toLowerCase().includes(searchLower) ||
+          candidate.positionApplied.toLowerCase().includes(searchLower) ||
+          candidate.skills.some((skill: string) => skill.toLowerCase().includes(searchLower));
+        
+        const matchesPipeline = pipelineFilter === 'all' || candidate.pipelineStatus === pipelineFilter;
+        const matchesJo = joFilter === 'all' || candidate.assignedJoId === joFilter;
+        
+        return matchesSearch && matchesPipeline && matchesJo;
+      })
+      .sort((a, b) => b.matchScore - a.matchScore);
+  }, [candidates, searchQuery, pipelineFilter, joFilter]);
 
   const getJobTitle = (joId?: string) => {
     if (!joId) return 'Unassigned';
@@ -62,9 +57,9 @@ export default function CandidatesPage() {
   };
 
   const getScoreClass = (score: number): string => {
-    if (score >= 85) return 'match-score-high';
-    if (score >= 70) return 'match-score-medium';
-    return 'match-score-low';
+    if (score >= 85) return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+    if (score >= 70) return 'bg-amber-100 text-amber-800 border-amber-300';
+    return 'bg-red-100 text-red-800 border-red-300';
   };
 
   const handleViewJo = (joId: string) => {
@@ -85,11 +80,10 @@ export default function CandidatesPage() {
   const clearFilters = () => {
     setSearchQuery('');
     setPipelineFilter('all');
-    setShortlistFilter('all');
     setJoFilter('all');
   };
 
-  const hasActiveFilters = searchQuery || pipelineFilter !== 'all' || shortlistFilter !== 'all' || joFilter !== 'all';
+  const hasActiveFilters = searchQuery || pipelineFilter !== 'all' || joFilter !== 'all';
 
   if (!isVectorized) {
     return (
@@ -155,18 +149,6 @@ export default function CandidatesPage() {
               </SelectContent>
             </Select>
 
-            {/* Shortlist Filter */}
-            <Select value={shortlistFilter} onValueChange={setShortlistFilter}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Shortlist" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Decisions</SelectItem>
-                {Object.entries(shortlistLabels).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
 
             {/* Job Order Filter */}
             <Select value={joFilter} onValueChange={setJoFilter}>
