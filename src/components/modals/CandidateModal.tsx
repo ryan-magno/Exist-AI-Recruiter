@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Mail, Phone, Linkedin, FileText, Sparkles, MessageSquare, ExternalLink, Download, Briefcase, Calendar, DollarSign, User } from 'lucide-react';
+import { X, Mail, Phone, Linkedin, FileText, Sparkles, MessageSquare, ExternalLink, Download, Briefcase, Calendar, DollarSign, User, Check, Loader2, Code } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -352,30 +352,109 @@ function NotesTab({
   onTechNotesChange: (notes: string) => void;
   onSave: () => void;
 }) {
+  const [hrSaveStatus, setHrSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [techSaveStatus, setTechSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  const handleHrChange = (value: string) => {
+    onHrNotesChange(value);
+    setHrSaveStatus('saving');
+    // Auto-save simulation
+    setTimeout(() => {
+      onSave();
+      setHrSaveStatus('saved');
+      setTimeout(() => setHrSaveStatus('idle'), 2000);
+    }, 1000);
+  };
+
+  const handleTechChange = (value: string) => {
+    onTechNotesChange(value);
+    setTechSaveStatus('saving');
+    // Auto-save simulation
+    setTimeout(() => {
+      onSave();
+      setTechSaveStatus('saved');
+      setTimeout(() => setTechSaveStatus('idle'), 2000);
+    }, 1000);
+  };
+
   return (
-    <div className="space-y-6">
-      <div>
-        <label className="font-medium text-foreground mb-2 block">HR Notes</label>
+    <div className="space-y-8">
+      {/* HR Notes Section */}
+      <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <User className="w-4 h-4 text-blue-600" />
+            <label className="font-medium text-foreground">HR Notes</label>
+          </div>
+          <SaveIndicator status={hrSaveStatus} />
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Interview scheduling, compensation discussions, cultural fit observations
+        </p>
         <Textarea
-          placeholder="Add HR interview notes, observations, and feedback..."
-          rows={5}
+          placeholder="Add notes about the candidate's background, interview availability, compensation expectations, benefits discussions, background check status, reference calls..."
+          rows={6}
           value={hrNotes}
-          onChange={(e) => onHrNotesChange(e.target.value)}
-          className="resize-none"
+          onChange={(e) => handleHrChange(e.target.value)}
+          className="resize-none bg-white min-h-[180px]"
         />
+        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+          <span>{hrNotes.length} / 5000 characters</span>
+        </div>
       </div>
-      <div>
-        <label className="font-medium text-foreground mb-2 block">Technical Interviewer Notes</label>
+
+      {/* Divider */}
+      <div className="border-t border-gray-200" />
+
+      {/* Technical Notes Section */}
+      <div className="bg-purple-50/50 rounded-xl p-4 border border-purple-100">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Code className="w-4 h-4 text-purple-600" />
+            <label className="font-medium text-foreground">Technical Interviewer Notes</label>
+          </div>
+          <SaveIndicator status={techSaveStatus} />
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Coding assessment, technical discussions, problem-solving approach
+        </p>
         <Textarea
-          placeholder="Add technical assessment notes, coding exercise feedback..."
-          rows={5}
+          placeholder="Add notes about technical assessment results, coding challenge performance, system design discussions, algorithm knowledge, debugging skills, code quality observations..."
+          rows={6}
           value={techNotes}
-          onChange={(e) => onTechNotesChange(e.target.value)}
-          className="resize-none"
+          onChange={(e) => handleTechChange(e.target.value)}
+          className="resize-none bg-white min-h-[180px]"
         />
+        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+          <span>{techNotes.length} / 5000 characters</span>
+        </div>
       </div>
-      <Button onClick={onSave}>Save Notes</Button>
     </div>
+  );
+}
+
+function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' }) {
+  if (status === 'idle') return null;
+  
+  return (
+    <span className={cn(
+      "text-xs flex items-center gap-1 transition-opacity",
+      status === 'saving' && 'text-muted-foreground',
+      status === 'saved' && 'text-green-600'
+    )}>
+      {status === 'saving' && (
+        <>
+          <Loader2 className="w-3 h-3 animate-spin" />
+          Saving...
+        </>
+      )}
+      {status === 'saved' && (
+        <>
+          <Check className="w-3 h-3" />
+          Saved
+        </>
+      )}
+    </span>
   );
 }
 
