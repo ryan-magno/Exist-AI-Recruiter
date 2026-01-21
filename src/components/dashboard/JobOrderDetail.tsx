@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, Briefcase, Edit, XCircle, Sparkles, Loader2, RefreshCw, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Building } from 'lucide-react';
+import { Calendar, Briefcase, Edit, XCircle, Sparkles, RefreshCw, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/context/AppContext';
 import { JobOrder, joStatusLabels, levelLabels, employmentTypeLabels } from '@/data/mockData';
@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useNavigate } from 'react-router-dom';
+import { EditJobOrderModal } from '@/components/modals/EditJobOrderModal';
 
 interface JobOrderDetailProps {
   jobOrder: JobOrder;
@@ -24,9 +25,10 @@ interface JobOrderDetailProps {
 
 export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
   const navigate = useNavigate();
-  const { updateJobOrderStatus, isFindingMatches, setIsFindingMatches, setSelectedJoId, markJoAsFulfilled } = useApp();
+  const { updateJobOrderStatus, updateJobOrder, isFindingMatches, setIsFindingMatches, setSelectedJoId, markJoAsFulfilled } = useApp();
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [showFulfilledDialog, setShowFulfilledDialog] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleClose = () => {
@@ -132,7 +134,12 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
                 Mark Fulfilled
               </Button>
             )}
-            <Button variant="outline" size="sm" className="gap-1.5">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-1.5"
+              onClick={() => setShowEditModal(true)}
+            >
               <Edit className="w-4 h-4" />
               Edit
             </Button>
@@ -213,6 +220,14 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit JO Modal */}
+      <EditJobOrderModal
+        jobOrder={jobOrder}
+        open={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        onSave={(updates) => updateJobOrder(jobOrder.id, updates)}
+      />
     </>
   );
 }

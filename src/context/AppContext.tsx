@@ -19,6 +19,7 @@ interface AppContextType {
   updateCandidateRemarks: (candidateId: string, remarks: string) => void;
   updateCandidateTechNotes: (candidateId: string, notes: string) => void;
   updateJobOrderStatus: (joId: string, status: JobOrder['status']) => void;
+  updateJobOrder: (joId: string, updates: Partial<JobOrder>) => void;
   addJobOrder: (jo: Omit<JobOrder, 'id' | 'joNumber' | 'createdDate' | 'candidateIds' | 'hiredCount'>) => void;
   deleteJobOrder: (joId: string) => void;
   unarchiveJobOrder: (joId: string) => void;
@@ -125,6 +126,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const updateJobOrder = (joId: string, updates: Partial<JobOrder>) => {
+    setJobOrders(prev =>
+      prev.map(jo => (jo.id === joId ? { ...jo, ...updates } : jo))
+    );
+  };
+
   const addJobOrder = (jo: Omit<JobOrder, 'id' | 'joNumber' | 'createdDate' | 'candidateIds' | 'hiredCount'>) => {
     const newJo: JobOrder = {
       ...jo,
@@ -183,6 +190,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateCandidateRemarks,
         updateCandidateTechNotes,
         updateJobOrderStatus,
+        updateJobOrder,
         addJobOrder,
         deleteJobOrder,
         unarchiveJobOrder,

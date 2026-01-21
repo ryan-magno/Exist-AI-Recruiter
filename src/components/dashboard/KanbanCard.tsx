@@ -1,6 +1,7 @@
 import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { GripVertical, Mail } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 import { Candidate } from '@/data/mockData';
 import { cn } from '@/lib/utils';
 
@@ -11,15 +12,14 @@ interface KanbanCardProps {
 }
 
 export function KanbanCard({ candidate, isDragging, onClick }: KanbanCardProps) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, isDragging: isDraggingState } = useDraggable({
     id: candidate.id,
   });
 
-  const style = transform
-    ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-      }
-    : undefined;
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDraggingState ? 0.5 : 1,
+  };
 
   const getScoreClass = (score: number): string => {
     if (score >= 90) return 'match-score-high';
@@ -28,13 +28,11 @@ export function KanbanCard({ candidate, isDragging, onClick }: KanbanCardProps) 
   };
 
   return (
-    <motion.div
+    <div
       ref={setNodeRef}
       style={style}
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        'kanban-card',
+        'kanban-card bg-card border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow',
         isDragging && 'shadow-lg ring-2 ring-primary opacity-90'
       )}
       onClick={onClick}
@@ -43,7 +41,8 @@ export function KanbanCard({ candidate, isDragging, onClick }: KanbanCardProps) 
         <div
           {...listeners}
           {...attributes}
-          className="cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded"
+          className="cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded touch-none"
+          onClick={(e) => e.stopPropagation()}
         >
           <GripVertical className="w-4 h-4 text-muted-foreground" />
         </div>
@@ -59,7 +58,7 @@ export function KanbanCard({ candidate, isDragging, onClick }: KanbanCardProps) 
           </div>
           
           <p className="text-xs text-muted-foreground truncate mb-2">
-            {candidate.experience}
+            {candidate.email}
           </p>
 
           <div className="flex flex-wrap gap-1">
@@ -79,6 +78,6 @@ export function KanbanCard({ candidate, isDragging, onClick }: KanbanCardProps) 
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

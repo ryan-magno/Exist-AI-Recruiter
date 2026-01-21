@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
 import { Level, EmploymentType, departmentOptions, levelLabels, employmentTypeLabels } from '@/data/mockData';
+import { cn } from '@/lib/utils';
 
 export default function CreateJOPage() {
   const navigate = useNavigate();
@@ -25,12 +26,24 @@ export default function CreateJOPage() {
     employmentType: '' as EmploymentType | ''
   });
 
+  const [errors, setErrors] = useState<Record<string, boolean>>({});
+
   const nextJoNumber = `JO-2024-${String(jobOrders.length + 1).padStart(3, '0')}`;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.title || !formData.description || !formData.level || !formData.requiredDate || !formData.department || !formData.employmentType) {
+    const newErrors: Record<string, boolean> = {};
+    if (!formData.title) newErrors.title = true;
+    if (!formData.description) newErrors.description = true;
+    if (!formData.level) newErrors.level = true;
+    if (!formData.requiredDate) newErrors.requiredDate = true;
+    if (!formData.department) newErrors.department = true;
+    if (!formData.employmentType) newErrors.employmentType = true;
+    
+    setErrors(newErrors);
+    
+    if (Object.keys(newErrors).length > 0) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -90,12 +103,16 @@ export default function CreateJOPage() {
             <div className="space-y-1.5">
               <Label className="flex items-center gap-2 text-sm">
                 <Briefcase className="w-4 h-4 text-muted-foreground" />
-                Position Title *
+                Position Title
               </Label>
               <Input
                 placeholder="e.g., Senior Java Developer"
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, title: e.target.value });
+                  if (e.target.value) setErrors(prev => ({ ...prev, title: false }));
+                }}
+                className={cn(errors.title && 'border-destructive focus-visible:ring-destructive')}
               />
             </div>
 
@@ -103,13 +120,16 @@ export default function CreateJOPage() {
             <div className="space-y-1.5">
               <Label className="flex items-center gap-2 text-sm">
                 <Building className="w-4 h-4 text-muted-foreground" />
-                Requesting Department *
+                Requesting Department
               </Label>
               <Select
                 value={formData.department}
-                onValueChange={(value) => setFormData({ ...formData, department: value })}
+                onValueChange={(value) => {
+                  setFormData({ ...formData, department: value });
+                  setErrors(prev => ({ ...prev, department: false }));
+                }}
               >
-                <SelectTrigger>
+                <SelectTrigger className={cn(errors.department && 'border-destructive focus-visible:ring-destructive')}>
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
@@ -122,24 +142,36 @@ export default function CreateJOPage() {
 
             {/* Job Description */}
             <div className="space-y-1.5">
-              <Label className="text-sm">Job Description *</Label>
+              <Label className="text-sm">Job Description</Label>
               <Textarea
                 placeholder="Describe the role, responsibilities, and requirements..."
-                rows={3}
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, description: e.target.value });
+                  if (e.target.value) setErrors(prev => ({ ...prev, description: false }));
+                  // Auto-resize
+                  e.target.style.height = 'auto';
+                  e.target.style.height = e.target.scrollHeight + 'px';
+                }}
+                className={cn(
+                  'min-h-[80px] resize-none overflow-hidden',
+                  errors.description && 'border-destructive focus-visible:ring-destructive'
+                )}
               />
             </div>
 
             {/* Level, Employment Type, Quantity */}
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-sm">Level *</Label>
+                <Label className="text-sm">Level</Label>
                 <Select
                   value={formData.level}
-                  onValueChange={(value) => setFormData({ ...formData, level: value as Level })}
+                  onValueChange={(value) => {
+                    setFormData({ ...formData, level: value as Level });
+                    setErrors(prev => ({ ...prev, level: false }));
+                  }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={cn(errors.level && 'border-destructive focus-visible:ring-destructive')}>
                     <SelectValue placeholder="Select level" />
                   </SelectTrigger>
                   <SelectContent>
@@ -151,12 +183,15 @@ export default function CreateJOPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm">Employment Type *</Label>
+                <Label className="text-sm">Employment Type</Label>
                 <Select
                   value={formData.employmentType}
-                  onValueChange={(value) => setFormData({ ...formData, employmentType: value as EmploymentType })}
+                  onValueChange={(value) => {
+                    setFormData({ ...formData, employmentType: value as EmploymentType });
+                    setErrors(prev => ({ ...prev, employmentType: false }));
+                  }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={cn(errors.employmentType && 'border-destructive focus-visible:ring-destructive')}>
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -170,7 +205,7 @@ export default function CreateJOPage() {
               <div className="space-y-1.5">
                 <Label className="flex items-center gap-2 text-sm">
                   <Users className="w-4 h-4 text-muted-foreground" />
-                  Quantity *
+                  Quantity
                 </Label>
                 <Input
                   type="number"
@@ -185,12 +220,16 @@ export default function CreateJOPage() {
             <div className="space-y-1.5">
               <Label className="flex items-center gap-2 text-sm">
                 <Calendar className="w-4 h-4 text-muted-foreground" />
-                Required Date *
+                Required Date
               </Label>
               <Input
                 type="date"
                 value={formData.requiredDate}
-                onChange={(e) => setFormData({ ...formData, requiredDate: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, requiredDate: e.target.value });
+                  if (e.target.value) setErrors(prev => ({ ...prev, requiredDate: false }));
+                }}
+                className={cn(errors.requiredDate && 'border-destructive focus-visible:ring-destructive')}
               />
             </div>
           </div>
