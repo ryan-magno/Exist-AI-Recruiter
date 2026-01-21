@@ -1,12 +1,12 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Upload, LayoutDashboard, FilePlus, Archive, Users, PanelLeft, PanelLeftClose } from 'lucide-react';
+import { Upload, Briefcase, FilePlus, Archive, Users, PanelLeft, PanelLeftClose } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
 import { Button } from '@/components/ui/button';
 import existLogo from '@/assets/exist-logo.png';
 
 const navItems = [
-  { path: '/dashboard', label: 'Job Orders', icon: LayoutDashboard },
+  { path: '/dashboard', label: 'Job Orders', icon: Briefcase },
   { path: '/create-jo', label: 'Create JO', icon: FilePlus },
   { path: '/archive', label: 'Archive', icon: Archive },
   { path: '/candidates', label: 'Candidates', icon: Users },
@@ -21,7 +21,7 @@ export function Sidebar() {
     <aside 
       className={cn(
         "fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300 z-50",
-        sidebarCollapsed ? "w-16" : "w-64"
+        sidebarCollapsed ? "w-20" : "w-[250px]"
       )}
     >
       {/* Logo */}
