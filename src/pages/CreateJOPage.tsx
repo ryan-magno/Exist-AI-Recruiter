@@ -239,7 +239,11 @@ export default function CreateJOPage() {
             <Button type="button" variant="outline" onClick={() => navigate('/dashboard')}>
               Cancel
             </Button>
-            <Button type="submit" className="gap-2">
+            <Button 
+              type="submit" 
+              className="gap-2"
+              disabled={!formData.title || !formData.description || !formData.level || !formData.requiredDate || !formData.department || !formData.employmentType}
+            >
               <FilePlus className="w-4 h-4" />
               Create Job Order
             </Button>

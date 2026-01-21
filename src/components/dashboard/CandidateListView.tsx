@@ -59,8 +59,8 @@ export function CandidateListView({ candidates }: CandidateListViewProps) {
             <TableRow className="bg-muted/30">
               <TableHead className="w-[70px]">Score</TableHead>
               <TableHead>Candidate</TableHead>
-              <TableHead className="w-[130px]">Status</TableHead>
-              <TableHead className="w-[130px]">Tech Interview</TableHead>
+              <TableHead className="min-w-[160px]">Status</TableHead>
+              <TableHead className="min-w-[140px]">Tech Interview</TableHead>
               <TableHead className="w-[110px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -90,7 +90,7 @@ export function CandidateListView({ candidates }: CandidateListViewProps) {
                     value={candidate.pipelineStatus}
                     onValueChange={(value) => updateCandidatePipelineStatus(candidate.id, value as PipelineStatus)}
                   >
-                    <SelectTrigger className={cn("h-8 text-xs border", pipelineStatusColors[candidate.pipelineStatus])}>
+                    <SelectTrigger className={cn("h-8 text-xs border min-w-[150px]", pipelineStatusColors[candidate.pipelineStatus])}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
