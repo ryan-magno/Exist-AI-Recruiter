@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApp } from '@/context/AppContext';
-import { pipelineStatusLabels, pipelineStatusColors, PipelineStatus, departmentOptions } from '@/data/mockData';
+import { pipelineStatusLabels, pipelineStatusColors, PipelineStatus } from '@/data/mockData';
 import { CandidateModal } from '@/components/modals/CandidateModal';
 import { EmailModal } from '@/components/modals/EmailModal';
 import { cn } from '@/lib/utils';
@@ -33,6 +33,13 @@ export default function CandidatesPage() {
     return jo?.department || 'Unknown';
   };
 
+  // Get job title for a candidate
+  const getJobTitle = (joId?: string) => {
+    if (!joId) return 'Unassigned';
+    const jo = jobOrders.find(j => j.id === joId);
+    return jo?.title || 'Unknown';
+  };
+
   // Sort by score (highest first) and filter
   const filteredCandidates = useMemo(() => {
     return candidates
@@ -52,12 +59,6 @@ export default function CandidatesPage() {
       })
       .sort((a, b) => b.matchScore - a.matchScore);
   }, [candidates, searchQuery, pipelineFilter, departmentFilter, jobOrders]);
-
-  const getJobTitle = (joId?: string) => {
-    if (!joId) return 'Unassigned';
-    const jo = jobOrders.find(j => j.id === joId);
-    return jo?.title || 'Unknown';
-  };
 
   const getScoreClass = (score: number): string => {
     if (score >= 85) return 'bg-emerald-100 text-emerald-800 border-emerald-300';
@@ -199,7 +200,7 @@ export default function CandidatesPage() {
                 <TableRow className="bg-muted/30">
                   <TableHead className="w-[100px]">Score</TableHead>
                   <TableHead>Candidate</TableHead>
-                  <TableHead>Department</TableHead>
+                  <TableHead>Applied For</TableHead>
                   <TableHead className="min-w-[180px]">Status</TableHead>
                   <TableHead className="w-[120px] text-right">Actions</TableHead>
                 </TableRow>

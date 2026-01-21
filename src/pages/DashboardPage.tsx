@@ -1,15 +1,15 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Users, Search, X, Filter } from 'lucide-react';
+import { FileText, Users, Search, X, Filter, Calendar, Clock, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useApp } from '@/context/AppContext';
 import { JobOrderList } from '@/components/dashboard/JobOrderList';
 import { JobOrderDetail } from '@/components/dashboard/JobOrderDetail';
-import { CandidateListView } from '@/components/dashboard/CandidateListView';
+import { DashboardKanban } from '@/components/dashboard/DashboardKanban';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { pipelineStatusLabels, PipelineStatus } from '@/data/mockData';
+import { pipelineStatusLabels, PipelineStatus, departmentOptions } from '@/data/mockData';
 
 export default function DashboardPage() {
   const { selectedJoId, jobOrders, isVectorized, getMatchesForJo } = useApp();
@@ -18,12 +18,50 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
+  // Filter state for job orders
+  const [joDepartmentFilter, setJoDepartmentFilter] = useState<string>('all');
+  const [joAgingFilter, setJoAgingFilter] = useState<string>('all');
+
   const selectedJo = jobOrders.find(jo => jo.id === selectedJoId);
   const matches = selectedJoId ? getMatchesForJo(selectedJoId) : [];
 
-  const activeJobOrders = jobOrders.filter(
-    jo => jo.status !== 'closed' && jo.status !== 'fulfilled'
-  );
+  // Get aging days for a job order
+  const getAgingDays = (createdDate: string): number => {
+    const created = new Date(createdDate);
+    const now = new Date();
+    return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  // Filter active job orders
+  const activeJobOrders = useMemo(() => {
+    return jobOrders.filter(jo => {
+      if (jo.status === 'closed' || jo.status === 'fulfilled') return false;
+      
+      // Department filter
+      if (joDepartmentFilter !== 'all' && jo.department !== joDepartmentFilter) return false;
+      
+      // Aging filter
+      if (joAgingFilter !== 'all') {
+        const days = getAgingDays(jo.createdDate);
+        switch (joAgingFilter) {
+          case 'fresh': // < 7 days
+            if (days >= 7) return false;
+            break;
+          case 'moderate': // 7-14 days
+            if (days < 7 || days > 14) return false;
+            break;
+          case 'aging': // 14-30 days
+            if (days < 14 || days > 30) return false;
+            break;
+          case 'stale': // > 30 days
+            if (days <= 30) return false;
+            break;
+        }
+      }
+      
+      return true;
+    });
+  }, [jobOrders, joDepartmentFilter, joAgingFilter]);
 
   // Filter candidates
   const filteredMatches = useMemo(() => {
@@ -41,17 +79,26 @@ export default function DashboardPage() {
   }, [matches, searchQuery, statusFilter]);
 
   const hasActiveFilters = searchQuery || statusFilter !== 'all';
+  const hasJoFilters = joDepartmentFilter !== 'all' || joAgingFilter !== 'all';
 
   const clearFilters = () => {
     setSearchQuery('');
     setStatusFilter('all');
   };
 
+  const clearJoFilters = () => {
+    setJoDepartmentFilter('all');
+    setJoAgingFilter('all');
+  };
+
+  // Get unique departments from job orders
+  const uniqueDepartments = [...new Set(jobOrders.map(jo => jo.department))];
+
   return (
     <div className="h-screen flex">
       <ResizablePanelGroup direction="horizontal" className="h-full">
         {/* Left Pane: JO List */}
-        <ResizablePanel defaultSize={35} minSize={20} maxSize={50}>
+        <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
           <div className="h-full bg-card overflow-hidden flex flex-col border-r border-border">
             <div className="p-4 flex items-center gap-2 border-b border-border">
               <FileText className="w-5 h-5 text-primary" />
@@ -62,6 +109,48 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
+
+            {/* JO Filters */}
+            <div className="p-3 border-b border-border space-y-2">
+              <div className="flex items-center gap-2">
+                <Building className="w-4 h-4 text-muted-foreground shrink-0" />
+                <Select value={joDepartmentFilter} onValueChange={setJoDepartmentFilter}>
+                  <SelectTrigger className="h-8 text-xs flex-1">
+                    <SelectValue placeholder="Department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {uniqueDepartments.map(dept => (
+                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+                <Select value={joAgingFilter} onValueChange={setJoAgingFilter}>
+                  <SelectTrigger className="h-8 text-xs flex-1">
+                    <SelectValue placeholder="Days Open" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Ages</SelectItem>
+                    <SelectItem value="fresh">Fresh (&lt; 7 days)</SelectItem>
+                    <SelectItem value="moderate">Moderate (7-14 days)</SelectItem>
+                    <SelectItem value="aging">Aging (14-30 days)</SelectItem>
+                    <SelectItem value="stale">Stale (&gt; 30 days)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {hasJoFilters && (
+                <Button variant="ghost" size="sm" onClick={clearJoFilters} className="w-full h-7 text-xs gap-1">
+                  <X className="w-3 h-3" />
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+
             <div className="flex-1 overflow-hidden">
               <JobOrderList jobOrders={activeJobOrders} />
             </div>
@@ -71,7 +160,7 @@ export default function DashboardPage() {
         <ResizableHandle withHandle />
 
         {/* Right Pane: Detail View */}
-        <ResizablePanel defaultSize={65}>
+        <ResizablePanel defaultSize={70}>
           <div className="h-full bg-background overflow-hidden flex flex-col">
             {selectedJo ? (
               <>
@@ -136,7 +225,7 @@ export default function DashboardPage() {
                       <EmptyMatchesState />
                     )
                   ) : (
-                    <CandidateListView candidates={filteredMatches} />
+                    <DashboardKanban candidates={filteredMatches} />
                   )}
                 </div>
               </>
