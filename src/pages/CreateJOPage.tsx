@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FilePlus, Calendar, Hash, Briefcase, Users } from 'lucide-react';
+import { FilePlus, Calendar, Hash, Briefcase, Users, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
+import { Level, EmploymentType, departmentOptions, levelLabels, employmentTypeLabels } from '@/data/mockData';
 
 export default function CreateJOPage() {
   const navigate = useNavigate();
@@ -17,9 +18,11 @@ export default function CreateJOPage() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    level: '' as 'Junior' | 'Mid' | 'Senior' | 'Lead' | '',
+    level: '' as Level | '',
     quantity: 1,
-    requiredDate: ''
+    requiredDate: '',
+    department: '',
+    employmentType: '' as EmploymentType | ''
   });
 
   const nextJoNumber = `JO-2024-${String(jobOrders.length + 1).padStart(3, '0')}`;
@@ -27,7 +30,7 @@ export default function CreateJOPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.title || !formData.description || !formData.level || !formData.requiredDate) {
+    if (!formData.title || !formData.description || !formData.level || !formData.requiredDate || !formData.department || !formData.employmentType) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -35,10 +38,12 @@ export default function CreateJOPage() {
     addJobOrder({
       title: formData.title,
       description: formData.description,
-      level: formData.level as 'Junior' | 'Mid' | 'Senior' | 'Lead',
+      level: formData.level as Level,
       quantity: formData.quantity,
       requiredDate: formData.requiredDate,
-      status: 'draft'
+      status: 'draft',
+      department: formData.department,
+      employmentType: formData.employmentType as EmploymentType
     });
 
     toast.success('Job Order created successfully', {
@@ -49,51 +54,41 @@ export default function CreateJOPage() {
   };
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
+    <div className="p-6 max-w-2xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center">
-              <FilePlus className="w-6 h-6 text-primary" />
+            <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center">
+              <FilePlus className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-foreground">
-                Create Job Order
-              </h1>
-              <p className="text-muted-foreground">
-                Define a new position to start matching candidates
-              </p>
+              <h1 className="text-2xl font-bold text-foreground">Create Job Order</h1>
+              <p className="text-sm text-muted-foreground">Define a new position to start matching candidates</p>
             </div>
           </div>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-card rounded-xl border shadow-sm p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="bg-card rounded-xl border shadow-sm p-5 space-y-4">
             {/* JO Number (Auto) */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2 text-sm">
                 <Hash className="w-4 h-4 text-muted-foreground" />
                 JO Number
               </Label>
-              <Input
-                value={nextJoNumber}
-                disabled
-                className="bg-muted"
-              />
-              <p className="text-xs text-muted-foreground">
-                Auto-generated based on sequence
-              </p>
+              <Input value={nextJoNumber} disabled className="bg-muted" />
+              <p className="text-xs text-muted-foreground">Auto-generated</p>
             </div>
 
             {/* Position Title */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2 text-sm">
                 <Briefcase className="w-4 h-4 text-muted-foreground" />
                 Position Title *
               </Label>
@@ -104,39 +99,76 @@ export default function CreateJOPage() {
               />
             </div>
 
+            {/* Department */}
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2 text-sm">
+                <Building className="w-4 h-4 text-muted-foreground" />
+                Requesting Department *
+              </Label>
+              <Select
+                value={formData.department}
+                onValueChange={(value) => setFormData({ ...formData, department: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departmentOptions.map(dept => (
+                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Job Description */}
-            <div className="space-y-2">
-              <Label>Job Description *</Label>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Job Description *</Label>
               <Textarea
                 placeholder="Describe the role, responsibilities, and requirements..."
-                rows={4}
+                rows={3}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>
 
-            {/* Level and Quantity */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Level *</Label>
+            {/* Level, Employment Type, Quantity */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm">Level *</Label>
                 <Select
                   value={formData.level}
-                  onValueChange={(value) => setFormData({ ...formData, level: value as typeof formData.level })}
+                  onValueChange={(value) => setFormData({ ...formData, level: value as Level })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select level" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Junior">Junior</SelectItem>
-                    <SelectItem value="Mid">Mid</SelectItem>
-                    <SelectItem value="Senior">Senior</SelectItem>
-                    <SelectItem value="Lead">Lead</SelectItem>
+                    {Object.entries(levelLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
+              <div className="space-y-1.5">
+                <Label className="text-sm">Employment Type *</Label>
+                <Select
+                  value={formData.employmentType}
+                  onValueChange={(value) => setFormData({ ...formData, employmentType: value as EmploymentType })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(employmentTypeLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-2 text-sm">
                   <Users className="w-4 h-4 text-muted-foreground" />
                   Quantity *
                 </Label>
@@ -150,8 +182,8 @@ export default function CreateJOPage() {
             </div>
 
             {/* Required Date */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2 text-sm">
                 <Calendar className="w-4 h-4 text-muted-foreground" />
                 Required Date *
               </Label>
@@ -165,11 +197,7 @@ export default function CreateJOPage() {
 
           {/* Submit */}
           <div className="flex justify-end gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate('/dashboard')}
-            >
+            <Button type="button" variant="outline" onClick={() => navigate('/dashboard')}>
               Cancel
             </Button>
             <Button type="submit" className="gap-2">

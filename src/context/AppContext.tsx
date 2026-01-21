@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { mockCandidates, mockJobOrders, Candidate, JobOrder, PipelineStatus, ShortlistDecision } from '@/data/mockData';
+import { mockCandidates, mockJobOrders, Candidate, JobOrder, PipelineStatus, TechInterviewResult, EmploymentType, Level } from '@/data/mockData';
 import { toast } from 'sonner';
 
 interface AppContextType {
@@ -14,17 +14,20 @@ interface AppContextType {
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (value: boolean) => void;
   updateCandidatePipelineStatus: (candidateId: string, status: PipelineStatus) => void;
-  updateCandidateShortlistDecision: (candidateId: string, decision: ShortlistDecision) => void;
-  updateCandidateHrNotes: (candidateId: string, notes: string) => void;
+  updateCandidateTechInterviewResult: (candidateId: string, result: TechInterviewResult) => void;
+  updateCandidateWorkingConditions: (candidateId: string, conditions: string) => void;
+  updateCandidateRemarks: (candidateId: string, remarks: string) => void;
   updateCandidateTechNotes: (candidateId: string, notes: string) => void;
   updateJobOrderStatus: (joId: string, status: JobOrder['status']) => void;
   addJobOrder: (jo: Omit<JobOrder, 'id' | 'joNumber' | 'createdDate' | 'candidateIds' | 'hiredCount'>) => void;
   deleteJobOrder: (joId: string) => void;
   unarchiveJobOrder: (joId: string) => void;
+  deleteCandidate: (candidateId: string) => void;
   getMatchesForJo: (joId: string) => Candidate[];
   getAllCandidates: () => Candidate[];
   isFindingMatches: boolean;
   setIsFindingMatches: (value: boolean) => void;
+  markJoAsFulfilled: (joId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -66,12 +69,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (isFulfilled) {
         // Show fulfillment dialog via toast
         toast.success('JO Fulfilled!', {
-          description: `${jo.joNumber} has reached its hiring target. Moving to archive.`,
+          description: `${jo.joNumber} has reached its hiring target (${newHiredCount}/${jo.quantity}). Would you like to close it?`,
           action: {
-            label: 'View Archive',
-            onClick: () => window.location.href = '/archive'
-          }
+            label: 'Close JO',
+            onClick: () => markJoAsFulfilled(joId)
+          },
+          duration: 10000
         });
+      } else {
+        toast.success(`Candidate hired! ${jo.quantity - newHiredCount} more position(s) to fill.`);
       }
       
       return prev.map(j => 
@@ -82,15 +88,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const updateCandidateShortlistDecision = (candidateId: string, decision: ShortlistDecision) => {
+  const markJoAsFulfilled = (joId: string) => {
+    setJobOrders(prev =>
+      prev.map(jo => (jo.id === joId ? { ...jo, status: 'closed' } : jo))
+    );
+    toast.success('Job Order closed and moved to archive');
+  };
+
+  const updateCandidateTechInterviewResult = (candidateId: string, result: TechInterviewResult) => {
     setCandidates(prev =>
-      prev.map(c => (c.id === candidateId ? { ...c, shortlistDecision: decision } : c))
+      prev.map(c => (c.id === candidateId ? { ...c, techInterviewResult: result } : c))
     );
   };
 
-  const updateCandidateHrNotes = (candidateId: string, notes: string) => {
+  const updateCandidateWorkingConditions = (candidateId: string, conditions: string) => {
     setCandidates(prev =>
-      prev.map(c => (c.id === candidateId ? { ...c, hrNotes: notes } : c))
+      prev.map(c => (c.id === candidateId ? { ...c, workingConditions: conditions } : c))
+    );
+  };
+
+  const updateCandidateRemarks = (candidateId: string, remarks: string) => {
+    setCandidates(prev =>
+      prev.map(c => (c.id === candidateId ? { ...c, remarks: remarks } : c))
     );
   };
 
@@ -130,6 +149,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success('Job Order restored to active');
   };
 
+  const deleteCandidate = (candidateId: string) => {
+    setCandidates(prev => prev.filter(c => c.id !== candidateId));
+    toast.success('Candidate removed');
+  };
+
   const getMatchesForJo = (joId: string): Candidate[] => {
     if (!isVectorized) return [];
     return candidates.filter(c => c.assignedJoId === joId);
@@ -154,17 +178,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         sidebarCollapsed,
         setSidebarCollapsed,
         updateCandidatePipelineStatus,
-        updateCandidateShortlistDecision,
-        updateCandidateHrNotes,
+        updateCandidateTechInterviewResult,
+        updateCandidateWorkingConditions,
+        updateCandidateRemarks,
         updateCandidateTechNotes,
         updateJobOrderStatus,
         addJobOrder,
         deleteJobOrder,
         unarchiveJobOrder,
+        deleteCandidate,
         getMatchesForJo,
         getAllCandidates,
         isFindingMatches,
-        setIsFindingMatches
+        setIsFindingMatches,
+        markJoAsFulfilled
       }}
     >
       {children}

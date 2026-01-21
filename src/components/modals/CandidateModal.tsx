@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { X, Mail, Phone, Linkedin, FileText, Sparkles, MessageSquare, ExternalLink, Download, Briefcase, Calendar, DollarSign, User, Check, Loader2, Code } from 'lucide-react';
+import { X, Mail, Phone, Linkedin, FileText, Sparkles, MessageSquare, ExternalLink, Download, Briefcase, Calendar, DollarSign, User, Check, Loader2, Code, GraduationCap, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Candidate, pipelineStatusLabels, pipelineStatusColors, shortlistLabels, shortlistColors, PipelineStatus, ShortlistDecision } from '@/data/mockData';
+import { Candidate, pipelineStatusLabels, pipelineStatusColors, PipelineStatus, techInterviewLabels, techInterviewColors, TechInterviewResult } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { EmailModal } from './EmailModal';
 import { TypewriterText } from '@/components/ui/TypewriterText';
@@ -20,15 +20,18 @@ interface CandidateModalProps {
 }
 
 export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: CandidateModalProps) {
-  const { updateCandidatePipelineStatus, updateCandidateShortlistDecision, updateCandidateHrNotes, updateCandidateTechNotes } = useApp();
+  const { updateCandidatePipelineStatus, updateCandidateTechInterviewResult, updateCandidateWorkingConditions, updateCandidateRemarks, updateCandidateTechNotes } = useApp();
   const [showEmailModal, setShowEmailModal] = useState(false);
-  const [hrNotes, setHrNotes] = useState(candidate?.hrNotes || '');
+  const [workingConditions, setWorkingConditions] = useState(candidate?.workingConditions || '');
+  const [remarks, setRemarks] = useState(candidate?.remarks || '');
   const [techNotes, setTechNotes] = useState(candidate?.techNotes || '');
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [hasPlayedAnimation, setHasPlayedAnimation] = useState(false);
 
   useEffect(() => {
     if (candidate) {
-      setHrNotes(candidate.hrNotes);
+      setWorkingConditions(candidate.workingConditions);
+      setRemarks(candidate.remarks);
       setTechNotes(candidate.techNotes);
       setActiveTab(initialTab);
     }
@@ -36,7 +39,8 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
 
   const handleSaveNotes = () => {
     if (candidate) {
-      updateCandidateHrNotes(candidate.id, hrNotes);
+      updateCandidateWorkingConditions(candidate.id, workingConditions);
+      updateCandidateRemarks(candidate.id, remarks);
       updateCandidateTechNotes(candidate.id, techNotes);
       toast.success('Notes saved');
     }
@@ -53,22 +57,22 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
   return (
     <>
       <Dialog open={!!candidate} onOpenChange={() => onClose()}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader className="flex-shrink-0">
+        <DialogContent className="max-w-3xl h-[85vh] overflow-hidden flex flex-col p-0">
+          <DialogHeader className="flex-shrink-0 p-4 pb-0">
             <div className="flex items-start justify-between">
               <div>
                 <DialogTitle className="text-xl font-bold">{candidate.name}</DialogTitle>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
-                  <a href={`mailto:${candidate.email}`} className="flex items-center gap-1.5 hover:text-primary transition-colors">
-                    <Mail className="w-4 h-4" />
+                <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1.5 flex-wrap">
+                  <a href={`mailto:${candidate.email}`} className="flex items-center gap-1 hover:text-primary transition-colors">
+                    <Mail className="w-3.5 h-3.5" />
                     {candidate.email}
                   </a>
-                  <span className="flex items-center gap-1.5">
-                    <Phone className="w-4 h-4" />
+                  <span className="flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5" />
                     {candidate.phone}
                   </span>
-                  <a href="#" className="flex items-center gap-1.5 hover:text-primary transition-colors">
-                    <Linkedin className="w-4 h-4" />
+                  <a href="#" className="flex items-center gap-1 hover:text-primary transition-colors">
+                    <Linkedin className="w-3.5 h-3.5" />
                     LinkedIn
                     <ExternalLink className="w-3 h-3" />
                   </a>
@@ -81,15 +85,15 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
             </div>
           </DialogHeader>
 
-          {/* Status Dropdowns */}
-          <div className="flex items-center gap-4 py-4 border-b">
-            <div className="flex-1">
-              <label className="text-xs text-muted-foreground mb-1 block">Pipeline Status</label>
+          {/* Status Row */}
+          <div className="flex items-center gap-3 px-4 py-3 border-b flex-wrap">
+            <div className="flex-1 min-w-[140px]">
+              <label className="text-xs text-muted-foreground mb-1 block">Status</label>
               <Select
                 value={candidate.pipelineStatus}
                 onValueChange={(value) => updateCandidatePipelineStatus(candidate.id, value as PipelineStatus)}
               >
-                <SelectTrigger className={cn("w-full", pipelineStatusColors[candidate.pipelineStatus])}>
+                <SelectTrigger className={cn("h-9 text-sm border", pipelineStatusColors[candidate.pipelineStatus])}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -99,17 +103,17 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex-1">
-              <label className="text-xs text-muted-foreground mb-1 block">Shortlist Decision</label>
+            <div className="flex-1 min-w-[140px]">
+              <label className="text-xs text-muted-foreground mb-1 block">Tech Interview</label>
               <Select
-                value={candidate.shortlistDecision}
-                onValueChange={(value) => updateCandidateShortlistDecision(candidate.id, value as ShortlistDecision)}
+                value={candidate.techInterviewResult}
+                onValueChange={(value) => updateCandidateTechInterviewResult(candidate.id, value as TechInterviewResult)}
               >
-                <SelectTrigger className={cn("w-full", shortlistColors[candidate.shortlistDecision])}>
+                <SelectTrigger className={cn("h-9 text-sm border", techInterviewColors[candidate.techInterviewResult])}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(shortlistLabels).map(([value, label]) => (
+                  {Object.entries(techInterviewLabels).map(([value, label]) => (
                     <SelectItem key={value} value={value}>{label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -122,39 +126,46 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
-              <TabsTrigger value="profile" className="gap-2">
+            <TabsList className="grid w-full grid-cols-4 flex-shrink-0 mx-4 mt-2" style={{width: 'calc(100% - 32px)'}}>
+              <TabsTrigger value="profile" className="gap-1.5 text-sm">
                 <User className="w-4 h-4" />
                 Profile
               </TabsTrigger>
-              <TabsTrigger value="analysis" className="gap-2">
+              <TabsTrigger value="analysis" className="gap-1.5 text-sm">
                 <Sparkles className="w-4 h-4" />
                 Match Intelligence
               </TabsTrigger>
-              <TabsTrigger value="notes" className="gap-2">
+              <TabsTrigger value="notes" className="gap-1.5 text-sm">
                 <MessageSquare className="w-4 h-4" />
                 Notes
               </TabsTrigger>
-              <TabsTrigger value="cv" className="gap-2">
+              <TabsTrigger value="cv" className="gap-1.5 text-sm">
                 <FileText className="w-4 h-4" />
                 CV Preview
               </TabsTrigger>
             </TabsList>
 
-            <div className="flex-1 overflow-auto mt-4">
+            <div className="flex-1 overflow-auto p-4">
               <TabsContent value="profile" className="m-0 h-full">
                 <ProfileTab candidate={candidate} />
               </TabsContent>
 
-              <TabsContent value="analysis" className="m-0">
-                <MatchAnalysis candidate={candidate} isActive={activeTab === 'analysis'} />
+              <TabsContent value="analysis" className="m-0 h-full">
+                <MatchAnalysis 
+                  candidate={candidate} 
+                  isActive={activeTab === 'analysis'} 
+                  hasPlayed={hasPlayedAnimation}
+                  onAnimationComplete={() => setHasPlayedAnimation(true)}
+                />
               </TabsContent>
 
-              <TabsContent value="notes" className="m-0">
+              <TabsContent value="notes" className="m-0 h-full">
                 <NotesTab 
-                  hrNotes={hrNotes}
+                  workingConditions={workingConditions}
+                  remarks={remarks}
                   techNotes={techNotes}
-                  onHrNotesChange={setHrNotes}
+                  onWorkingConditionsChange={setWorkingConditions}
+                  onRemarksChange={setRemarks}
                   onTechNotesChange={setTechNotes}
                   onSave={handleSaveNotes}
                 />
@@ -179,56 +190,74 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
 
 function ProfileTab({ candidate }: { candidate: Candidate }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Info Grid */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-muted/30 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+          <div className="flex items-center gap-2 text-slate-600 mb-1">
             <Briefcase className="w-4 h-4" />
-            <span className="text-xs">Employment Type</span>
+            <span className="text-xs font-medium">Employment Type</span>
           </div>
-          <p className="font-medium text-foreground">{candidate.employmentType}</p>
+          <p className="font-semibold text-foreground">{candidate.employmentType}</p>
         </div>
-        <div className="bg-muted/30 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+          <div className="flex items-center gap-2 text-slate-600 mb-1">
             <User className="w-4 h-4" />
-            <span className="text-xs">Position Applied</span>
+            <span className="text-xs font-medium">Position Applied</span>
           </div>
-          <p className="font-medium text-foreground">{candidate.positionApplied}</p>
+          <p className="font-semibold text-foreground">{candidate.positionApplied}</p>
         </div>
-        <div className="bg-muted/30 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+          <div className="flex items-center gap-2 text-slate-600 mb-1">
             <DollarSign className="w-4 h-4" />
-            <span className="text-xs">Expected Salary</span>
+            <span className="text-xs font-medium">Expected Salary</span>
           </div>
-          <p className="font-medium text-foreground">{candidate.expectedSalary}</p>
+          <p className="font-semibold text-foreground">{candidate.expectedSalary}</p>
         </div>
-        <div className="bg-muted/30 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+          <div className="flex items-center gap-2 text-slate-600 mb-1">
             <Calendar className="w-4 h-4" />
-            <span className="text-xs">Earliest Start Date</span>
+            <span className="text-xs font-medium">Earliest Start Date</span>
           </div>
-          <p className="font-medium text-foreground">{new Date(candidate.earliestStartDate).toLocaleDateString()}</p>
+          <p className="font-semibold text-foreground">{new Date(candidate.earliestStartDate).toLocaleDateString()}</p>
+        </div>
+      </div>
+
+      {/* Education & Work Experience */}
+      <div className="grid grid-cols-1 gap-3">
+        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+          <div className="flex items-center gap-2 text-blue-700 mb-1">
+            <GraduationCap className="w-4 h-4" />
+            <span className="text-xs font-medium">Educational Background</span>
+          </div>
+          <p className="font-medium text-foreground">{candidate.educationalBackground}</p>
+        </div>
+        <div className="bg-violet-50 rounded-lg p-3 border border-violet-200">
+          <div className="flex items-center gap-2 text-violet-700 mb-1">
+            <Clock className="w-4 h-4" />
+            <span className="text-xs font-medium">Relevant Work Experience</span>
+          </div>
+          <p className="font-medium text-foreground">{candidate.relevantWorkExperience}</p>
         </div>
       </div>
 
       {/* Current Occupation */}
-      <div className="bg-muted/30 rounded-lg p-4">
-        <div className="flex items-center gap-2 text-muted-foreground mb-1">
+      <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+        <div className="flex items-center gap-2 text-slate-600 mb-1">
           <Briefcase className="w-4 h-4" />
-          <span className="text-xs">Current Occupation</span>
+          <span className="text-xs font-medium">Current Occupation</span>
         </div>
-        <p className="font-medium text-foreground">{candidate.currentOccupation}</p>
+        <p className="font-semibold text-foreground">{candidate.currentOccupation}</p>
       </div>
 
       {/* Experience */}
       <div>
-        <h4 className="font-medium text-foreground mb-3">Experience</h4>
-        <div className="bg-accent/30 rounded-lg p-4">
-          <p className="text-foreground font-medium mb-2">
+        <h4 className="font-semibold text-foreground mb-2 text-sm">Experience Details</h4>
+        <div className="bg-emerald-50 rounded-lg p-3 border-l-4 border-emerald-500">
+          <p className="text-foreground font-semibold mb-1">
             Total: {candidate.experienceDetails.totalYears} years
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-slate-700">
             {candidate.experienceDetails.breakdown}
           </p>
         </div>
@@ -236,12 +265,12 @@ function ProfileTab({ candidate }: { candidate: Candidate }) {
 
       {/* Skills */}
       <div>
-        <h4 className="font-medium text-foreground mb-3">Skills</h4>
+        <h4 className="font-semibold text-foreground mb-2 text-sm">Key Skills</h4>
         <div className="flex flex-wrap gap-2">
-          {candidate.skills.map((skill) => (
+          {candidate.keySkills.map((skill) => (
             <span
               key={skill}
-              className="px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm font-medium"
+              className="px-3 py-1.5 bg-primary/15 text-primary rounded-full text-sm font-medium border border-primary/30"
             >
               {skill}
             </span>
@@ -252,55 +281,60 @@ function ProfileTab({ candidate }: { candidate: Candidate }) {
   );
 }
 
-function MatchAnalysis({ candidate, isActive }: { candidate: Candidate; isActive: boolean }) {
-  const [showContent, setShowContent] = useState(false);
+function MatchAnalysis({ candidate, isActive, hasPlayed, onAnimationComplete }: { candidate: Candidate; isActive: boolean; hasPlayed: boolean; onAnimationComplete: () => void }) {
+  const [showContent, setShowContent] = useState(hasPlayed);
 
   useEffect(() => {
-    if (isActive) {
+    if (isActive && !hasPlayed) {
       setShowContent(false);
-      const timer = setTimeout(() => setShowContent(true), 100);
+      const timer = setTimeout(() => {
+        setShowContent(true);
+        onAnimationComplete();
+      }, 100);
       return () => clearTimeout(timer);
     }
-  }, [isActive]);
+  }, [isActive, hasPlayed, onAnimationComplete]);
+
+  const shouldAnimate = isActive && !hasPlayed;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Match Score */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-3">
         <Sparkles className="w-5 h-5 text-primary" />
         <h3 className="font-semibold text-foreground">AI Match Intelligence</h3>
-        <span className="status-badge match-score-high font-semibold">
+        <span className="px-2.5 py-1 rounded-full text-sm font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
           {candidate.matchScore}% Match
         </span>
       </div>
 
       {/* Overall Summary */}
-      <div className="bg-accent/30 rounded-xl p-6">
-        <h4 className="font-medium text-foreground mb-3">Overall Summary</h4>
-        {showContent && isActive ? (
+      <div className="bg-sky-50 rounded-xl p-4 border border-sky-200">
+        <h4 className="font-semibold text-sky-800 mb-2">Overall Summary</h4>
+        {shouldAnimate && showContent ? (
           <TypewriterText text={candidate.matchAnalysis.summary} delay={0} speed={15} />
         ) : (
-          <p className="text-foreground">{candidate.matchAnalysis.summary}</p>
+          <p className="text-slate-700">{candidate.matchAnalysis.summary}</p>
         )}
       </div>
 
       {/* Strengths */}
       <div>
-        <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-primary" />
+        <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
           Strengths
         </h4>
-        <div className="space-y-2">
+        <div className="space-y-2 bg-emerald-50 rounded-lg p-3 border border-emerald-200">
           {candidate.matchAnalysis.strengths.map((strength, index) => (
             <motion.div
               key={index}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 }}
-              className="flex items-start gap-2 text-foreground"
+              className="flex items-start gap-2 text-slate-700"
             >
-              <span className="text-primary mt-1">✓</span>
-              {showContent && isActive ? (
+              <span className="text-emerald-600 mt-0.5">✓</span>
+              {shouldAnimate && showContent ? (
                 <TypewriterText text={strength} delay={800 + index * 400} speed={20} />
               ) : (
                 <span>{strength}</span>
@@ -312,21 +346,21 @@ function MatchAnalysis({ candidate, isActive }: { candidate: Candidate; isActive
 
       {/* Weaknesses */}
       <div>
-        <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-amber-500" />
+        <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
           Areas to Consider
         </h4>
-        <div className="space-y-2">
+        <div className="space-y-2 bg-amber-50 rounded-lg p-3 border border-amber-200">
           {candidate.matchAnalysis.weaknesses.map((weakness, index) => (
             <motion.div
               key={index}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: (candidate.matchAnalysis.strengths.length + index) * 0.1 }}
-              className="flex items-start gap-2 text-foreground"
+              className="flex items-start gap-2 text-slate-700"
             >
-              <span className="text-amber-500 mt-1">△</span>
-              {showContent && isActive ? (
+              <span className="text-amber-600 mt-0.5">△</span>
+              {shouldAnimate && showContent ? (
                 <TypewriterText text={weakness} delay={800 + (candidate.matchAnalysis.strengths.length + index) * 400} speed={20} />
               ) : (
                 <span>{weakness}</span>
@@ -340,94 +374,85 @@ function MatchAnalysis({ candidate, isActive }: { candidate: Candidate; isActive
 }
 
 function NotesTab({ 
-  hrNotes, 
+  workingConditions, 
+  remarks, 
   techNotes, 
-  onHrNotesChange, 
+  onWorkingConditionsChange, 
+  onRemarksChange,
   onTechNotesChange,
   onSave 
 }: { 
-  hrNotes: string; 
-  techNotes: string; 
-  onHrNotesChange: (notes: string) => void;
+  workingConditions: string; 
+  remarks: string; 
+  techNotes: string;
+  onWorkingConditionsChange: (notes: string) => void;
+  onRemarksChange: (notes: string) => void;
   onTechNotesChange: (notes: string) => void;
   onSave: () => void;
 }) {
-  const [hrSaveStatus, setHrSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
-  const [techSaveStatus, setTechSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-  const handleHrChange = (value: string) => {
-    onHrNotesChange(value);
-    setHrSaveStatus('saving');
-    // Auto-save simulation
+  const handleChange = (setter: (v: string) => void) => (value: string) => {
+    setter(value);
+    setSaveStatus('saving');
     setTimeout(() => {
       onSave();
-      setHrSaveStatus('saved');
-      setTimeout(() => setHrSaveStatus('idle'), 2000);
-    }, 1000);
-  };
-
-  const handleTechChange = (value: string) => {
-    onTechNotesChange(value);
-    setTechSaveStatus('saving');
-    // Auto-save simulation
-    setTimeout(() => {
-      onSave();
-      setTechSaveStatus('saved');
-      setTimeout(() => setTechSaveStatus('idle'), 2000);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
     }, 1000);
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       {/* HR Notes Section */}
-      <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <User className="w-4 h-4 text-blue-600" />
-            <label className="font-medium text-foreground">HR Notes</label>
+            <User className="w-4 h-4 text-blue-700" />
+            <label className="font-semibold text-blue-800">HR Notes</label>
           </div>
-          <SaveIndicator status={hrSaveStatus} />
+          <SaveIndicator status={saveStatus} />
         </div>
-        <p className="text-xs text-muted-foreground mb-3">
-          Interview scheduling, compensation discussions, cultural fit observations
-        </p>
-        <Textarea
-          placeholder="Add notes about the candidate's background, interview availability, compensation expectations, benefits discussions, background check status, reference calls..."
-          rows={6}
-          value={hrNotes}
-          onChange={(e) => handleHrChange(e.target.value)}
-          className="resize-none bg-white min-h-[180px]"
-        />
-        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-          <span>{hrNotes.length} / 5000 characters</span>
+        
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-blue-700 mb-1 block">Working Conditions</label>
+            <Textarea
+              placeholder="Preferred working setup, schedule flexibility, location requirements..."
+              rows={3}
+              value={workingConditions}
+              onChange={(e) => handleChange(onWorkingConditionsChange)(e.target.value)}
+              className="resize-none bg-white text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-blue-700 mb-1 block">Remarks</label>
+            <Textarea
+              placeholder="General observations, interview notes, compensation discussions..."
+              rows={3}
+              value={remarks}
+              onChange={(e) => handleChange(onRemarksChange)(e.target.value)}
+              className="resize-none bg-white text-sm"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Divider */}
-      <div className="border-t border-gray-200" />
-
       {/* Technical Notes Section */}
-      <div className="bg-purple-50/50 rounded-xl p-4 border border-purple-100">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-violet-50 rounded-xl p-4 border border-violet-200">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <Code className="w-4 h-4 text-purple-600" />
-            <label className="font-medium text-foreground">Technical Interviewer Notes</label>
+            <Code className="w-4 h-4 text-violet-700" />
+            <label className="font-semibold text-violet-800">Technical Interviewer Notes</label>
           </div>
-          <SaveIndicator status={techSaveStatus} />
         </div>
-        <p className="text-xs text-muted-foreground mb-3">
-          Coding assessment, technical discussions, problem-solving approach
-        </p>
         <Textarea
-          placeholder="Add notes about technical assessment results, coding challenge performance, system design discussions, algorithm knowledge, debugging skills, code quality observations..."
-          rows={6}
+          placeholder="Technical assessment results, coding challenge performance, system design discussions..."
+          rows={4}
           value={techNotes}
-          onChange={(e) => handleTechChange(e.target.value)}
-          className="resize-none bg-white min-h-[180px]"
+          onChange={(e) => handleChange(onTechNotesChange)(e.target.value)}
+          className="resize-none bg-white text-sm"
         />
-        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-          <span>{techNotes.length} / 5000 characters</span>
-        </div>
       </div>
     </div>
   );
@@ -439,8 +464,8 @@ function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' }) {
   return (
     <span className={cn(
       "text-xs flex items-center gap-1 transition-opacity",
-      status === 'saving' && 'text-muted-foreground',
-      status === 'saved' && 'text-green-600'
+      status === 'saving' && 'text-slate-500',
+      status === 'saved' && 'text-emerald-600'
     )}>
       {status === 'saving' && (
         <>
@@ -460,20 +485,20 @@ function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' }) {
 
 function CVPreview({ candidate }: { candidate: Candidate }) {
   return (
-    <div className="bg-muted/30 rounded-xl border-2 border-dashed border-muted p-8 flex flex-col items-center justify-center min-h-[300px]">
-      <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center mb-4">
-        <FileText className="w-8 h-8 text-muted-foreground" />
+    <div className="bg-slate-100 rounded-xl border-2 border-dashed border-slate-300 p-8 flex flex-col items-center justify-center h-full min-h-[300px]">
+      <div className="w-14 h-14 rounded-xl bg-slate-200 flex items-center justify-center mb-3">
+        <FileText className="w-7 h-7 text-slate-500" />
       </div>
-      <h3 className="font-medium text-foreground mb-2">CV Document Preview</h3>
-      <p className="text-sm text-muted-foreground text-center max-w-sm">
+      <h3 className="font-semibold text-foreground mb-1">CV Document Preview</h3>
+      <p className="text-sm text-slate-600 text-center">
         {candidate.name.replace(' ', '_')}_CV.pdf
       </p>
-      <p className="text-xs text-muted-foreground mt-1">
+      <p className="text-xs text-slate-500 mt-1">
         Rendering document preview...
       </p>
-      <div className="mt-4 w-full max-w-md space-y-3">
+      <div className="mt-4 w-full max-w-md space-y-2">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-3 bg-muted rounded animate-pulse" style={{ width: `${100 - i * 15}%` }} />
+          <div key={i} className="h-2.5 bg-slate-200 rounded animate-pulse" style={{ width: `${100 - i * 15}%` }} />
         ))}
       </div>
     </div>
