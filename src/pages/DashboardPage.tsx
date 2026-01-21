@@ -239,42 +239,36 @@ export default function DashboardPage() {
   );
 }
 
-function EmptySelectionState() {
-  return (
-    <div className="flex-1 flex items-center justify-center h-full">
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center">
-        <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-          <FileText className="w-8 h-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-medium text-foreground mb-2">Select a Job Order</h3>
-        <p className="text-muted-foreground text-sm">Choose a job order from the list to view matched candidates.</p>
-      </motion.div>
+const EmptySelectionState = () => (
+  <div className="flex-1 flex items-center justify-center h-full">
+    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center">
+      <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+        <FileText className="w-8 h-8 text-muted-foreground" />
+      </div>
+      <h3 className="text-lg font-medium text-foreground mb-2">Select a Job Order</h3>
+      <p className="text-muted-foreground text-sm">Choose a job order from the list to view matched candidates.</p>
+    </motion.div>
+  </div>
+);
+
+const EmptyVectorizationState = () => (
+  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center h-full text-center">
+    <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
+      <Users className="w-8 h-8 text-muted-foreground" />
     </div>
-  );
-}
+    <h3 className="text-lg font-semibold text-foreground mb-2">No Candidates Yet</h3>
+    <p className="text-muted-foreground text-sm max-w-md">
+      Upload and vectorize candidate CVs to enable AI-powered matching.
+    </p>
+  </motion.div>
+);
 
-function EmptyVectorizationState() {
-  return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center h-full text-center">
-      <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
-        <Users className="w-8 h-8 text-muted-foreground" />
-      </div>
-      <h3 className="text-lg font-semibold text-foreground mb-2">No Candidates Yet</h3>
-      <p className="text-muted-foreground text-sm max-w-md">
-        Upload and vectorize candidate CVs to enable AI-powered matching.
-      </p>
-    </motion.div>
-  );
-}
-
-function EmptyMatchesState() {
-  return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center h-full text-center">
-      <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
-        <Users className="w-8 h-8 text-muted-foreground" />
-      </div>
-      <h3 className="text-lg font-semibold text-foreground mb-2">No Matches Found</h3>
-      <p className="text-muted-foreground text-sm max-w-md">No candidates currently match this job order's requirements.</p>
-    </motion.div>
-  );
-}
+const EmptyMatchesState = () => (
+  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center h-full text-center">
+    <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
+      <Users className="w-8 h-8 text-muted-foreground" />
+    </div>
+    <h3 className="text-lg font-semibold text-foreground mb-2">No Matches Found</h3>
+    <p className="text-muted-foreground text-sm max-w-md">No candidates currently match this job order's requirements.</p>
+  </motion.div>
+);
