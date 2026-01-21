@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, Briefcase, Edit, XCircle, Sparkles, RefreshCw, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Building } from 'lucide-react';
+import { Calendar, Briefcase, Edit, XCircle, Sparkles, RefreshCw, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Building, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/context/AppContext';
 import { JobOrder, joStatusLabels, levelLabels, employmentTypeLabels } from '@/data/mockData';
@@ -31,6 +31,27 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
+  const getAgingDays = (createdDate: string): number => {
+    const created = new Date(createdDate);
+    const now = new Date();
+    return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const getAgingColor = (days: number): string => {
+    if (days <= 7) return 'text-emerald-600';
+    if (days <= 14) return 'text-amber-600';
+    if (days <= 30) return 'text-orange-600';
+    return 'text-red-600';
+  };
+
+  const formatDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
   const handleClose = () => {
     updateJobOrderStatus(jobOrder.id, 'closed');
     setShowCloseDialog(false);
@@ -56,6 +77,8 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
   const descriptionPreview = jobOrder.description.length > 120 
     ? jobOrder.description.slice(0, 120) + '...' 
     : jobOrder.description;
+
+  const agingDays = getAgingDays(jobOrder.createdDate);
 
   return (
     <>
@@ -98,7 +121,19 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
               </div>
               <div className="flex items-center gap-1">
                 <Calendar className="w-4 h-4" />
-                <span>Required by {new Date(jobOrder.requiredDate).toLocaleDateString()}</span>
+                <span>Required by {formatDate(jobOrder.requiredDate)}</span>
+              </div>
+            </div>
+            
+            {/* Created Date and Aging */}
+            <div className="flex items-center gap-4 text-sm mt-2">
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <Calendar className="w-4 h-4" />
+                <span>Created {formatDate(jobOrder.createdDate)}</span>
+              </div>
+              <div className={cn('flex items-center gap-1 font-medium', getAgingColor(agingDays))}>
+                <Clock className="w-4 h-4" />
+                <span>{agingDays} days open</span>
               </div>
             </div>
           </div>

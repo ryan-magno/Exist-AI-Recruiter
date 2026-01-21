@@ -1,17 +1,22 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { List, LayoutGrid, FileText, Users } from 'lucide-react';
+import { FileText, Users, Search, X, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useApp } from '@/context/AppContext';
 import { JobOrderList } from '@/components/dashboard/JobOrderList';
 import { JobOrderDetail } from '@/components/dashboard/JobOrderDetail';
-import { KanbanBoard } from '@/components/dashboard/KanbanBoard';
 import { CandidateListView } from '@/components/dashboard/CandidateListView';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { pipelineStatusLabels, PipelineStatus } from '@/data/mockData';
 
 export default function DashboardPage() {
   const { selectedJoId, jobOrders, isVectorized, getMatchesForJo } = useApp();
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  
+  // Filter state for candidates
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const selectedJo = jobOrders.find(jo => jo.id === selectedJoId);
   const matches = selectedJoId ? getMatchesForJo(selectedJoId) : [];
@@ -20,13 +25,35 @@ export default function DashboardPage() {
     jo => jo.status !== 'closed' && jo.status !== 'fulfilled'
   );
 
+  // Filter candidates
+  const filteredMatches = useMemo(() => {
+    return matches.filter(candidate => {
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch = !searchQuery || 
+        candidate.name.toLowerCase().includes(searchLower) ||
+        candidate.email.toLowerCase().includes(searchLower) ||
+        candidate.skills.some((skill: string) => skill.toLowerCase().includes(searchLower));
+      
+      const matchesStatus = statusFilter === 'all' || candidate.pipelineStatus === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [matches, searchQuery, statusFilter]);
+
+  const hasActiveFilters = searchQuery || statusFilter !== 'all';
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+  };
+
   return (
     <div className="h-screen flex">
       <ResizablePanelGroup direction="horizontal" className="h-full">
         {/* Left Pane: JO List */}
         <ResizablePanel defaultSize={35} minSize={20} maxSize={50}>
-          <div className="h-full bg-card overflow-hidden flex flex-col">
-            <div className="p-4 flex items-center gap-2">
+          <div className="h-full bg-card overflow-hidden flex flex-col border-r border-border">
+            <div className="p-4 flex items-center gap-2 border-b border-border">
               <FileText className="w-5 h-5 text-primary" />
               <div>
                 <h2 className="text-lg font-semibold text-foreground">Job Orders</h2>
@@ -35,7 +62,7 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-hidden">
               <JobOrderList jobOrders={activeJobOrders} />
             </div>
           </div>
@@ -48,46 +75,68 @@ export default function DashboardPage() {
           <div className="h-full bg-background overflow-hidden flex flex-col">
             {selectedJo ? (
               <>
-                <JobOrderDetail jobOrder={selectedJo} matchCount={matches.length} />
+                <JobOrderDetail jobOrder={selectedJo} matchCount={filteredMatches.length} />
                 
-                <div className="px-4 py-2 border-b border-border flex items-center justify-between bg-card/50">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">
-                      {matches.length} Matched Candidates
-                    </span>
+                {/* Candidates Header with Filter */}
+                <div className="px-4 py-3 border-b border-border bg-card/50">
+                  <div className="flex items-center justify-between gap-4 mb-3">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground">
+                        {filteredMatches.length} Matched Candidates
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
-                    <Button
-                      size="sm"
-                      variant={viewMode === 'list' ? 'default' : 'ghost'}
-                      className="gap-1 h-7 text-xs"
-                      onClick={() => setViewMode('list')}
-                    >
-                      <List className="w-3.5 h-3.5" />
-                      List
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={viewMode === 'kanban' ? 'default' : 'ghost'}
-                      className="gap-1 h-7 text-xs"
-                      onClick={() => setViewMode('kanban')}
-                    >
-                      <LayoutGrid className="w-3.5 h-3.5" />
-                      Board
-                    </Button>
+
+                  {/* Filter Controls */}
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-1 max-w-xs">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search candidates..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 h-8 text-sm"
+                      />
+                    </div>
+                    
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[180px] h-8 text-sm">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        {Object.entries(pipelineStatusLabels).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {hasActiveFilters && (
+                      <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 gap-1.5">
+                        <X className="w-3.5 h-3.5" />
+                        Clear
+                      </Button>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex-1 overflow-auto p-4">
                   {!isVectorized ? (
                     <EmptyVectorizationState />
-                  ) : matches.length === 0 ? (
-                    <EmptyMatchesState />
-                  ) : viewMode === 'list' ? (
-                    <CandidateListView candidates={matches} />
+                  ) : filteredMatches.length === 0 ? (
+                    hasActiveFilters ? (
+                      <div className="flex flex-col items-center justify-center h-full text-center">
+                        <Filter className="w-12 h-12 text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-semibold text-foreground mb-2">No candidates match your filters</h3>
+                        <p className="text-muted-foreground text-sm mb-4">Try adjusting your search or status filter</p>
+                        <Button variant="outline" onClick={clearFilters}>Clear Filters</Button>
+                      </div>
+                    ) : (
+                      <EmptyMatchesState />
+                    )
                   ) : (
-                    <KanbanBoard candidates={matches} />
+                    <CandidateListView candidates={filteredMatches} />
                   )}
                 </div>
               </>

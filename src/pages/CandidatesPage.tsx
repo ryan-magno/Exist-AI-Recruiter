@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Mail, MessageSquare, Search, X, Eye, Filter, Trash2 } from 'lucide-react';
+import { Users, Mail, MessageSquare, Search, X, Eye, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApp } from '@/context/AppContext';
-import { pipelineStatusLabels, pipelineStatusColors, PipelineStatus, techInterviewLabels, techInterviewColors, TechInterviewResult } from '@/data/mockData';
+import { pipelineStatusLabels, pipelineStatusColors, PipelineStatus, departmentOptions } from '@/data/mockData';
 import { CandidateModal } from '@/components/modals/CandidateModal';
 import { EmailModal } from '@/components/modals/EmailModal';
 import { cn } from '@/lib/utils';
@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router-dom';
 
 export default function CandidatesPage() {
   const navigate = useNavigate();
-  const { getAllCandidates, updateCandidatePipelineStatus, updateCandidateTechInterviewResult, deleteCandidate, jobOrders, isVectorized, setSelectedJoId } = useApp();
+  const { getAllCandidates, updateCandidatePipelineStatus, jobOrders, isVectorized, setSelectedJoId } = useApp();
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
   const [emailCandidate, setEmailCandidate] = useState<any>(null);
   const [initialTab, setInitialTab] = useState('profile');
@@ -22,9 +22,16 @@ export default function CandidatesPage() {
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [pipelineFilter, setPipelineFilter] = useState<string>('all');
-  const [joFilter, setJoFilter] = useState<string>('all');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   
   const candidates = getAllCandidates();
+
+  // Get department for a candidate based on their assigned JO
+  const getDepartment = (joId?: string) => {
+    if (!joId) return 'Unassigned';
+    const jo = jobOrders.find(j => j.id === joId);
+    return jo?.department || 'Unknown';
+  };
 
   // Sort by score (highest first) and filter
   const filteredCandidates = useMemo(() => {
@@ -37,23 +44,19 @@ export default function CandidatesPage() {
           candidate.skills.some((skill: string) => skill.toLowerCase().includes(searchLower));
         
         const matchesPipeline = pipelineFilter === 'all' || candidate.pipelineStatus === pipelineFilter;
-        const matchesJo = joFilter === 'all' || candidate.assignedJoId === joFilter;
         
-        return matchesSearch && matchesPipeline && matchesJo;
+        const candidateDept = getDepartment(candidate.assignedJoId);
+        const matchesDepartment = departmentFilter === 'all' || candidateDept === departmentFilter;
+        
+        return matchesSearch && matchesPipeline && matchesDepartment;
       })
       .sort((a, b) => b.matchScore - a.matchScore);
-  }, [candidates, searchQuery, pipelineFilter, joFilter]);
+  }, [candidates, searchQuery, pipelineFilter, departmentFilter, jobOrders]);
 
   const getJobTitle = (joId?: string) => {
     if (!joId) return 'Unassigned';
     const jo = jobOrders.find(j => j.id === joId);
     return jo?.title || 'Unknown';
-  };
-
-  const getJoNumber = (joId?: string) => {
-    if (!joId) return '';
-    const jo = jobOrders.find(j => j.id === joId);
-    return jo?.joNumber || '';
   };
 
   const getScoreClass = (score: number): string => {
@@ -80,10 +83,13 @@ export default function CandidatesPage() {
   const clearFilters = () => {
     setSearchQuery('');
     setPipelineFilter('all');
-    setJoFilter('all');
+    setDepartmentFilter('all');
   };
 
-  const hasActiveFilters = searchQuery || pipelineFilter !== 'all' || joFilter !== 'all';
+  const hasActiveFilters = searchQuery || pipelineFilter !== 'all' || departmentFilter !== 'all';
+
+  // Get unique departments from job orders
+  const uniqueDepartments = [...new Set(jobOrders.map(jo => jo.department))];
 
   if (!isVectorized) {
     return (
@@ -138,7 +144,7 @@ export default function CandidatesPage() {
 
             {/* Pipeline Status Filter */}
             <Select value={pipelineFilter} onValueChange={setPipelineFilter}>
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Pipeline Status" />
               </SelectTrigger>
               <SelectContent>
@@ -149,16 +155,15 @@ export default function CandidatesPage() {
               </SelectContent>
             </Select>
 
-
-            {/* Job Order Filter */}
-            <Select value={joFilter} onValueChange={setJoFilter}>
+            {/* Department Filter */}
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Applied For" />
+                <SelectValue placeholder="Department" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Job Orders</SelectItem>
-                {jobOrders.map((jo) => (
-                  <SelectItem key={jo.id} value={jo.id}>{jo.title}</SelectItem>
+                <SelectItem value="all">All Departments</SelectItem>
+                {uniqueDepartments.map((dept) => (
+                  <SelectItem key={dept} value={dept}>{dept}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -194,8 +199,8 @@ export default function CandidatesPage() {
                 <TableRow className="bg-muted/30">
                   <TableHead className="w-[100px]">Score</TableHead>
                   <TableHead>Candidate</TableHead>
-                  <TableHead>Applied For</TableHead>
-                  <TableHead className="w-[160px]">Status</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead className="min-w-[180px]">Status</TableHead>
                   <TableHead className="w-[120px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -225,8 +230,8 @@ export default function CandidatesPage() {
                         className="text-left hover:text-primary transition-colors"
                         onClick={() => candidate.assignedJoId && handleViewJo(candidate.assignedJoId)}
                       >
-                        <p className="text-foreground font-medium">{getJobTitle(candidate.assignedJoId)}</p>
-                        <p className="text-xs text-muted-foreground">{getJoNumber(candidate.assignedJoId)}</p>
+                        <p className="text-foreground font-medium">{getDepartment(candidate.assignedJoId)}</p>
+                        <p className="text-xs text-muted-foreground">{getJobTitle(candidate.assignedJoId)}</p>
                       </button>
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
@@ -234,7 +239,7 @@ export default function CandidatesPage() {
                         value={candidate.pipelineStatus}
                         onValueChange={(value) => updateCandidatePipelineStatus(candidate.id, value as PipelineStatus)}
                       >
-                        <SelectTrigger className={cn("h-8 text-xs", pipelineStatusColors[candidate.pipelineStatus])}>
+                        <SelectTrigger className={cn("h-8 text-xs min-w-[160px]", pipelineStatusColors[candidate.pipelineStatus])}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

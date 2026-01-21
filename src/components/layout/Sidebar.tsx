@@ -49,16 +49,21 @@ export function Sidebar() {
               key={item.path}
               to={item.path}
               className={cn(
-                'flex items-center gap-3 h-10 rounded-lg text-sm font-medium',
+                'flex items-center h-10 rounded-lg text-sm font-medium',
                 'transition-all duration-150 ease-out',
                 'hover:bg-muted',
                 isActive && 'bg-primary/10 text-primary',
                 !isActive && 'text-muted-foreground',
-                isHovered ? 'px-3' : 'px-0 justify-center'
+                isHovered ? 'px-3 gap-3' : 'justify-center'
               )}
               title={!isHovered ? item.label : undefined}
             >
-              <Icon className="w-5 h-5 shrink-0" />
+              <div className={cn(
+                "flex items-center justify-center shrink-0",
+                !isHovered && "w-10 h-10"
+              )}>
+                <Icon className="w-5 h-5" />
+              </div>
               <span className={cn(
                 "whitespace-nowrap transition-opacity duration-100 ease-out",
                 isHovered ? "opacity-100" : "opacity-0 w-0 overflow-hidden"

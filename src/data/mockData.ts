@@ -733,8 +733,8 @@ export const mockJobOrders: JobOrder[] = [
 ];
 
 export const pipelineStatusLabels: Record<PipelineStatus, string> = {
-  'new-match': 'New Match',
-  'hr-interview': 'HR Interview',
+  'new-match': 'For HR Interview',
+  'hr-interview': 'For Tech Interview',
   'tech-interview': 'Tech Interview',
   'offer': 'Offer',
   'hired': 'Hired',
