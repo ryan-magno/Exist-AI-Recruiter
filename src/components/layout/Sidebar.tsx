@@ -19,31 +19,27 @@ export function Sidebar() {
   return (
     <aside 
       className={cn(
-        "fixed left-0 top-0 h-screen bg-card flex flex-col transition-all duration-300 z-50 border-r border-border",
-        isHovered ? "w-56" : "w-16"
+        "fixed left-0 top-0 h-screen bg-card flex flex-col z-50 border-r border-border",
+        "transition-[width] duration-150 ease-out",
+        isHovered ? "w-52" : "w-14"
       )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Logo */}
-      <div className="h-14 flex items-center justify-center px-3 border-b border-border">
-        {isHovered ? (
-          <img 
-            src={existLogo} 
-            alt="Exist Software Labs" 
-            className="h-8 object-contain"
-          />
-        ) : (
-          <img 
-            src={existLogo} 
-            alt="Exist Software Labs" 
-            className="h-6 w-6 object-contain"
-          />
-        )}
+      <div className="h-14 flex items-center justify-center px-2 border-b border-border">
+        <img 
+          src={existLogo} 
+          alt="Exist Software Labs" 
+          className={cn(
+            "object-contain transition-all duration-150 ease-out",
+            isHovered ? "h-7" : "h-6 w-6"
+          )}
+        />
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-2 py-2 space-y-1">
+      <nav className="flex-1 px-2 py-3 space-y-1">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
@@ -53,16 +49,22 @@ export function Sidebar() {
               key={item.path}
               to={item.path}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                'flex items-center gap-3 h-10 rounded-lg text-sm font-medium',
+                'transition-all duration-150 ease-out',
                 'hover:bg-muted',
                 isActive && 'bg-primary/10 text-primary',
                 !isActive && 'text-muted-foreground',
-                !isHovered && 'justify-center px-2'
+                isHovered ? 'px-3' : 'px-0 justify-center'
               )}
               title={!isHovered ? item.label : undefined}
             >
               <Icon className="w-5 h-5 shrink-0" />
-              {isHovered && <span>{item.label}</span>}
+              <span className={cn(
+                "whitespace-nowrap transition-opacity duration-100 ease-out",
+                isHovered ? "opacity-100" : "opacity-0 w-0 overflow-hidden"
+              )}>
+                {item.label}
+              </span>
             </NavLink>
           );
         })}
