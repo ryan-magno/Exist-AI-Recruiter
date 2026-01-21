@@ -1,8 +1,7 @@
+import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Upload, Briefcase, FilePlus, Archive, Users, PanelLeft, PanelLeftClose } from 'lucide-react';
+import { Upload, Briefcase, FilePlus, Archive, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useApp } from '@/context/AppContext';
-import { Button } from '@/components/ui/button';
 import existLogo from '@/assets/exist-logo.png';
 
 const navItems = [
@@ -15,41 +14,32 @@ const navItems = [
 
 export function Sidebar() {
   const location = useLocation();
-  const { sidebarCollapsed, setSidebarCollapsed } = useApp();
+  const [isHovered, setIsHovered] = useState(false);
 
   return (
     <aside 
       className={cn(
-        "fixed left-0 top-0 h-screen bg-card flex flex-col transition-all duration-300 z-50",
-        sidebarCollapsed ? "w-16" : "w-56"
+        "fixed left-0 top-0 h-screen bg-card flex flex-col transition-all duration-300 z-50 border-r border-border",
+        isHovered ? "w-56" : "w-16"
       )}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Logo */}
-      <div className={cn(
-        "p-3 flex items-center",
-        sidebarCollapsed ? "justify-center" : "justify-between"
-      )}>
-        {!sidebarCollapsed && (
-          <div className="flex items-center justify-center flex-1">
-            <img 
-              src={existLogo} 
-              alt="Exist Software Labs" 
-              className="h-8 object-contain"
-            />
-          </div>
+      <div className="h-14 flex items-center justify-center px-3 border-b border-border">
+        {isHovered ? (
+          <img 
+            src={existLogo} 
+            alt="Exist Software Labs" 
+            className="h-8 object-contain"
+          />
+        ) : (
+          <img 
+            src={existLogo} 
+            alt="Exist Software Labs" 
+            className="h-6 w-6 object-contain"
+          />
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="h-8 w-8 shrink-0"
-        >
-          {sidebarCollapsed ? (
-            <PanelLeft className="w-4 h-4" />
-          ) : (
-            <PanelLeftClose className="w-4 h-4" />
-          )}
-        </Button>
       </div>
 
       {/* Navigation */}
@@ -65,14 +55,14 @@ export function Sidebar() {
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
                 'hover:bg-muted',
-                isActive && 'bg-primary/10 text-primary border-l-4 border-primary -ml-0.5 pl-[10px]',
+                isActive && 'bg-primary/10 text-primary',
                 !isActive && 'text-muted-foreground',
-                sidebarCollapsed && 'justify-center px-2'
+                !isHovered && 'justify-center px-2'
               )}
-              title={sidebarCollapsed ? item.label : undefined}
+              title={!isHovered ? item.label : undefined}
             >
               <Icon className="w-5 h-5 shrink-0" />
-              {!sidebarCollapsed && <span>{item.label}</span>}
+              {isHovered && <span>{item.label}</span>}
             </NavLink>
           );
         })}
