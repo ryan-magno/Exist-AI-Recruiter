@@ -11,6 +11,7 @@ export interface Candidate {
   linkedIn: string;
   matchScore: number;
   pipelineStatus: PipelineStatus;
+  statusChangedDate: string; // Date when status was last changed
   techInterviewResult: TechInterviewResult;
   skills: string[];
   experience: string;
@@ -105,6 +106,7 @@ export const mockCandidates: Candidate[] = [
     linkedIn: 'linkedin.com/in/mariasantos',
     matchScore: 98,
     pipelineStatus: 'new-match',
+    statusChangedDate: '2026-01-19',
     techInterviewResult: 'pending',
     skills: ['Java', 'Spring Boot', 'AWS', 'Microservices', 'PostgreSQL'],
     experience: '7 years in enterprise software development',
@@ -150,6 +152,7 @@ export const mockCandidates: Candidate[] = [
     linkedIn: 'linkedin.com/in/johnrodriguez',
     matchScore: 95,
     pipelineStatus: 'hr-interview',
+    statusChangedDate: '2026-01-15',
     techInterviewResult: 'pending',
     skills: ['Java', 'Kotlin', 'AWS', 'Docker', 'Kubernetes'],
     experience: '6 years in software development',
@@ -195,6 +198,7 @@ export const mockCandidates: Candidate[] = [
     linkedIn: 'linkedin.com/in/angelacruz',
     matchScore: 88,
     pipelineStatus: 'new-match',
+    statusChangedDate: '2026-01-20',
     techInterviewResult: 'pending',
     skills: ['Java', 'React', 'Node.js', 'MongoDB'],
     experience: '5 years full-stack development',
@@ -240,6 +244,7 @@ export const mockCandidates: Candidate[] = [
     linkedIn: 'linkedin.com/in/michaeltan',
     matchScore: 96,
     pipelineStatus: 'new-match',
+    statusChangedDate: '2026-01-18',
     techInterviewResult: 'pending',
     skills: ['Selenium', 'Cypress', 'JUnit', 'TestNG', 'API Testing'],
     experience: '5 years in QA automation',
@@ -285,6 +290,7 @@ export const mockCandidates: Candidate[] = [
     linkedIn: 'linkedin.com/in/patriciareyes',
     matchScore: 91,
     pipelineStatus: 'offer',
+    statusChangedDate: '2026-01-13',
     techInterviewResult: 'pass',
     skills: ['Manual Testing', 'Selenium', 'JIRA', 'Agile'],
     experience: '4 years in software testing',
@@ -330,6 +336,7 @@ export const mockCandidates: Candidate[] = [
     linkedIn: 'linkedin.com/in/robertlim',
     matchScore: 94,
     pipelineStatus: 'new-match',
+    statusChangedDate: '2026-01-21',
     techInterviewResult: 'pending',
     skills: ['Project Management', 'Agile', 'Scrum', 'JIRA', 'MS Project'],
     experience: '8 years in IT project management',
@@ -375,6 +382,7 @@ export const mockCandidates: Candidate[] = [
     linkedIn: 'linkedin.com/in/jennifergarcia',
     matchScore: 89,
     pipelineStatus: 'rejected',
+    statusChangedDate: '2026-01-10',
     techInterviewResult: 'fail',
     skills: ['Project Management', 'Scrum', 'Risk Management'],
     experience: '5 years in project coordination',
@@ -420,6 +428,7 @@ export const mockCandidates: Candidate[] = [
     linkedIn: 'linkedin.com/in/davidfernandez',
     matchScore: 72,
     pipelineStatus: 'rejected',
+    statusChangedDate: '2026-01-08',
     techInterviewResult: 'fail',
     skills: ['Java', 'Basic SQL'],
     experience: '2 years junior development',
@@ -465,6 +474,7 @@ export const mockCandidates: Candidate[] = [
     linkedIn: 'linkedin.com/in/sarahvillanueva',
     matchScore: 93,
     pipelineStatus: 'new-match',
+    statusChangedDate: '2026-01-20',
     techInterviewResult: 'pending',
     skills: ['React', 'TypeScript', 'Node.js', 'GraphQL', 'AWS'],
     experience: '6 years in frontend development',
@@ -510,6 +520,7 @@ export const mockCandidates: Candidate[] = [
     linkedIn: 'linkedin.com/in/markaquino',
     matchScore: 87,
     pipelineStatus: 'tech-interview',
+    statusChangedDate: '2026-01-12',
     techInterviewResult: 'pending',
     skills: ['React', 'Vue.js', 'JavaScript', 'CSS', 'Figma'],
     experience: '4 years in web development',
@@ -555,6 +566,7 @@ export const mockCandidates: Candidate[] = [
     linkedIn: 'linkedin.com/in/christinabautista',
     matchScore: 90,
     pipelineStatus: 'new-match',
+    statusChangedDate: '2026-01-17',
     techInterviewResult: 'pending',
     skills: ['Python', 'Machine Learning', 'TensorFlow', 'SQL', 'AWS'],
     experience: '5 years in data science',
@@ -600,6 +612,7 @@ export const mockCandidates: Candidate[] = [
     linkedIn: 'linkedin.com/in/paulomendoza',
     matchScore: 85,
     pipelineStatus: 'new-match',
+    statusChangedDate: '2026-01-17',
     techInterviewResult: 'pending',
     skills: ['Python', 'R', 'Tableau', 'SQL', 'Statistics'],
     experience: '4 years in analytics',
@@ -735,7 +748,7 @@ export const mockJobOrders: JobOrder[] = [
 export const pipelineStatusLabels: Record<PipelineStatus, string> = {
   'new-match': 'For HR Interview',
   'hr-interview': 'For Tech Interview',
-  'tech-interview': 'Tech Interview',
+  'tech-interview': 'For Tech Interview',
   'offer': 'Offer',
   'hired': 'Hired',
   'rejected': 'Rejected'
