@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Calendar, Briefcase, Edit, XCircle, Sparkles, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Calendar, Briefcase, Edit, XCircle, Sparkles, Loader2, RefreshCw, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/context/AppContext';
-import { JobOrder, joStatusLabels } from '@/data/mockData';
+import { JobOrder, joStatusLabels, levelLabels, employmentTypeLabels } from '@/data/mockData';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -24,69 +24,84 @@ interface JobOrderDetailProps {
 
 export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
   const navigate = useNavigate();
-  const { updateJobOrderStatus, isFindingMatches, setIsFindingMatches, setSelectedJoId } = useApp();
+  const { updateJobOrderStatus, isFindingMatches, setIsFindingMatches, setSelectedJoId, markJoAsFulfilled } = useApp();
   const [showCloseDialog, setShowCloseDialog] = useState(false);
+  const [showFulfilledDialog, setShowFulfilledDialog] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleClose = () => {
     updateJobOrderStatus(jobOrder.id, 'closed');
     setShowCloseDialog(false);
     setSelectedJoId(null);
     toast.success(`${jobOrder.title} closed and moved to archive`);
-    
-    // Optional: Navigate to archive after a delay
-    setTimeout(() => {
-      navigate('/archive');
-    }, 2000);
+    setTimeout(() => navigate('/archive'), 2000);
+  };
+
+  const handleMarkFulfilled = () => {
+    markJoAsFulfilled(jobOrder.id);
+    setShowFulfilledDialog(false);
+    setSelectedJoId(null);
+    setTimeout(() => navigate('/archive'), 2000);
   };
 
   const handleFindBestMatch = async () => {
     setIsFindingMatches(true);
-    // Simulate AI re-ranking
     await new Promise(resolve => setTimeout(resolve, 2000));
     setIsFindingMatches(false);
     toast.success('Best matches updated based on latest AI analysis');
   };
 
+  const descriptionPreview = jobOrder.description.length > 120 
+    ? jobOrder.description.slice(0, 120) + '...' 
+    : jobOrder.description;
+
   return (
     <>
-      <div className="p-6 border-b border-border bg-card">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
+      <div className="p-4 border-b border-border bg-card">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="text-sm font-medium text-muted-foreground">
                 {jobOrder.joNumber}
               </span>
               <span className={cn(
-                'status-badge uppercase text-[11px] font-semibold tracking-wide',
-                jobOrder.status === 'in-progress' && 'bg-blue-100 text-blue-700',
-                jobOrder.status === 'fulfilled' && 'bg-primary text-primary-foreground',
-                jobOrder.status === 'draft' && 'bg-muted text-muted-foreground',
-                jobOrder.status === 'closed' && 'bg-gray-100 text-gray-600'
+                'px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide border',
+                jobOrder.status === 'in-progress' && 'bg-sky-100 text-sky-700 border-sky-300',
+                jobOrder.status === 'fulfilled' && 'bg-emerald-100 text-emerald-700 border-emerald-300',
+                jobOrder.status === 'draft' && 'bg-slate-100 text-slate-600 border-slate-300',
+                jobOrder.status === 'closed' && 'bg-slate-100 text-slate-500 border-slate-300'
               )}>
                 {joStatusLabels[jobOrder.status]}
               </span>
               {jobOrder.hiredCount > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  Hired: {jobOrder.hiredCount}/{jobOrder.quantity}
+                <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                  {jobOrder.hiredCount}/{jobOrder.quantity} Hired
                 </span>
               )}
             </div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">
+            <h2 className="text-xl font-bold text-foreground mb-2 truncate">
               {jobOrder.title}
             </h2>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1.5">
-                <Briefcase className="w-4 h-4" />
-                <span>{jobOrder.level}</span>
+            <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
+              <div className="flex items-center gap-1">
+                <Building className="w-4 h-4" />
+                <span>{jobOrder.department}</span>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
+                <Briefcase className="w-4 h-4" />
+                <span>{levelLabels[jobOrder.level]}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs px-1.5 py-0.5 bg-muted rounded">{employmentTypeLabels[jobOrder.employmentType]}</span>
+              </div>
+              <div className="flex items-center gap-1">
                 <Calendar className="w-4 h-4" />
                 <span>Required by {new Date(jobOrder.requiredDate).toLocaleDateString()}</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <Button 
               variant="default" 
               size="sm" 
@@ -106,9 +121,20 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
                 </>
               )}
             </Button>
+            {jobOrder.hiredCount >= jobOrder.quantity && jobOrder.status !== 'fulfilled' && jobOrder.status !== 'closed' && (
+              <Button 
+                variant="default" 
+                size="sm" 
+                className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => setShowFulfilledDialog(true)}
+              >
+                <CheckCircle className="w-4 h-4" />
+                Mark Fulfilled
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="gap-1.5">
               <Edit className="w-4 h-4" />
-              Edit JO
+              Edit
             </Button>
             <Button 
               variant="outline" 
@@ -117,17 +143,32 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
               onClick={() => setShowCloseDialog(true)}
             >
               <XCircle className="w-4 h-4" />
-              Close JO
+              Close
             </Button>
           </div>
         </div>
 
-        <p className="text-muted-foreground mt-4 text-sm leading-relaxed">
-          {jobOrder.description}
-        </p>
+        {/* Description with See More */}
+        <div className="mt-3">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {isExpanded ? jobOrder.description : descriptionPreview}
+          </p>
+          {jobOrder.description.length > 120 && (
+            <button 
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-sm text-primary font-medium flex items-center gap-1 mt-1 hover:underline"
+            >
+              {isExpanded ? (
+                <>Show less <ChevronUp className="w-3 h-3" /></>
+              ) : (
+                <>See more <ChevronDown className="w-3 h-3" /></>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Close JO Confirmation Dialog */}
+      {/* Close JO Dialog */}
       <AlertDialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -137,17 +178,37 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
               </div>
               <AlertDialogTitle>Close Job Order?</AlertDialogTitle>
             </div>
-            <AlertDialogDescription className="text-left">
-              Are you sure you want to close "<strong>{jobOrder.title}</strong>"? This will move it to the archive and stop active recruitment.
+            <AlertDialogDescription>
+              Are you sure you want to close "<strong>{jobOrder.title}</strong>"? This will move it to the archive.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleClose}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={handleClose} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Close JO
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Fulfilled Dialog */}
+      <AlertDialog open={showFulfilledDialog} onOpenChange={setShowFulfilledDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
+              </div>
+              <AlertDialogTitle>Mark as Fulfilled?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              All {jobOrder.quantity} position(s) for "<strong>{jobOrder.title}</strong>" have been filled. Would you like to close this JO and move it to the archive?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Active</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMarkFulfilled} className="bg-emerald-600 hover:bg-emerald-700">
+              Close & Archive
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

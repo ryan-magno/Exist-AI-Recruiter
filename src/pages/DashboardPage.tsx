@@ -24,16 +24,16 @@ export default function DashboardPage() {
     <div className="h-screen flex">
       <ResizablePanelGroup direction="horizontal" className="h-full">
         {/* Left Pane: JO List */}
-        <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
-          <div className="h-full border-r border-border bg-card overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-border">
-              <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-                <FileText className="w-5 h-5 text-primary" />
-                Job Orders
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                {activeJobOrders.length} active orders
-              </p>
+        <ResizablePanel defaultSize={35} minSize={20} maxSize={50}>
+          <div className="h-full bg-card overflow-hidden flex flex-col">
+            <div className="p-4 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Job Orders</h2>
+                <p className="text-xs text-muted-foreground">
+                  {activeJobOrders.length} active
+                </p>
+              </div>
             </div>
             <div className="flex-1 overflow-auto">
               <JobOrderList jobOrders={activeJobOrders} />
@@ -50,36 +50,36 @@ export default function DashboardPage() {
               <>
                 <JobOrderDetail jobOrder={selectedJo} matchCount={matches.length} />
                 
-                <div className="px-6 py-3 border-b border-border flex items-center justify-between bg-card">
+                <div className="px-4 py-2 border-b border-border flex items-center justify-between bg-card/50">
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm font-medium text-foreground">
                       {matches.length} Matched Candidates
                     </span>
                   </div>
-                  <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                  <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
                     <Button
                       size="sm"
                       variant={viewMode === 'list' ? 'default' : 'ghost'}
-                      className="gap-1.5 h-8"
+                      className="gap-1 h-7 text-xs"
                       onClick={() => setViewMode('list')}
                     >
-                      <List className="w-4 h-4" />
+                      <List className="w-3.5 h-3.5" />
                       List
                     </Button>
                     <Button
                       size="sm"
                       variant={viewMode === 'kanban' ? 'default' : 'ghost'}
-                      className="gap-1.5 h-8"
+                      className="gap-1 h-7 text-xs"
                       onClick={() => setViewMode('kanban')}
                     >
-                      <LayoutGrid className="w-4 h-4" />
+                      <LayoutGrid className="w-3.5 h-3.5" />
                       Board
                     </Button>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-auto p-6">
+                <div className="flex-1 overflow-auto p-4">
                   {!isVectorized ? (
                     <EmptyVectorizationState />
                   ) : matches.length === 0 ? (
@@ -103,7 +103,7 @@ export default function DashboardPage() {
 
 function EmptySelectionState() {
   return (
-    <div className="flex-1 flex items-center justify-center">
+    <div className="flex-1 flex items-center justify-center h-full">
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center">
         <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
           <FileText className="w-8 h-8 text-muted-foreground" />
@@ -118,13 +118,12 @@ function EmptySelectionState() {
 function EmptyVectorizationState() {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center h-full text-center">
-      <div className="w-20 h-20 rounded-2xl bg-accent flex items-center justify-center mb-6">
-        <Users className="w-10 h-10 text-primary/50" />
+      <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
+        <Users className="w-8 h-8 text-muted-foreground" />
       </div>
-      <h3 className="text-xl font-semibold text-foreground mb-2">No Candidates Yet</h3>
-      <p className="text-muted-foreground max-w-md">
+      <h3 className="text-lg font-semibold text-foreground mb-2">No Candidates Yet</h3>
+      <p className="text-muted-foreground text-sm max-w-md">
         Upload and vectorize candidate CVs to enable AI-powered matching.
-        Go to <span className="text-primary font-medium">Upload CV</span> to get started.
       </p>
     </motion.div>
   );
@@ -133,11 +132,11 @@ function EmptyVectorizationState() {
 function EmptyMatchesState() {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center h-full text-center">
-      <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mb-6">
-        <Users className="w-10 h-10 text-muted-foreground" />
+      <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
+        <Users className="w-8 h-8 text-muted-foreground" />
       </div>
-      <h3 className="text-xl font-semibold text-foreground mb-2">No Matches Found</h3>
-      <p className="text-muted-foreground max-w-md">No candidates currently match this job order's requirements.</p>
+      <h3 className="text-lg font-semibold text-foreground mb-2">No Matches Found</h3>
+      <p className="text-muted-foreground text-sm max-w-md">No candidates currently match this job order's requirements.</p>
     </motion.div>
   );
 }

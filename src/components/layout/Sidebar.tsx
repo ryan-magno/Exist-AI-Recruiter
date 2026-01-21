@@ -15,18 +15,18 @@ const navItems = [
 
 export function Sidebar() {
   const location = useLocation();
-  const { isVectorized, sidebarCollapsed, setSidebarCollapsed } = useApp();
+  const { sidebarCollapsed, setSidebarCollapsed } = useApp();
 
   return (
     <aside 
       className={cn(
-        "fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300 z-50",
-        sidebarCollapsed ? "w-20" : "w-[250px]"
+        "fixed left-0 top-0 h-screen bg-card flex flex-col transition-all duration-300 z-50",
+        sidebarCollapsed ? "w-16" : "w-56"
       )}
     >
       {/* Logo */}
       <div className={cn(
-        "p-4 border-b border-sidebar-border flex items-center",
+        "p-3 flex items-center",
         sidebarCollapsed ? "justify-center" : "justify-between"
       )}>
         {!sidebarCollapsed && (
@@ -34,7 +34,7 @@ export function Sidebar() {
             <img 
               src={existLogo} 
               alt="Exist Software Labs" 
-              className="h-10 object-contain"
+              className="h-8 object-contain"
             />
           </div>
         )}
@@ -53,7 +53,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-2 space-y-1">
+      <nav className="flex-1 px-2 py-2 space-y-1">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
@@ -63,8 +63,10 @@ export function Sidebar() {
               key={item.path}
               to={item.path}
               className={cn(
-                'sidebar-item',
-                isActive && 'sidebar-item-active',
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                'hover:bg-muted',
+                isActive && 'bg-primary/10 text-primary border-l-4 border-primary -ml-0.5 pl-[10px]',
+                !isActive && 'text-muted-foreground',
                 sidebarCollapsed && 'justify-center px-2'
               )}
               title={sidebarCollapsed ? item.label : undefined}
@@ -75,33 +77,6 @@ export function Sidebar() {
           );
         })}
       </nav>
-
-      {/* Status Indicator */}
-      <div className={cn(
-        "p-2 border-t border-sidebar-border",
-        sidebarCollapsed && "px-1"
-      )}>
-        <div className={cn(
-          "flex items-center gap-3 px-3 py-2 rounded-lg",
-          isVectorized ? "bg-accent" : "bg-muted",
-          sidebarCollapsed && "justify-center px-0"
-        )}>
-          <div className={cn(
-            "w-2 h-2 rounded-full shrink-0",
-            isVectorized ? "bg-primary animate-pulse" : "bg-muted-foreground"
-          )} />
-          {!sidebarCollapsed && (
-            <div>
-              <p className="text-sm font-medium text-sidebar-foreground">
-                {isVectorized ? 'AI Active' : 'Awaiting Data'}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {isVectorized ? 'Candidates matched' : 'Upload CVs to start'}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
     </aside>
   );
 }

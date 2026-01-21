@@ -15,7 +15,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <Sidebar />
       <main className={cn(
         "min-h-screen transition-all duration-300",
-        sidebarCollapsed ? "ml-20" : "ml-[250px]"
+        sidebarCollapsed ? "ml-16" : "ml-56"
       )}>
         {children}
       </main>
