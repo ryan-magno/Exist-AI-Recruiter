@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,8 +15,14 @@ interface EmailModalProps {
 }
 
 export function EmailModal({ open, onClose, candidate }: EmailModalProps) {
-  const [subject, setSubject] = useState(`Interview Invitation for Senior Java Developer Position`);
-  const [body, setBody] = useState(`Dear ${candidate.name},
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+
+  // Update email content when candidate changes
+  useEffect(() => {
+    if (candidate) {
+      setSubject(`Interview Invitation for Senior Java Developer Position`);
+      setBody(`Dear ${candidate.name},
 
 We were impressed with your profile and would like to invite you for an interview for the Senior Java Developer position at our company.
 
@@ -28,13 +34,18 @@ Looking forward to hearing from you.
 
 Best regards,
 HR Team`);
+    }
+  }, [candidate]);
 
   const handleSend = () => {
+    if (!candidate) return;
     toast.success('Email sent successfully', {
       description: `Interview invitation sent to ${candidate.name}`
     });
     onClose();
   };
+
+  if (!candidate) return null;
 
   return (
     <Dialog open={open} onOpenChange={() => onClose()}>
