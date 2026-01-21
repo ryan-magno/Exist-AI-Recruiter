@@ -42,14 +42,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isFindingMatches, setIsFindingMatches] = useState(false);
 
   const updateCandidatePipelineStatus = (candidateId: string, status: PipelineStatus) => {
+    const today = new Date().toISOString().split('T')[0];
+    
     setCandidates(prev => {
+      const candidate = prev.find(c => c.id === candidateId);
+      
+      // Only update statusChangedDate if the status is actually changing
       const updatedCandidates = prev.map(c => 
-        c.id === candidateId ? { ...c, pipelineStatus: status } : c
+        c.id === candidateId 
+          ? { 
+              ...c, 
+              pipelineStatus: status,
+              statusChangedDate: c.pipelineStatus !== status ? today : c.statusChangedDate
+            } 
+          : c
       );
       
       // If marking as hired, update the job order hired count
-      if (status === 'hired') {
-        const candidate = prev.find(c => c.id === candidateId);
+      if (status === 'hired' && candidate?.pipelineStatus !== 'hired') {
         if (candidate?.assignedJoId) {
           handleHiredCandidate(candidate.assignedJoId);
         }
