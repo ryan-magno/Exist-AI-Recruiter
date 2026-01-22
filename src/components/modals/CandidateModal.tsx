@@ -78,15 +78,10 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
                   </a>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleDownloadCV}>
-                  <Download className="w-4 h-4" />
-                  Download CV
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
+              <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={handleDownloadCV}>
+                <Download className="w-4 h-4" />
+                Download CV
+              </Button>
             </div>
           </DialogHeader>
 
@@ -239,6 +234,13 @@ function ProfileTab({ candidate }: { candidate: Candidate }) {
 
       {/* Info Grid */}
       <div className="grid grid-cols-2 gap-3">
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+          <div className="flex items-center gap-2 text-slate-600 mb-1">
+            <Calendar className="w-4 h-4" />
+            <span className="text-xs font-medium">Applied Date</span>
+          </div>
+          <p className="font-semibold text-foreground">{new Date(candidate.appliedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+        </div>
         <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
           <div className="flex items-center gap-2 text-slate-600 mb-1">
             <Briefcase className="w-4 h-4" />

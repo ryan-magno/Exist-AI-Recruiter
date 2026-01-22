@@ -190,20 +190,34 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
 
         {/* Description with See More */}
         <div className="mt-3">
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {isExpanded ? jobOrder.description : descriptionPreview}
-          </p>
-          {jobOrder.description.length > 120 && (
-            <button 
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="text-sm text-primary font-medium flex items-center gap-1 mt-1 hover:underline"
-            >
+          {jobOrder.description.length > 120 ? (
+            <>
               {isExpanded ? (
-                <>Show less <ChevronUp className="w-3 h-3" /></>
+                <div className="max-h-32 overflow-y-auto pr-2">
+                  <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                    {jobOrder.description}
+                  </p>
+                </div>
               ) : (
-                <>See more <ChevronDown className="w-3 h-3" /></>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {descriptionPreview}
+                </p>
               )}
-            </button>
+              <button 
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="text-sm text-primary font-medium flex items-center gap-1 mt-1 hover:underline"
+              >
+                {isExpanded ? (
+                  <>Show less <ChevronUp className="w-3 h-3" /></>
+                ) : (
+                  <>See more <ChevronDown className="w-3 h-3" /></>
+                )}
+              </button>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {jobOrder.description}
+            </p>
           )}
         </div>
       </div>
