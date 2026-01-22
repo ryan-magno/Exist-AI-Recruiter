@@ -155,10 +155,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Right Pane: Detail View */}
-      <div className="flex-1 h-full bg-background overflow-hidden flex flex-col">
+      {/* Right Pane: Detail View - Scrollable */}
+      <div className="flex-1 h-full bg-background overflow-auto">
         {selectedJo ? (
-          <>
+          <div className="min-h-full">
             <JobOrderDetail jobOrder={selectedJo} matchCount={filteredMatches.length} />
             
             {/* Candidates Header with Filter */}
@@ -208,12 +208,12 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto p-4">
+            <div className="p-4">
               {!isVectorized ? (
                 <EmptyVectorizationState />
               ) : filteredMatches.length === 0 ? (
                 hasActiveFilters ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center">
+                  <div className="flex flex-col items-center justify-center py-20 text-center">
                     <Filter className="w-12 h-12 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold text-foreground mb-2">No candidates match your filters</h3>
                     <p className="text-muted-foreground text-sm mb-4">Try adjusting your search or status filter</p>
@@ -226,7 +226,7 @@ export default function DashboardPage() {
                 <DashboardKanban candidates={filteredMatches} />
               )}
             </div>
-          </>
+          </div>
         ) : (
           <EmptySelectionState />
         )}
