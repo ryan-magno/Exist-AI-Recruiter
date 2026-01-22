@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { mockCandidates, mockJobOrders, Candidate, JobOrder, PipelineStatus, TechInterviewResult, EmploymentType, Level } from '@/data/mockData';
+import { mockCandidates, mockJobOrders, Candidate, JobOrder, PipelineStatus, TechInterviewResult, TimelineEntry } from '@/data/mockData';
 import { toast } from 'sonner';
 
 interface AppContextType {
@@ -41,34 +41,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isFindingMatches, setIsFindingMatches] = useState(false);
 
-  const updateCandidatePipelineStatus = (candidateId: string, status: PipelineStatus) => {
-    const today = new Date().toISOString().split('T')[0];
-    
-    setCandidates(prev => {
-      const candidate = prev.find(c => c.id === candidateId);
-      
-      // Only update statusChangedDate if the status is actually changing
-      const updatedCandidates = prev.map(c => 
-        c.id === candidateId 
-          ? { 
-              ...c, 
-              pipelineStatus: status,
-              statusChangedDate: c.pipelineStatus !== status ? today : c.statusChangedDate
-            } 
-          : c
-      );
-      
-      // If marking as hired, update the job order hired count
-      if (status === 'hired' && candidate?.pipelineStatus !== 'hired') {
-        if (candidate?.assignedJoId) {
-          handleHiredCandidate(candidate.assignedJoId);
-        }
-      }
-      
-      return updatedCandidates;
-    });
-  };
-
   const handleHiredCandidate = (joId: string) => {
     setJobOrders(prev => {
       const jo = prev.find(j => j.id === joId);
@@ -78,7 +50,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const isFulfilled = newHiredCount >= jo.quantity;
       
       if (isFulfilled) {
-        // Show fulfillment dialog via toast
         toast.success('JO Fulfilled!', {
           description: `${jo.joNumber} has reached its hiring target (${newHiredCount}/${jo.quantity}). Would you like to close it?`,
           action: {
@@ -96,6 +67,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ? { ...j, hiredCount: newHiredCount, status: isFulfilled ? 'fulfilled' : j.status }
           : j
       );
+    });
+  };
+
+  const updateCandidatePipelineStatus = (candidateId: string, status: PipelineStatus) => {
+    const today = new Date().toISOString().split('T')[0];
+    
+    setCandidates(prev => {
+      const candidate = prev.find(c => c.id === candidateId);
+      
+      if (!candidate || candidate.pipelineStatus === status) {
+        return prev;
+      }
+
+      const previousStatusDate = new Date(candidate.statusChangedDate);
+      const currentDate = new Date(today);
+      const durationDays = Math.floor((currentDate.getTime() - previousStatusDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      const newTimelineEntry: TimelineEntry = {
+        id: `t${candidateId}-${Date.now()}`,
+        fromStatus: candidate.pipelineStatus,
+        toStatus: status,
+        date: today,
+        durationDays
+      };
+
+      const updatedCandidates = prev.map(c => 
+        c.id === candidateId 
+          ? { 
+              ...c, 
+              pipelineStatus: status,
+              statusChangedDate: today,
+              timeline: [...(c.timeline || []), newTimelineEntry]
+            } 
+          : c
+      );
+      
+      if (status === 'hired' && candidate.pipelineStatus !== 'hired') {
+        if (candidate.assignedJoId) {
+          handleHiredCandidate(candidate.assignedJoId);
+        }
+      }
+      
+      return updatedCandidates;
     });
   };
 

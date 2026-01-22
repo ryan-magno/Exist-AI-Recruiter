@@ -1,11 +1,17 @@
 import { motion } from 'framer-motion';
-import { Users, Calendar, Clock } from 'lucide-react';
+import { Users, Calendar, Clock, AlertCircle, Zap, ChevronRight } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { JobOrder } from '@/data/mockData';
 import { cn } from '@/lib/utils';
 
 interface JobOrderListProps {
   jobOrders: JobOrder[];
+}
+
+interface SmartAction {
+  label: string;
+  priority: 'critical' | 'high' | 'tech' | 'closing';
+  icon: typeof AlertCircle;
 }
 
 export function JobOrderList({ jobOrders }: JobOrderListProps) {
@@ -32,34 +38,87 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
     });
   };
 
-  // Get pipeline counts for a job order
-  const getPipelineCounts = (joId: string) => {
+  // Get smart actions for a job order
+  const getSmartActions = (joId: string): SmartAction[] => {
     const matches = getMatchesForJo(joId);
-    const counts = {
-      forHr: 0,
-      forTech: 0,
-      offer: 0,
-      hired: 0
-    };
+    const actions: SmartAction[] = [];
 
-    matches.forEach(candidate => {
-      switch (candidate.pipelineStatus) {
-        case 'new-match':
-          counts.forHr++;
-          break;
-        case 'hr-interview':
-          counts.forTech++;
-          break;
-        case 'offer':
-          counts.offer++;
-          break;
-        case 'hired':
-          counts.hired++;
-          break;
-      }
-    });
+    // Count candidates in each stage
+    const forHrCount = matches.filter(c => c.pipelineStatus === 'new-match').length;
+    const forTechCount = matches.filter(c => c.pipelineStatus === 'hr-interview').length;
+    const offerCount = matches.filter(c => c.pipelineStatus === 'offer').length;
+    const totalActive = matches.filter(c => !['rejected', 'hired'].includes(c.pipelineStatus)).length;
 
-    return counts;
+    // Priority order: Critical (red) > High (orange) > Tech (violet) > Closing (green)
+    
+    // If pipeline is empty -> "Source Candidates" (Red - Critical)
+    if (totalActive === 0) {
+      actions.push({
+        label: 'Source Candidates',
+        priority: 'critical',
+        icon: AlertCircle
+      });
+    }
+
+    // If there are new applicants -> "N for HR Interview" (Orange - High Priority)
+    if (forHrCount > 0) {
+      actions.push({
+        label: `${forHrCount} for HR Interview${forHrCount > 1 ? 's' : ''}`,
+        priority: 'high',
+        icon: Zap
+      });
+    }
+
+    // If candidates are in tech stage -> "N for Tech Interviews" (Violet - Tech)
+    if (forTechCount > 0) {
+      actions.push({
+        label: `${forTechCount} for Tech Interview${forTechCount > 1 ? 's' : ''}`,
+        priority: 'tech',
+        icon: Zap
+      });
+    }
+
+    // If candidates are in offer stage -> "Finalize N Offers" (Green - Closing)
+    if (offerCount > 0) {
+      actions.push({
+        label: `Finalize ${offerCount} Offer${offerCount > 1 ? 's' : ''}`,
+        priority: 'closing',
+        icon: Zap
+      });
+    }
+
+    // Return max 2 actions
+    return actions.slice(0, 2);
+  };
+
+  const getActionStyles = (priority: SmartAction['priority']) => {
+    switch (priority) {
+      case 'critical':
+        return 'bg-red-50 text-red-700 border-red-200';
+      case 'high':
+        return 'bg-orange-50 text-orange-700 border-orange-200';
+      case 'tech':
+        return 'bg-violet-50 text-violet-700 border-violet-200';
+      case 'closing':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      default:
+        return 'bg-muted text-muted-foreground border-border';
+    }
+  };
+
+  const getIconColor = (priority: SmartAction['priority']) => {
+    switch (priority) {
+      case 'critical':
+        return 'text-red-600';
+      case 'high':
+        return 'text-orange-600';
+      case 'tech':
+        return 'text-violet-600';
+      case 'closing':
+        return 'text-emerald-600';
+      default:
+        return 'text-muted-foreground';
+    }
   };
 
   return (
@@ -68,11 +127,7 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
         {jobOrders.map((jo, index) => {
           const agingDays = getAgingDays(jo.createdDate);
           const isSelected = selectedJoId === jo.id;
-          const pipeline = getPipelineCounts(jo.id);
-
-          // Calculate pipeline bar widths
-          const total = pipeline.forHr + pipeline.forTech + pipeline.offer + pipeline.hired;
-          const getWidth = (count: number) => total > 0 ? (count / total) * 100 : 0;
+          const smartActions = getSmartActions(jo.id);
 
           return (
             <motion.div
@@ -118,61 +173,33 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
                 </div>
               </div>
 
-              {/* Pipeline Progress Bar */}
-              {total > 0 && (
-                <>
-                  <div className="flex h-1.5 rounded-full overflow-hidden bg-muted mb-2">
-                    {pipeline.forHr > 0 && (
-                      <div 
-                        className="bg-sky-500 transition-all duration-300" 
-                        style={{ width: `${getWidth(pipeline.forHr)}%` }}
-                      />
-                    )}
-                    {pipeline.forTech > 0 && (
-                      <div 
-                        className="bg-violet-500 transition-all duration-300" 
-                        style={{ width: `${getWidth(pipeline.forTech)}%` }}
-                      />
-                    )}
-                    {pipeline.offer > 0 && (
-                      <div 
-                        className="bg-amber-500 transition-all duration-300" 
-                        style={{ width: `${getWidth(pipeline.offer)}%` }}
-                      />
-                    )}
-                    {pipeline.hired > 0 && (
-                      <div 
-                        className="bg-emerald-500 transition-all duration-300" 
-                        style={{ width: `${getWidth(pipeline.hired)}%` }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Pipeline Labels */}
-                  <div className="flex items-center gap-2 text-[10px] flex-wrap">
-                    <div className="flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
-                      <span className="text-muted-foreground">HR ({pipeline.forHr})</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
-                      <span className="text-muted-foreground">Tech ({pipeline.forTech})</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                      <span className="text-muted-foreground">Offer ({pipeline.offer})</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      <span className="text-muted-foreground">Hired ({pipeline.hired})</span>
-                    </div>
-                  </div>
-                </>
+              {/* Smart Actions */}
+              {smartActions.length > 0 && (
+                <div className="space-y-1.5">
+                  {smartActions.map((action, actionIndex) => {
+                    const ActionIcon = action.icon;
+                    return (
+                      <div
+                        key={actionIndex}
+                        className={cn(
+                          'flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-medium',
+                          getActionStyles(action.priority)
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <ActionIcon className={cn('w-3.5 h-3.5', getIconColor(action.priority))} />
+                          <span>{action.label}</span>
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 opacity-60" />
+                      </div>
+                    );
+                  })}
+                </div>
               )}
 
-              {/* Footer: No Candidates */}
-              {total === 0 && (
-                <p className="text-xs text-muted-foreground">No candidates yet</p>
+              {/* No Actions State */}
+              {smartActions.length === 0 && (
+                <p className="text-xs text-muted-foreground">All actions complete</p>
               )}
             </motion.div>
           );
