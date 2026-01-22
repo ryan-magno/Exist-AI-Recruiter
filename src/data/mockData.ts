@@ -39,6 +39,7 @@ export interface Candidate {
   educationalBackground: string;
   relevantWorkExperience: string;
   keySkills: string[];
+  appliedDate: string; // Date when the candidate applied/submitted CV
 }
 
 export interface JobOrder {
@@ -142,7 +143,8 @@ export const mockCandidates: Candidate[] = [
     assignedJoId: 'jo1',
     educationalBackground: 'BS Computer Science, University of the Philippines Diliman, 2017',
     relevantWorkExperience: '7 years - Enterprise Java Development, Cloud Architecture, Team Leadership',
-    keySkills: ['Java', 'Spring Boot', 'AWS', 'Microservices']
+    keySkills: ['Java', 'Spring Boot', 'AWS', 'Microservices'],
+    appliedDate: '2026-01-10'
   },
   {
     id: 'c2',
@@ -188,7 +190,8 @@ export const mockCandidates: Candidate[] = [
     assignedJoId: 'jo1',
     educationalBackground: 'BS Information Technology, Ateneo de Manila University, 2018',
     relevantWorkExperience: '6 years - Backend Development, Cloud Infrastructure, DevOps',
-    keySkills: ['Java', 'Kotlin', 'Kubernetes', 'Docker']
+    keySkills: ['Java', 'Kotlin', 'Kubernetes', 'Docker'],
+    appliedDate: '2026-01-08'
   },
   {
     id: 'c3',
@@ -234,7 +237,8 @@ export const mockCandidates: Candidate[] = [
     assignedJoId: 'jo1',
     educationalBackground: 'BS Computer Engineering, Mapua University, 2019',
     relevantWorkExperience: '5 years - Full-stack Development, Freelance Projects',
-    keySkills: ['Java', 'React', 'Node.js', 'MongoDB']
+    keySkills: ['Java', 'React', 'Node.js', 'MongoDB'],
+    appliedDate: '2026-01-12'
   },
   {
     id: 'c4',
@@ -280,7 +284,8 @@ export const mockCandidates: Candidate[] = [
     assignedJoId: 'jo2',
     educationalBackground: 'BS Computer Science, De La Salle University, 2019',
     relevantWorkExperience: '5 years - QA Automation, Test Framework Development',
-    keySkills: ['Selenium', 'Cypress', 'API Testing', 'CI/CD']
+    keySkills: ['Selenium', 'Cypress', 'API Testing', 'CI/CD'],
+    appliedDate: '2026-01-05'
   },
   {
     id: 'c5',
@@ -326,7 +331,8 @@ export const mockCandidates: Candidate[] = [
     assignedJoId: 'jo2',
     educationalBackground: 'BS Information Systems, UST, 2020',
     relevantWorkExperience: '4 years - Manual & Automation Testing, Banking Domain',
-    keySkills: ['Selenium', 'Manual Testing', 'JIRA', 'Agile']
+    keySkills: ['Selenium', 'Manual Testing', 'JIRA', 'Agile'],
+    appliedDate: '2026-01-02'
   },
   {
     id: 'c6',
@@ -372,7 +378,8 @@ export const mockCandidates: Candidate[] = [
     assignedJoId: 'jo3',
     educationalBackground: 'MBA, Asian Institute of Management, 2018',
     relevantWorkExperience: '8 years - IT Project Management, Enterprise Implementations',
-    keySkills: ['PMP', 'Agile', 'Scrum', 'Stakeholder Management']
+    keySkills: ['PMP', 'Agile', 'Scrum', 'Stakeholder Management'],
+    appliedDate: '2026-01-06'
   },
   {
     id: 'c7',
@@ -418,7 +425,8 @@ export const mockCandidates: Candidate[] = [
     assignedJoId: 'jo3',
     educationalBackground: 'BS Business Administration, Ateneo de Manila, 2019',
     relevantWorkExperience: '5 years - Project Coordination, Associate PM',
-    keySkills: ['Scrum', 'Risk Management', 'Coordination']
+    keySkills: ['Scrum', 'Risk Management', 'Coordination'],
+    appliedDate: '2025-12-28'
   },
   {
     id: 'c8',
@@ -464,7 +472,8 @@ export const mockCandidates: Candidate[] = [
     assignedJoId: 'jo1',
     educationalBackground: 'BS Computer Science, PUP, 2022',
     relevantWorkExperience: '2 years - Junior Development',
-    keySkills: ['Java', 'SQL']
+    keySkills: ['Java', 'SQL'],
+    appliedDate: '2025-12-20'
   },
   {
     id: 'c9',
@@ -510,7 +519,8 @@ export const mockCandidates: Candidate[] = [
     assignedJoId: 'jo4',
     educationalBackground: 'BS Computer Science, UP Los Baños, 2018',
     relevantWorkExperience: '6 years - Frontend Development, React/TypeScript',
-    keySkills: ['React', 'TypeScript', 'GraphQL', 'Performance']
+    keySkills: ['React', 'TypeScript', 'GraphQL', 'Performance'],
+    appliedDate: '2026-01-14'
   },
   {
     id: 'c10',
@@ -556,7 +566,8 @@ export const mockCandidates: Candidate[] = [
     assignedJoId: 'jo4',
     educationalBackground: 'BS Information Technology, FEU, 2020',
     relevantWorkExperience: '4 years - Frontend Development, UI/UX Implementation',
-    keySkills: ['React', 'Vue.js', 'CSS', 'JavaScript']
+    keySkills: ['React', 'Vue.js', 'CSS', 'JavaScript'],
+    appliedDate: '2026-01-03'
   },
   {
     id: 'c11',
@@ -602,7 +613,8 @@ export const mockCandidates: Candidate[] = [
     assignedJoId: 'jo5',
     educationalBackground: 'PhD Computer Science, UP Diliman, 2021',
     relevantWorkExperience: '5 years - Data Science, Machine Learning Research',
-    keySkills: ['Python', 'TensorFlow', 'AWS SageMaker', 'ML']
+    keySkills: ['Python', 'TensorFlow', 'AWS SageMaker', 'ML'],
+    appliedDate: '2026-01-09'
   },
   {
     id: 'c12',
@@ -648,7 +660,8 @@ export const mockCandidates: Candidate[] = [
     assignedJoId: 'jo5',
     educationalBackground: 'MS Statistics, Ateneo de Manila, 2020',
     relevantWorkExperience: '4 years - Business Analytics, Data Visualization',
-    keySkills: ['Python', 'R', 'Tableau', 'SQL']
+    keySkills: ['Python', 'R', 'Tableau', 'SQL'],
+    appliedDate: '2026-01-11'
   }
 ];
 
