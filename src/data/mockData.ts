@@ -3,6 +3,14 @@ export type TechInterviewResult = 'pending' | 'pass' | 'fail';
 export type EmploymentType = 'full-time' | 'project-based' | 'consultant';
 export type Level = 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
 
+export interface TimelineEntry {
+  id: string;
+  fromStatus: PipelineStatus | 'applied';
+  toStatus: PipelineStatus;
+  date: string;
+  durationDays?: number; // Days spent in the previous status
+}
+
 export interface Candidate {
   id: string;
   name: string;
@@ -40,6 +48,7 @@ export interface Candidate {
   relevantWorkExperience: string;
   keySkills: string[];
   appliedDate: string; // Date when the candidate applied/submitted CV
+  timeline: TimelineEntry[]; // Track all status movements
 }
 
 export interface JobOrder {
@@ -144,7 +153,10 @@ export const mockCandidates: Candidate[] = [
     educationalBackground: 'BS Computer Science, University of the Philippines Diliman, 2017',
     relevantWorkExperience: '7 years - Enterprise Java Development, Cloud Architecture, Team Leadership',
     keySkills: ['Java', 'Spring Boot', 'AWS', 'Microservices'],
-    appliedDate: '2026-01-10'
+    appliedDate: '2026-01-10',
+    timeline: [
+      { id: 't1-1', fromStatus: 'applied', toStatus: 'new-match', date: '2026-01-19', durationDays: 9 }
+    ]
   },
   {
     id: 'c2',
@@ -191,7 +203,11 @@ export const mockCandidates: Candidate[] = [
     educationalBackground: 'BS Information Technology, Ateneo de Manila University, 2018',
     relevantWorkExperience: '6 years - Backend Development, Cloud Infrastructure, DevOps',
     keySkills: ['Java', 'Kotlin', 'Kubernetes', 'Docker'],
-    appliedDate: '2026-01-08'
+    appliedDate: '2026-01-08',
+    timeline: [
+      { id: 't2-1', fromStatus: 'applied', toStatus: 'new-match', date: '2026-01-10', durationDays: 2 },
+      { id: 't2-2', fromStatus: 'new-match', toStatus: 'hr-interview', date: '2026-01-15', durationDays: 5 }
+    ]
   },
   {
     id: 'c3',
@@ -238,7 +254,10 @@ export const mockCandidates: Candidate[] = [
     educationalBackground: 'BS Computer Engineering, Mapua University, 2019',
     relevantWorkExperience: '5 years - Full-stack Development, Freelance Projects',
     keySkills: ['Java', 'React', 'Node.js', 'MongoDB'],
-    appliedDate: '2026-01-12'
+    appliedDate: '2026-01-12',
+    timeline: [
+      { id: 't3-1', fromStatus: 'applied', toStatus: 'new-match', date: '2026-01-20', durationDays: 8 }
+    ]
   },
   {
     id: 'c4',
@@ -285,7 +304,10 @@ export const mockCandidates: Candidate[] = [
     educationalBackground: 'BS Computer Science, De La Salle University, 2019',
     relevantWorkExperience: '5 years - QA Automation, Test Framework Development',
     keySkills: ['Selenium', 'Cypress', 'API Testing', 'CI/CD'],
-    appliedDate: '2026-01-05'
+    appliedDate: '2026-01-05',
+    timeline: [
+      { id: 't4-1', fromStatus: 'applied', toStatus: 'new-match', date: '2026-01-18', durationDays: 13 }
+    ]
   },
   {
     id: 'c5',
@@ -332,7 +354,12 @@ export const mockCandidates: Candidate[] = [
     educationalBackground: 'BS Information Systems, UST, 2020',
     relevantWorkExperience: '4 years - Manual & Automation Testing, Banking Domain',
     keySkills: ['Selenium', 'Manual Testing', 'JIRA', 'Agile'],
-    appliedDate: '2026-01-02'
+    appliedDate: '2026-01-02',
+    timeline: [
+      { id: 't5-1', fromStatus: 'applied', toStatus: 'new-match', date: '2026-01-04', durationDays: 2 },
+      { id: 't5-2', fromStatus: 'new-match', toStatus: 'hr-interview', date: '2026-01-07', durationDays: 3 },
+      { id: 't5-3', fromStatus: 'hr-interview', toStatus: 'offer', date: '2026-01-13', durationDays: 6 }
+    ]
   },
   {
     id: 'c6',
@@ -379,7 +406,10 @@ export const mockCandidates: Candidate[] = [
     educationalBackground: 'MBA, Asian Institute of Management, 2018',
     relevantWorkExperience: '8 years - IT Project Management, Enterprise Implementations',
     keySkills: ['PMP', 'Agile', 'Scrum', 'Stakeholder Management'],
-    appliedDate: '2026-01-06'
+    appliedDate: '2026-01-06',
+    timeline: [
+      { id: 't6-1', fromStatus: 'applied', toStatus: 'new-match', date: '2026-01-21', durationDays: 15 }
+    ]
   },
   {
     id: 'c7',
@@ -426,7 +456,12 @@ export const mockCandidates: Candidate[] = [
     educationalBackground: 'BS Business Administration, Ateneo de Manila, 2019',
     relevantWorkExperience: '5 years - Project Coordination, Associate PM',
     keySkills: ['Scrum', 'Risk Management', 'Coordination'],
-    appliedDate: '2025-12-28'
+    appliedDate: '2025-12-28',
+    timeline: [
+      { id: 't7-1', fromStatus: 'applied', toStatus: 'new-match', date: '2026-01-02', durationDays: 5 },
+      { id: 't7-2', fromStatus: 'new-match', toStatus: 'hr-interview', date: '2026-01-05', durationDays: 3 },
+      { id: 't7-3', fromStatus: 'hr-interview', toStatus: 'rejected', date: '2026-01-10', durationDays: 5 }
+    ]
   },
   {
     id: 'c8',
@@ -473,7 +508,11 @@ export const mockCandidates: Candidate[] = [
     educationalBackground: 'BS Computer Science, PUP, 2022',
     relevantWorkExperience: '2 years - Junior Development',
     keySkills: ['Java', 'SQL'],
-    appliedDate: '2025-12-20'
+    appliedDate: '2025-12-20',
+    timeline: [
+      { id: 't8-1', fromStatus: 'applied', toStatus: 'new-match', date: '2025-12-28', durationDays: 8 },
+      { id: 't8-2', fromStatus: 'new-match', toStatus: 'rejected', date: '2026-01-08', durationDays: 11 }
+    ]
   },
   {
     id: 'c9',
@@ -520,7 +559,10 @@ export const mockCandidates: Candidate[] = [
     educationalBackground: 'BS Computer Science, UP Los Baños, 2018',
     relevantWorkExperience: '6 years - Frontend Development, React/TypeScript',
     keySkills: ['React', 'TypeScript', 'GraphQL', 'Performance'],
-    appliedDate: '2026-01-14'
+    appliedDate: '2026-01-14',
+    timeline: [
+      { id: 't9-1', fromStatus: 'applied', toStatus: 'new-match', date: '2026-01-20', durationDays: 6 }
+    ]
   },
   {
     id: 'c10',
@@ -567,7 +609,11 @@ export const mockCandidates: Candidate[] = [
     educationalBackground: 'BS Information Technology, FEU, 2020',
     relevantWorkExperience: '4 years - Frontend Development, UI/UX Implementation',
     keySkills: ['React', 'Vue.js', 'CSS', 'JavaScript'],
-    appliedDate: '2026-01-03'
+    appliedDate: '2026-01-03',
+    timeline: [
+      { id: 't10-1', fromStatus: 'applied', toStatus: 'new-match', date: '2026-01-06', durationDays: 3 },
+      { id: 't10-2', fromStatus: 'new-match', toStatus: 'hr-interview', date: '2026-01-12', durationDays: 6 }
+    ]
   },
   {
     id: 'c11',
@@ -614,7 +660,10 @@ export const mockCandidates: Candidate[] = [
     educationalBackground: 'PhD Computer Science, UP Diliman, 2021',
     relevantWorkExperience: '5 years - Data Science, Machine Learning Research',
     keySkills: ['Python', 'TensorFlow', 'AWS SageMaker', 'ML'],
-    appliedDate: '2026-01-09'
+    appliedDate: '2026-01-09',
+    timeline: [
+      { id: 't11-1', fromStatus: 'applied', toStatus: 'new-match', date: '2026-01-17', durationDays: 8 }
+    ]
   },
   {
     id: 'c12',
@@ -661,7 +710,10 @@ export const mockCandidates: Candidate[] = [
     educationalBackground: 'MS Statistics, Ateneo de Manila, 2020',
     relevantWorkExperience: '4 years - Business Analytics, Data Visualization',
     keySkills: ['Python', 'R', 'Tableau', 'SQL'],
-    appliedDate: '2026-01-11'
+    appliedDate: '2026-01-11',
+    timeline: [
+      { id: 't12-1', fromStatus: 'applied', toStatus: 'new-match', date: '2026-01-17', durationDays: 6 }
+    ]
   }
 ];
 

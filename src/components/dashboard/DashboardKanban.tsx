@@ -11,13 +11,14 @@ import {
 } from '@dnd-kit/core';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Mail, MessageSquare, Trash2, Clock, Calendar } from 'lucide-react';
+import { GripVertical, Mail, MessageSquare, Trash2, Clock, Calendar, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Candidate, PipelineStatus, pipelineStatusLabels, techInterviewLabels, techInterviewColors, TechInterviewResult } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { CandidateModal } from '@/components/modals/CandidateModal';
 import { EmailModal } from '@/components/modals/EmailModal';
+import { CandidateTimeline } from './CandidateTimeline';
 import { cn } from '@/lib/utils';
 
 interface DashboardKanbanProps {
@@ -68,6 +69,8 @@ interface KanbanCardProps {
   onEmail: (candidate: Candidate) => void;
   onDelete: (id: string) => void;
   onTechInterviewChange: (id: string, result: TechInterviewResult) => void;
+  onToggleTimeline: (id: string) => void;
+  showTimeline: boolean;
 }
 
 function KanbanCard({ 
@@ -77,7 +80,9 @@ function KanbanCard({
   onOpenNotes, 
   onEmail, 
   onDelete,
-  onTechInterviewChange 
+  onTechInterviewChange,
+  onToggleTimeline,
+  showTimeline
 }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging: isDraggingState } = useDraggable({
     id: candidate.id,
@@ -102,83 +107,103 @@ function KanbanCard({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'bg-card border rounded-lg p-3 cursor-pointer hover:shadow-md transition-all',
+        'bg-card border rounded-lg cursor-pointer hover:shadow-md transition-all',
         isDragging && 'shadow-lg ring-2 ring-primary opacity-90'
       )}
-      onClick={() => onOpenProfile(candidate)}
     >
-      {/* Header with drag handle and score */}
-      <div className="flex items-start gap-2 mb-2">
-        <div
-          {...listeners}
-          {...attributes}
-          className="cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded touch-none"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <GripVertical className="w-4 h-4 text-muted-foreground" />
-        </div>
-        
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <p className="font-semibold text-sm text-foreground truncate">
-              {candidate.name}
-            </p>
-            <span className={cn('px-2 py-0.5 rounded-full text-xs font-bold border shrink-0', getScoreClass(candidate.matchScore))}>
-              {candidate.matchScore}%
-            </span>
+      <div className="p-3" onClick={() => onOpenProfile(candidate)}>
+        {/* Header with drag handle and score */}
+        <div className="flex items-start gap-2 mb-2">
+          <div
+            {...listeners}
+            {...attributes}
+            className="cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded touch-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="w-4 h-4 text-muted-foreground" />
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <p className="font-semibold text-sm text-foreground truncate">
+                {candidate.name}
+              </p>
+              <span className={cn('px-2 py-0.5 rounded-full text-xs font-bold border shrink-0', getScoreClass(candidate.matchScore))}>
+                {candidate.matchScore}%
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Stage Aging Indicator */}
-      <div className={cn(
-        'flex items-center justify-between px-2 py-1.5 rounded-md border mb-2 text-xs',
-        getStageAgingColor(agingDays)
-      )}>
-        <div className="flex items-center gap-1">
-          <Clock className="w-3 h-3" />
-          <span>{getStageAgingLabel(agingDays)}</span>
+        {/* Stage Aging Indicator */}
+        <div className={cn(
+          'flex items-center justify-between px-2 py-1.5 rounded-md border mb-2 text-xs',
+          getStageAgingColor(agingDays)
+        )}>
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            <span>{getStageAgingLabel(agingDays)}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            <span>Since {formatStageDate(candidate.statusChangedDate)}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Calendar className="w-3 h-3" />
-          <span>Since {formatStageDate(candidate.statusChangedDate)}</span>
-        </div>
-      </div>
 
-      {/* Tech Interview Status - only show if not in For HR Interview */}
-      {showTechInterview && (
-        <div className="mb-2" onClick={(e) => e.stopPropagation()}>
-          <label className="text-[10px] font-medium text-muted-foreground mb-1 block uppercase tracking-wide">
-            Tech Interview Status
-          </label>
-          <Select
-            value={candidate.techInterviewResult}
-            onValueChange={(value) => onTechInterviewChange(candidate.id, value as TechInterviewResult)}
+        {/* Tech Interview Status - only show if not in For HR Interview */}
+        {showTechInterview && (
+          <div className="mb-2" onClick={(e) => e.stopPropagation()}>
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block uppercase tracking-wide">
+              Tech Interview Status
+            </label>
+            <Select
+              value={candidate.techInterviewResult}
+              onValueChange={(value) => onTechInterviewChange(candidate.id, value as TechInterviewResult)}
+            >
+              <SelectTrigger className={cn("h-7 text-xs border w-full", techInterviewColors[candidate.techInterviewResult])}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(techInterviewLabels).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-1 pt-1 border-t" onClick={(e) => e.stopPropagation()}>
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            className={cn("h-7 w-7", showTimeline && "bg-primary/10 text-primary")} 
+            onClick={() => onToggleTimeline(candidate.id)} 
+            title="View timeline"
           >
-            <SelectTrigger className={cn("h-7 text-xs border w-full", techInterviewColors[candidate.techInterviewResult])}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(techInterviewLabels).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <History className="w-3.5 h-3.5" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEmail(candidate)} title="Send email">
+            <Mail className="w-3.5 h-3.5" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onOpenNotes(candidate)} title="View notes">
+            <MessageSquare className="w-3.5 h-3.5" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(candidate.id)} title="Delete">
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Timeline Section - Expandable */}
+      {showTimeline && (
+        <div className="border-t bg-muted/30">
+          <CandidateTimeline 
+            timeline={candidate.timeline || []} 
+            appliedDate={candidate.appliedDate} 
+          />
         </div>
       )}
-
-      {/* Actions */}
-      <div className="flex items-center justify-end gap-1 pt-1 border-t" onClick={(e) => e.stopPropagation()}>
-        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEmail(candidate)} title="Send email">
-          <Mail className="w-3.5 h-3.5" />
-        </Button>
-        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onOpenNotes(candidate)} title="View notes">
-          <MessageSquare className="w-3.5 h-3.5" />
-        </Button>
-        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(candidate.id)} title="Delete">
-          <Trash2 className="w-3.5 h-3.5" />
-        </Button>
-      </div>
     </div>
   );
 }
@@ -193,9 +218,11 @@ interface KanbanColumnProps {
   onEmail: (candidate: Candidate) => void;
   onDelete: (id: string) => void;
   onTechInterviewChange: (id: string, result: TechInterviewResult) => void;
+  onToggleTimeline: (id: string) => void;
+  expandedTimelineId: string | null;
 }
 
-function KanbanColumn({ id, title, candidates, onOpenProfile, onOpenNotes, onEmail, onDelete, onTechInterviewChange }: KanbanColumnProps) {
+function KanbanColumn({ id, title, candidates, onOpenProfile, onOpenNotes, onEmail, onDelete, onTechInterviewChange, onToggleTimeline, expandedTimelineId }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
@@ -228,6 +255,8 @@ function KanbanColumn({ id, title, candidates, onOpenProfile, onOpenNotes, onEma
               onEmail={onEmail}
               onDelete={onDelete}
               onTechInterviewChange={onTechInterviewChange}
+              onToggleTimeline={onToggleTimeline}
+              showTimeline={expandedTimelineId === candidate.id}
             />
           ))
         )}
@@ -243,6 +272,7 @@ export function DashboardKanban({ candidates }: DashboardKanbanProps) {
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [emailCandidate, setEmailCandidate] = useState<Candidate | null>(null);
   const [initialTab, setInitialTab] = useState<string>('profile');
+  const [expandedTimelineId, setExpandedTimelineId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -281,6 +311,10 @@ export function DashboardKanban({ candidates }: DashboardKanbanProps) {
     setSelectedCandidate(candidate);
   };
 
+  const handleToggleTimeline = (candidateId: string) => {
+    setExpandedTimelineId(prev => prev === candidateId ? null : candidateId);
+  };
+
   const activeCandidate = candidates.find(c => c.id === activeId);
 
   const getCandidatesForColumn = (status: PipelineStatus) => {
@@ -309,6 +343,8 @@ export function DashboardKanban({ candidates }: DashboardKanbanProps) {
               onEmail={setEmailCandidate}
               onDelete={deleteCandidate}
               onTechInterviewChange={updateCandidateTechInterviewResult}
+              onToggleTimeline={handleToggleTimeline}
+              expandedTimelineId={expandedTimelineId}
             />
           ))}
         </div>
