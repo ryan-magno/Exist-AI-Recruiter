@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Mail, Phone, Linkedin, FileText, Sparkles, MessageSquare, ExternalLink, Download, Briefcase, Calendar, DollarSign, User, Check, Loader2, Code, GraduationCap, Clock } from 'lucide-react';
+import { X, Mail, Phone, Linkedin, FileText, Sparkles, MessageSquare, ExternalLink, Download, Briefcase, Calendar, DollarSign, User, Check, Loader2, Code, GraduationCap, Clock, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Candidate, pipelineStatusLabels, pipelineStatusColors, PipelineStatus, techInterviewLabels, techInterviewColors, TechInterviewResult } from '@/data/mockData';
+import { Candidate, pipelineStatusLabels, pipelineStatusColors, PipelineStatus, techInterviewLabels, techInterviewColors, TechInterviewResult, mockJobOrders } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { EmailModal } from './EmailModal';
 import { TypewriterText } from '@/components/ui/TypewriterText';
@@ -59,8 +59,8 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
       <Dialog open={!!candidate} onOpenChange={() => onClose()}>
         <DialogContent className="max-w-3xl h-[85vh] overflow-hidden flex flex-col p-0">
           <DialogHeader className="flex-shrink-0 p-4 pb-0">
-            <div className="flex items-start justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
                 <DialogTitle className="text-xl font-bold">{candidate.name}</DialogTitle>
                 <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1.5 flex-wrap">
                   <a href={`mailto:${candidate.email}`} className="flex items-center gap-1 hover:text-primary transition-colors">
@@ -78,10 +78,15 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
                   </a>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={handleDownloadCV}>
-                <Download className="w-4 h-4" />
-                Download CV
-              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleDownloadCV}>
+                  <Download className="w-4 h-4" />
+                  Download CV
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </DialogHeader>
 
@@ -104,7 +109,7 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
               </Select>
             </div>
             <div className="flex-1 min-w-[140px]">
-              <label className="text-xs text-muted-foreground mb-1 block">Tech Interview</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Tech Interview Status</label>
               <Select
                 value={candidate.techInterviewResult}
                 onValueChange={(value) => updateCandidateTechInterviewResult(candidate.id, value as TechInterviewResult)}
@@ -189,8 +194,49 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
 }
 
 function ProfileTab({ candidate }: { candidate: Candidate }) {
+  // Get positions this candidate could fit based on their skills
+  const getPositionsFitFor = () => {
+    const matchingJobs = mockJobOrders
+      .filter(jo => jo.status === 'in-progress' || jo.status === 'draft')
+      .filter(jo => {
+        // Simple matching based on skills and position applied
+        const positionMatch = candidate.positionApplied.toLowerCase().includes(jo.title.toLowerCase().split(' ')[0]);
+        return positionMatch || jo.candidateIds.includes(candidate.id);
+      })
+      .map(jo => ({
+        title: jo.title,
+        department: jo.department,
+        level: jo.level
+      }));
+    
+    return matchingJobs.length > 0 ? matchingJobs : [{ title: candidate.positionApplied, department: 'N/A', level: 'N/A' }];
+  };
+
+  const positionsFit = getPositionsFitFor();
+
   return (
     <div className="space-y-4">
+      {/* Position/s Fit For */}
+      <div className="bg-primary/5 rounded-xl p-4 border border-primary/20">
+        <div className="flex items-center gap-2 text-primary mb-3">
+          <Target className="w-5 h-5" />
+          <h4 className="font-semibold">Position/s Fit For</h4>
+        </div>
+        <div className="space-y-2">
+          {positionsFit.map((pos, index) => (
+            <div key={index} className="flex items-center justify-between bg-white rounded-lg p-3 border border-primary/10">
+              <div>
+                <p className="font-medium text-foreground">{pos.title}</p>
+                <p className="text-xs text-muted-foreground">{pos.department}</p>
+              </div>
+              {pos.level !== 'N/A' && (
+                <span className="text-xs font-medium px-2 py-1 bg-muted rounded">{pos.level}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Info Grid */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">

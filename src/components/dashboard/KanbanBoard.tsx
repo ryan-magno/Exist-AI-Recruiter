@@ -21,9 +21,8 @@ interface KanbanBoardProps {
 }
 
 const columns: { id: PipelineStatus; title: string }[] = [
-  { id: 'new-match', title: 'New Match' },
-  { id: 'hr-interview', title: 'HR Interview' },
-  { id: 'tech-interview', title: 'Tech Interview' },
+  { id: 'new-match', title: 'For HR Interview' },
+  { id: 'hr-interview', title: 'For Tech Interview' },
   { id: 'offer', title: 'Offer' },
   { id: 'hired', title: 'Hired' },
   { id: 'rejected', title: 'Rejected' },

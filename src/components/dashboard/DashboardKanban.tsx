@@ -11,7 +11,6 @@ import {
 } from '@dnd-kit/core';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { motion } from 'framer-motion';
 import { GripVertical, Mail, MessageSquare, Trash2, Clock, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,12 +24,13 @@ interface DashboardKanbanProps {
   candidates: Candidate[];
 }
 
-// Define visible columns for dashboard (excluding rejected)
+// Define visible columns for dashboard (including rejected)
 const columns: { id: PipelineStatus; title: string }[] = [
   { id: 'new-match', title: 'For HR Interview' },
   { id: 'hr-interview', title: 'For Tech Interview' },
   { id: 'offer', title: 'Offer' },
   { id: 'hired', title: 'Hired' },
+  { id: 'rejected', title: 'Rejected' },
 ];
 
 // Stage aging utility functions
@@ -127,9 +127,6 @@ function KanbanCard({
               {candidate.matchScore}%
             </span>
           </div>
-          <p className="text-xs text-muted-foreground truncate">
-            {candidate.email}
-          </p>
         </div>
       </div>
 
@@ -151,6 +148,9 @@ function KanbanCard({
       {/* Tech Interview Status - only show if not in For HR Interview */}
       {showTechInterview && (
         <div className="mb-2" onClick={(e) => e.stopPropagation()}>
+          <label className="text-[10px] font-medium text-muted-foreground mb-1 block uppercase tracking-wide">
+            Tech Interview Status
+          </label>
           <Select
             value={candidate.techInterviewResult}
             onValueChange={(value) => onTechInterviewChange(candidate.id, value as TechInterviewResult)}
@@ -199,7 +199,7 @@ function KanbanColumn({ id, title, candidates, onOpenProfile, onOpenNotes, onEma
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
-    <div className="flex-shrink-0 w-72">
+    <div className="flex-shrink-0 w-64">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-sm text-foreground">{title}</h3>
         <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
@@ -315,7 +315,7 @@ export function DashboardKanban({ candidates }: DashboardKanbanProps) {
 
         <DragOverlay>
           {activeCandidate ? (
-            <div className="bg-card border rounded-lg p-3 shadow-lg ring-2 ring-primary opacity-90 w-72">
+            <div className="bg-card border rounded-lg p-3 shadow-lg ring-2 ring-primary opacity-90 w-64">
               <div className="flex items-center gap-2">
                 <p className="font-semibold text-sm text-foreground truncate flex-1">
                   {activeCandidate.name}
