@@ -48,7 +48,6 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
           counts.forHr++;
           break;
         case 'hr-interview':
-        case 'tech-interview':
           counts.forTech++;
           break;
         case 'offer':
@@ -65,10 +64,9 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
 
   return (
     <div className="flex flex-col h-full overflow-auto">
-      <div className="p-2 space-y-2">
+      <div className="p-3 space-y-2">
         {jobOrders.map((jo, index) => {
           const agingDays = getAgingDays(jo.createdDate);
-          const matches = getMatchesForJo(jo.id);
           const isSelected = selectedJoId === jo.id;
           const pipeline = getPipelineCounts(jo.id);
 
@@ -84,7 +82,7 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
               transition={{ delay: index * 0.03, duration: 0.2 }}
               onClick={() => setSelectedJoId(jo.id)}
               className={cn(
-                'p-4 cursor-pointer rounded-xl border transition-all duration-150',
+                'p-3 cursor-pointer rounded-xl border transition-all duration-150',
                 isSelected 
                   ? 'bg-primary/5 border-primary shadow-sm' 
                   : 'bg-card border-border hover:border-primary/30 hover:shadow-sm'
@@ -92,10 +90,10 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
             >
               {/* Header: Title & Hired Count */}
               <div className="flex items-start justify-between gap-2 mb-1">
-                <h3 className="font-semibold text-foreground text-sm leading-tight line-clamp-1">
+                <h3 className="font-semibold text-foreground text-sm leading-tight line-clamp-2">
                   {jo.title}
                 </h3>
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-md shrink-0">
+                <div className="flex items-center gap-1 px-2 py-0.5 bg-muted rounded-md shrink-0">
                   <Users className="w-3.5 h-3.5 text-muted-foreground" />
                   <span className="text-xs font-semibold text-foreground">
                     {jo.hiredCount}/{jo.quantity}
@@ -114,7 +112,7 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
                   <Calendar className="w-3 h-3" />
                   <span>{formatDate(jo.createdDate)}</span>
                 </div>
-                <div className={cn('flex items-center gap-1', getAgingColor(agingDays))}>
+                <div className={cn('flex items-center gap-1 font-medium', getAgingColor(agingDays))}>
                   <Clock className="w-3 h-3" />
                   <span>{agingDays}d open</span>
                 </div>
@@ -123,7 +121,7 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
               {/* Pipeline Progress Bar */}
               {total > 0 && (
                 <>
-                  <div className="flex h-2 rounded-full overflow-hidden bg-muted mb-2">
+                  <div className="flex h-1.5 rounded-full overflow-hidden bg-muted mb-2">
                     {pipeline.forHr > 0 && (
                       <div 
                         className="bg-sky-500 transition-all duration-300" 
@@ -151,28 +149,28 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
                   </div>
 
                   {/* Pipeline Labels */}
-                  <div className="flex items-center gap-3 text-[10px]">
+                  <div className="flex items-center gap-2 text-[10px] flex-wrap">
                     <div className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-sky-500" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
                       <span className="text-muted-foreground">HR ({pipeline.forHr})</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-violet-500" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
                       <span className="text-muted-foreground">Tech ({pipeline.forTech})</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                       <span className="text-muted-foreground">Offer ({pipeline.offer})</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                       <span className="text-muted-foreground">Hired ({pipeline.hired})</span>
                     </div>
                   </div>
                 </>
               )}
 
-              {/* Footer: Active Candidates */}
+              {/* Footer: No Candidates */}
               {total === 0 && (
                 <p className="text-xs text-muted-foreground">No candidates yet</p>
               )}

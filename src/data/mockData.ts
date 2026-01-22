@@ -1,4 +1,4 @@
-export type PipelineStatus = 'new-match' | 'hr-interview' | 'tech-interview' | 'offer' | 'hired' | 'rejected';
+export type PipelineStatus = 'new-match' | 'hr-interview' | 'offer' | 'hired' | 'rejected';
 export type TechInterviewResult = 'pending' | 'pass' | 'fail';
 export type EmploymentType = 'full-time' | 'project-based' | 'consultant';
 export type Level = 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
@@ -519,7 +519,7 @@ export const mockCandidates: Candidate[] = [
     phone: '+63 926 012 3456',
     linkedIn: 'linkedin.com/in/markaquino',
     matchScore: 87,
-    pipelineStatus: 'tech-interview',
+    pipelineStatus: 'hr-interview',
     statusChangedDate: '2026-01-12',
     techInterviewResult: 'pending',
     skills: ['React', 'Vue.js', 'JavaScript', 'CSS', 'Figma'],
@@ -748,7 +748,6 @@ export const mockJobOrders: JobOrder[] = [
 export const pipelineStatusLabels: Record<PipelineStatus, string> = {
   'new-match': 'For HR Interview',
   'hr-interview': 'For Tech Interview',
-  'tech-interview': 'For Tech Interview',
   'offer': 'Offer',
   'hired': 'Hired',
   'rejected': 'Rejected'
@@ -757,7 +756,6 @@ export const pipelineStatusLabels: Record<PipelineStatus, string> = {
 export const pipelineStatusColors: Record<PipelineStatus, string> = {
   'new-match': 'bg-sky-100 text-sky-800 border-sky-300',
   'hr-interview': 'bg-violet-100 text-violet-800 border-violet-300',
-  'tech-interview': 'bg-indigo-100 text-indigo-800 border-indigo-300',
   'offer': 'bg-amber-100 text-amber-800 border-amber-300',
   'hired': 'bg-emerald-100 text-emerald-800 border-emerald-300',
   'rejected': 'bg-red-100 text-red-800 border-red-300'

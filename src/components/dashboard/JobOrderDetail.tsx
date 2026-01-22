@@ -98,11 +98,9 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
               )}>
                 {joStatusLabels[jobOrder.status]}
               </span>
-              {jobOrder.hiredCount > 0 && (
-                <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                  {jobOrder.hiredCount}/{jobOrder.quantity} Hired
-                </span>
-              )}
+              <span className="text-sm font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+                {jobOrder.hiredCount}/{jobOrder.quantity} Filled
+              </span>
             </div>
             <h2 className="text-xl font-bold text-foreground mb-2 truncate">
               {jobOrder.title}
