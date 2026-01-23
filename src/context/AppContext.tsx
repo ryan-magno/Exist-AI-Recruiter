@@ -41,7 +41,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isFindingMatches, setIsFindingMatches] = useState(false);
 
-  const handleHiredCandidate = (joId: string) => {
+  const handleHiredCandidate = (joId: string, candidateId: string) => {
+    // Check if this candidate was already counted as hired (to prevent double counting)
+    const candidate = candidates.find(c => c.id === candidateId);
+    if (candidate?.pipelineStatus === 'hired') {
+      return; // Already hired, don't increment again
+    }
+
     setJobOrders(prev => {
       const jo = prev.find(j => j.id === joId);
       if (!jo) return prev;
@@ -105,7 +111,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       
       if (status === 'hired' && candidate.pipelineStatus !== 'hired') {
         if (candidate.assignedJoId) {
-          handleHiredCandidate(candidate.assignedJoId);
+          handleHiredCandidate(candidate.assignedJoId, candidateId);
         }
       }
       

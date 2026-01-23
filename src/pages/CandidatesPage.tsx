@@ -231,8 +231,8 @@ export default function CandidatesPage() {
                         className="text-left hover:text-primary transition-colors"
                         onClick={() => candidate.assignedJoId && handleViewJo(candidate.assignedJoId)}
                       >
-                        <p className="text-foreground font-medium">{getDepartment(candidate.assignedJoId)}</p>
-                        <p className="text-xs text-muted-foreground">{getJobTitle(candidate.assignedJoId)}</p>
+                        <p className="text-foreground font-medium">{getJobTitle(candidate.assignedJoId)}</p>
+                        <p className="text-xs text-muted-foreground">{getDepartment(candidate.assignedJoId)}</p>
                       </button>
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
