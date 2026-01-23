@@ -62,41 +62,29 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
       <Dialog open={!!candidate} onOpenChange={() => onClose()}>
         <DialogContent className="max-w-3xl h-[85vh] overflow-hidden flex flex-col p-0">
           <DialogHeader className="flex-shrink-0 p-4 pb-0">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <DialogTitle className="text-xl font-bold">{currentCandidate.name}</DialogTitle>
-                <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1.5 flex-wrap">
-                  <a href={`mailto:${currentCandidate.email}`} className="flex items-center gap-1 hover:text-primary transition-colors">
-                    <Mail className="w-3.5 h-3.5" />
-                    {currentCandidate.email}
-                  </a>
-                  <span className="flex items-center gap-1">
-                    <Phone className="w-3.5 h-3.5" />
-                    {currentCandidate.phone}
-                  </span>
-                  <a href="#" className="flex items-center gap-1 hover:text-primary transition-colors">
-                    <Linkedin className="w-3.5 h-3.5" />
-                    LinkedIn
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowEmailModal(true)}>
-                  <Mail className="w-4 h-4" />
-                  Email
-                </Button>
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleDownloadCV}>
-                  <Download className="w-4 h-4" />
-                  Download CV
-                </Button>
+            <div className="flex-1 min-w-0">
+              <DialogTitle className="text-xl font-bold">{currentCandidate.name}</DialogTitle>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1.5 flex-wrap">
+                <a href={`mailto:${currentCandidate.email}`} className="flex items-center gap-1 hover:text-primary transition-colors">
+                  <Mail className="w-3.5 h-3.5" />
+                  {currentCandidate.email}
+                </a>
+                <span className="flex items-center gap-1">
+                  <Phone className="w-3.5 h-3.5" />
+                  {currentCandidate.phone}
+                </span>
+                <a href="#" className="flex items-center gap-1 hover:text-primary transition-colors">
+                  <Linkedin className="w-3.5 h-3.5" />
+                  LinkedIn
+                  <ExternalLink className="w-3 h-3" />
+                </a>
               </div>
             </div>
           </DialogHeader>
 
-          {/* Status Row */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b flex-wrap">
-            <div className="flex-1 min-w-[140px]">
+          {/* Status Row with Actions */}
+          <div className="flex items-end gap-3 px-4 py-3 border-b flex-wrap">
+            <div className="min-w-[140px]">
               <label className="text-xs text-muted-foreground mb-1 block">Status</label>
               <Select
                 value={currentCandidate.pipelineStatus}
@@ -112,7 +100,7 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex-1 min-w-[140px]">
+            <div className="min-w-[140px]">
               <label className="text-xs text-muted-foreground mb-1 block">Tech Interview Status</label>
               <Select
                 value={currentCandidate.techInterviewResult}
@@ -127,6 +115,16 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => setShowEmailModal(true)}>
+                <Mail className="w-4 h-4" />
+                Email
+              </Button>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={handleDownloadCV}>
+                <Download className="w-4 h-4" />
+                Download CV
+              </Button>
             </div>
           </div>
 
