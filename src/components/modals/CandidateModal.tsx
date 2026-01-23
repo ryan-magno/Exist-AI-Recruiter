@@ -20,13 +20,16 @@ interface CandidateModalProps {
 }
 
 export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: CandidateModalProps) {
-  const { updateCandidatePipelineStatus, updateCandidateTechInterviewResult, updateCandidateWorkingConditions, updateCandidateRemarks, updateCandidateTechNotes } = useApp();
+  const { updateCandidatePipelineStatus, updateCandidateTechInterviewResult, updateCandidateWorkingConditions, updateCandidateRemarks, updateCandidateTechNotes, candidates } = useApp();
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [workingConditions, setWorkingConditions] = useState(candidate?.workingConditions || '');
   const [remarks, setRemarks] = useState(candidate?.remarks || '');
   const [techNotes, setTechNotes] = useState(candidate?.techNotes || '');
   const [activeTab, setActiveTab] = useState(initialTab);
   const [hasPlayedAnimation, setHasPlayedAnimation] = useState(false);
+
+  // Get the latest candidate data from context to reflect status changes
+  const currentCandidate = candidate ? candidates.find(c => c.id === candidate.id) || candidate : null;
 
   useEffect(() => {
     if (candidate) {
@@ -52,7 +55,7 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
     });
   };
 
-  if (!candidate) return null;
+  if (!currentCandidate) return null;
 
   return (
     <>
@@ -61,15 +64,15 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
           <DialogHeader className="flex-shrink-0 p-4 pb-0">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <DialogTitle className="text-xl font-bold">{candidate.name}</DialogTitle>
+                <DialogTitle className="text-xl font-bold">{currentCandidate.name}</DialogTitle>
                 <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1.5 flex-wrap">
-                  <a href={`mailto:${candidate.email}`} className="flex items-center gap-1 hover:text-primary transition-colors">
+                  <a href={`mailto:${currentCandidate.email}`} className="flex items-center gap-1 hover:text-primary transition-colors">
                     <Mail className="w-3.5 h-3.5" />
-                    {candidate.email}
+                    {currentCandidate.email}
                   </a>
                   <span className="flex items-center gap-1">
                     <Phone className="w-3.5 h-3.5" />
-                    {candidate.phone}
+                    {currentCandidate.phone}
                   </span>
                   <a href="#" className="flex items-center gap-1 hover:text-primary transition-colors">
                     <Linkedin className="w-3.5 h-3.5" />
@@ -78,10 +81,16 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
                   </a>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={handleDownloadCV}>
-                <Download className="w-4 h-4" />
-                Download CV
-              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowEmailModal(true)}>
+                  <Mail className="w-4 h-4" />
+                  Email
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleDownloadCV}>
+                  <Download className="w-4 h-4" />
+                  Download CV
+                </Button>
+              </div>
             </div>
           </DialogHeader>
 
@@ -90,10 +99,10 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
             <div className="flex-1 min-w-[140px]">
               <label className="text-xs text-muted-foreground mb-1 block">Status</label>
               <Select
-                value={candidate.pipelineStatus}
-                onValueChange={(value) => updateCandidatePipelineStatus(candidate.id, value as PipelineStatus)}
+                value={currentCandidate.pipelineStatus}
+                onValueChange={(value) => updateCandidatePipelineStatus(currentCandidate.id, value as PipelineStatus)}
               >
-                <SelectTrigger className={cn("h-9 text-sm border", pipelineStatusColors[candidate.pipelineStatus])}>
+                <SelectTrigger className={cn("h-9 text-sm border", pipelineStatusColors[currentCandidate.pipelineStatus])}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -106,10 +115,10 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
             <div className="flex-1 min-w-[140px]">
               <label className="text-xs text-muted-foreground mb-1 block">Tech Interview Status</label>
               <Select
-                value={candidate.techInterviewResult}
-                onValueChange={(value) => updateCandidateTechInterviewResult(candidate.id, value as TechInterviewResult)}
+                value={currentCandidate.techInterviewResult}
+                onValueChange={(value) => updateCandidateTechInterviewResult(currentCandidate.id, value as TechInterviewResult)}
               >
-                <SelectTrigger className={cn("h-9 text-sm border", techInterviewColors[candidate.techInterviewResult])}>
+                <SelectTrigger className={cn("h-9 text-sm border", techInterviewColors[currentCandidate.techInterviewResult])}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -119,10 +128,6 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" className="gap-2 self-end" onClick={() => setShowEmailModal(true)}>
-              <Mail className="w-4 h-4" />
-              Email
-            </Button>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
@@ -145,14 +150,14 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
               </TabsTrigger>
             </TabsList>
 
-            <div className="flex-1 overflow-auto p-4">
+            <div className="flex-1 overflow-auto p-4 pb-6">
               <TabsContent value="profile" className="m-0 h-full">
-                <ProfileTab candidate={candidate} />
+                <ProfileTab candidate={currentCandidate} />
               </TabsContent>
 
               <TabsContent value="analysis" className="m-0 h-full">
                 <MatchAnalysis 
-                  candidate={candidate} 
+                  candidate={currentCandidate} 
                   isActive={activeTab === 'analysis'} 
                   hasPlayed={hasPlayedAnimation}
                   onAnimationComplete={() => setHasPlayedAnimation(true)}
@@ -171,8 +176,8 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
                 />
               </TabsContent>
 
-              <TabsContent value="cv" className="m-0 h-full">
-                <CVPreview candidate={candidate} />
+              <TabsContent value="cv" className="m-0 h-full pb-4">
+                <CVPreview candidate={currentCandidate} />
               </TabsContent>
             </div>
           </Tabs>
@@ -182,7 +187,7 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
       <EmailModal
         open={showEmailModal}
         onClose={() => setShowEmailModal(false)}
-        candidate={candidate}
+        candidate={currentCandidate}
       />
     </>
   );
