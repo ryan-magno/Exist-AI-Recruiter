@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Briefcase, Users, Building, Save } from 'lucide-react';
+import { Calendar, Briefcase, Users, Building, Save, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
@@ -14,6 +13,7 @@ import {
 import { toast } from 'sonner';
 import { JobOrder, Level, EmploymentType, departmentOptions, levelLabels, employmentTypeLabels } from '@/data/mockData';
 import { cn } from '@/lib/utils';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 
 interface EditJobOrderModalProps {
   jobOrder: JobOrder | null;
@@ -30,7 +30,8 @@ export function EditJobOrderModal({ jobOrder, open, onClose, onSave }: EditJobOr
     quantity: 1,
     requiredDate: '',
     department: '',
-    employmentType: '' as EmploymentType | ''
+    employmentType: '' as EmploymentType | '',
+    requestorName: ''
   });
 
   const [errors, setErrors] = useState<Record<string, boolean>>({});
@@ -44,7 +45,8 @@ export function EditJobOrderModal({ jobOrder, open, onClose, onSave }: EditJobOr
         quantity: jobOrder.quantity,
         requiredDate: jobOrder.requiredDate,
         department: jobOrder.department,
-        employmentType: jobOrder.employmentType
+        employmentType: jobOrder.employmentType,
+        requestorName: jobOrder.requestorName || ''
       });
       setErrors({});
     }
@@ -75,7 +77,8 @@ export function EditJobOrderModal({ jobOrder, open, onClose, onSave }: EditJobOr
       quantity: formData.quantity,
       requiredDate: formData.requiredDate,
       department: formData.department,
-      employmentType: formData.employmentType as EmploymentType
+      employmentType: formData.employmentType as EmploymentType,
+      requestorName: formData.requestorName
     });
 
     toast.success('Job Order updated successfully');
@@ -112,6 +115,19 @@ export function EditJobOrderModal({ jobOrder, open, onClose, onSave }: EditJobOr
             />
           </div>
 
+          {/* Requestor Name */}
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2 text-sm">
+              <User className="w-4 h-4 text-muted-foreground" />
+              Requestor Name
+            </Label>
+            <Input
+              placeholder="e.g., John Smith"
+              value={formData.requestorName}
+              onChange={(e) => setFormData({ ...formData, requestorName: e.target.value })}
+            />
+          </div>
+
           {/* Department */}
           <div className="space-y-1.5">
             <Label className="flex items-center gap-2 text-sm">
@@ -139,19 +155,15 @@ export function EditJobOrderModal({ jobOrder, open, onClose, onSave }: EditJobOr
           {/* Job Description */}
           <div className="space-y-1.5">
             <Label className="text-sm">Job Description</Label>
-            <Textarea
-              placeholder="Describe the role, responsibilities, and requirements..."
+            <RichTextEditor
               value={formData.description}
-              onChange={(e) => {
-                setFormData({ ...formData, description: e.target.value });
-                if (e.target.value) setErrors(prev => ({ ...prev, description: false }));
-                e.target.style.height = 'auto';
-                e.target.style.height = e.target.scrollHeight + 'px';
+              onChange={(value) => {
+                setFormData({ ...formData, description: value });
+                if (value) setErrors(prev => ({ ...prev, description: false }));
               }}
-              className={cn(
-                'min-h-[100px] resize-none overflow-hidden',
-                errors.description && 'border-destructive focus-visible:ring-destructive'
-              )}
+              placeholder="Describe the role, responsibilities, and requirements..."
+              error={errors.description}
+              minHeight="150px"
             />
           </div>
 

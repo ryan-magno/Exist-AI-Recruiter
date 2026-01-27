@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { mockCandidates, mockJobOrders, Candidate, JobOrder, PipelineStatus, TechInterviewResult, TimelineEntry } from '@/data/mockData';
+import { mockCandidates, mockJobOrders, Candidate, JobOrder, PipelineStatus, TechInterviewResult, TimelineEntry, HRInterviewForm, TechInterviewForm } from '@/data/mockData';
 import { toast } from 'sonner';
 
 interface AppContextType {
@@ -18,6 +18,8 @@ interface AppContextType {
   updateCandidateWorkingConditions: (candidateId: string, conditions: string) => void;
   updateCandidateRemarks: (candidateId: string, remarks: string) => void;
   updateCandidateTechNotes: (candidateId: string, notes: string) => void;
+  updateCandidateHRForm: (candidateId: string, form: HRInterviewForm) => void;
+  updateCandidateTechForm: (candidateId: string, form: TechInterviewForm) => void;
   updateJobOrderStatus: (joId: string, status: JobOrder['status']) => void;
   updateJobOrder: (joId: string, updates: Partial<JobOrder>) => void;
   addJobOrder: (jo: Omit<JobOrder, 'id' | 'joNumber' | 'createdDate' | 'candidateIds' | 'hiredCount'>) => void;
@@ -42,10 +44,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isFindingMatches, setIsFindingMatches] = useState(false);
 
   const handleHiredCandidate = (joId: string, candidateId: string) => {
-    // Check if this candidate was already counted as hired (to prevent double counting)
     const candidate = candidates.find(c => c.id === candidateId);
     if (candidate?.pipelineStatus === 'hired') {
-      return; // Already hired, don't increment again
+      return;
     }
 
     setJobOrders(prev => {
@@ -150,6 +151,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const updateCandidateHRForm = (candidateId: string, form: HRInterviewForm) => {
+    setCandidates(prev =>
+      prev.map(c => (c.id === candidateId ? { ...c, hrInterviewForm: form } : c))
+    );
+  };
+
+  const updateCandidateTechForm = (candidateId: string, form: TechInterviewForm) => {
+    setCandidates(prev =>
+      prev.map(c => (c.id === candidateId ? { ...c, techInterviewForm: form } : c))
+    );
+  };
+
   const updateJobOrderStatus = (joId: string, status: JobOrder['status']) => {
     setJobOrders(prev =>
       prev.map(jo => (jo.id === joId ? { ...jo, status } : jo))
@@ -219,6 +232,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateCandidateWorkingConditions,
         updateCandidateRemarks,
         updateCandidateTechNotes,
+        updateCandidateHRForm,
+        updateCandidateTechForm,
         updateJobOrderStatus,
         updateJobOrder,
         addJobOrder,

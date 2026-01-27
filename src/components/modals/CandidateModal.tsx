@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Mail, Phone, Linkedin, FileText, Sparkles, MessageSquare, ExternalLink, Download, Briefcase, Calendar, DollarSign, User, Check, Loader2, Code, GraduationCap, Clock, Target } from 'lucide-react';
+import { X, Mail, Phone, Linkedin, FileText, Sparkles, MessageSquare, ExternalLink, Download, Briefcase, Calendar, DollarSign, User, Check, Loader2, Code, GraduationCap, Clock, Target, History, UserCheck, Building, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Candidate, pipelineStatusLabels, pipelineStatusColors, PipelineStatus, techInterviewLabels, techInterviewColors, TechInterviewResult, mockJobOrders } from '@/data/mockData';
+import { Candidate, pipelineStatusLabels, pipelineStatusColors, PipelineStatus, techInterviewLabels, techInterviewColors, TechInterviewResult, mockJobOrders, WorkExperience } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { EmailModal } from './EmailModal';
 import { TypewriterText } from '@/components/ui/TypewriterText';
+import { HRInterviewFormTab } from '@/components/candidate/HRInterviewFormTab';
+import { TechInterviewFormTab } from '@/components/candidate/TechInterviewFormTab';
+import { ApplicationHistoryTab } from '@/components/candidate/ApplicationHistoryTab';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -59,12 +61,39 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
 
   return (
     <>
-      <Dialog open={!!candidate} onOpenChange={() => onClose()}>
-        <DialogContent className="max-w-3xl h-[85vh] overflow-hidden flex flex-col p-0">
-          <DialogHeader className="flex-shrink-0 p-4 pb-0">
+      {/* Full screen overlay modal */}
+      <div 
+        className={cn(
+          "fixed inset-0 z-50 flex items-center justify-center bg-black/50 transition-opacity",
+          candidate ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.2 }}
+          className="bg-background rounded-xl shadow-2xl w-[95vw] max-w-5xl h-[90vh] flex flex-col overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between gap-4 p-4 pb-0 flex-shrink-0">
             <div className="flex-1 min-w-0">
-              <DialogTitle className="text-xl font-bold">{currentCandidate.name}</DialogTitle>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1.5 flex-wrap">
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-xl font-bold">{currentCandidate.name}</h2>
+                {/* Applicant Type Badge */}
+                <span className={cn(
+                  'px-2 py-0.5 rounded-full text-xs font-semibold border flex items-center gap-1',
+                  currentCandidate.applicantType === 'internal' 
+                    ? 'bg-blue-100 text-blue-700 border-blue-300' 
+                    : 'bg-slate-100 text-slate-600 border-slate-300'
+                )}>
+                  <Tag className="w-3 h-3" />
+                  {currentCandidate.applicantType === 'internal' ? 'Internal' : 'External'}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
                 <a href={`mailto:${currentCandidate.email}`} className="flex items-center gap-1 hover:text-primary transition-colors">
                   <Mail className="w-3.5 h-3.5" />
                   {currentCandidate.email}
@@ -80,10 +109,13 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
                 </a>
               </div>
             </div>
-          </DialogHeader>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
 
           {/* Status Row with Actions */}
-          <div className="flex items-end gap-3 px-4 py-3 border-b flex-wrap">
+          <div className="flex items-end gap-3 px-4 py-3 border-b flex-wrap flex-shrink-0">
             <div className="min-w-[140px]">
               <label className="text-xs text-muted-foreground mb-1 block">Status</label>
               <Select
@@ -129,22 +161,34 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-4 flex-shrink-0 mx-4 mt-2" style={{width: 'calc(100% - 32px)'}}>
-              <TabsTrigger value="profile" className="gap-1.5 text-sm">
-                <User className="w-4 h-4" />
+            <TabsList className="grid w-full grid-cols-7 flex-shrink-0 mx-4 mt-2" style={{width: 'calc(100% - 32px)'}}>
+              <TabsTrigger value="profile" className="gap-1.5 text-xs">
+                <User className="w-3.5 h-3.5" />
                 Profile
               </TabsTrigger>
-              <TabsTrigger value="analysis" className="gap-1.5 text-sm">
-                <Sparkles className="w-4 h-4" />
-                Match Intelligence
+              <TabsTrigger value="analysis" className="gap-1.5 text-xs">
+                <Sparkles className="w-3.5 h-3.5" />
+                Match
               </TabsTrigger>
-              <TabsTrigger value="notes" className="gap-1.5 text-sm">
-                <MessageSquare className="w-4 h-4" />
+              <TabsTrigger value="history" className="gap-1.5 text-xs">
+                <History className="w-3.5 h-3.5" />
+                History
+              </TabsTrigger>
+              <TabsTrigger value="hr-form" className="gap-1.5 text-xs">
+                <UserCheck className="w-3.5 h-3.5" />
+                HR Form
+              </TabsTrigger>
+              <TabsTrigger value="tech-form" className="gap-1.5 text-xs">
+                <Code className="w-3.5 h-3.5" />
+                Tech Form
+              </TabsTrigger>
+              <TabsTrigger value="notes" className="gap-1.5 text-xs">
+                <MessageSquare className="w-3.5 h-3.5" />
                 Notes
               </TabsTrigger>
-              <TabsTrigger value="cv" className="gap-1.5 text-sm">
-                <FileText className="w-4 h-4" />
-                CV Preview
+              <TabsTrigger value="cv" className="gap-1.5 text-xs">
+                <FileText className="w-3.5 h-3.5" />
+                CV
               </TabsTrigger>
             </TabsList>
 
@@ -160,6 +204,18 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
                   hasPlayed={hasPlayedAnimation}
                   onAnimationComplete={() => setHasPlayedAnimation(true)}
                 />
+              </TabsContent>
+
+              <TabsContent value="history" className="m-0 h-full">
+                <ApplicationHistoryTab candidate={currentCandidate} />
+              </TabsContent>
+
+              <TabsContent value="hr-form" className="m-0 h-full">
+                <HRInterviewFormTab candidate={currentCandidate} />
+              </TabsContent>
+
+              <TabsContent value="tech-form" className="m-0 h-full">
+                <TechInterviewFormTab candidate={currentCandidate} />
               </TabsContent>
 
               <TabsContent value="notes" className="m-0 h-full">
@@ -179,8 +235,8 @@ export function CandidateModal({ candidate, onClose, initialTab = 'profile' }: C
               </TabsContent>
             </div>
           </Tabs>
-        </DialogContent>
-      </Dialog>
+        </motion.div>
+      </div>
 
       <EmailModal
         open={showEmailModal}
@@ -197,7 +253,6 @@ function ProfileTab({ candidate }: { candidate: Candidate }) {
     const matchingJobs = mockJobOrders
       .filter(jo => jo.status === 'in-progress' || jo.status === 'draft')
       .filter(jo => {
-        // Simple matching based on skills and position applied
         const positionMatch = candidate.positionApplied.toLowerCase().includes(jo.title.toLowerCase().split(' ')[0]);
         return positionMatch || jo.candidateIds.includes(candidate.id);
       })
@@ -274,43 +329,37 @@ function ProfileTab({ candidate }: { candidate: Candidate }) {
         </div>
       </div>
 
-      {/* Education & Work Experience */}
-      <div className="grid grid-cols-1 gap-3">
-        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-          <div className="flex items-center gap-2 text-blue-700 mb-1">
-            <GraduationCap className="w-4 h-4" />
-            <span className="text-xs font-medium">Educational Background</span>
-          </div>
-          <p className="font-medium text-foreground">{candidate.educationalBackground}</p>
+      {/* Education */}
+      <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+        <div className="flex items-center gap-2 text-blue-700 mb-1">
+          <GraduationCap className="w-4 h-4" />
+          <span className="text-xs font-medium">Educational Background</span>
         </div>
-        <div className="bg-violet-50 rounded-lg p-3 border border-violet-200">
-          <div className="flex items-center gap-2 text-violet-700 mb-1">
-            <Clock className="w-4 h-4" />
-            <span className="text-xs font-medium">Relevant Work Experience</span>
-          </div>
-          <p className="font-medium text-foreground">{candidate.relevantWorkExperience}</p>
-        </div>
+        <p className="font-medium text-foreground">{candidate.educationalBackground}</p>
       </div>
 
       {/* Current Occupation */}
       <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
         <div className="flex items-center gap-2 text-slate-600 mb-1">
-          <Briefcase className="w-4 h-4" />
+          <Building className="w-4 h-4" />
           <span className="text-xs font-medium">Current Occupation</span>
         </div>
         <p className="font-semibold text-foreground">{candidate.currentOccupation}</p>
       </div>
 
-      {/* Experience */}
+      {/* Work Experience - ALL EXPERIENCE */}
       <div>
-        <h4 className="font-semibold text-foreground mb-2 text-sm">Experience Details</h4>
-        <div className="bg-emerald-50 rounded-lg p-3 border-l-4 border-emerald-500">
-          <p className="text-foreground font-semibold mb-1">
-            Total: {candidate.experienceDetails.totalYears} years
-          </p>
-          <p className="text-sm text-slate-700">
-            {candidate.experienceDetails.breakdown}
-          </p>
+        <div className="flex items-center gap-2 mb-3">
+          <Briefcase className="w-5 h-5 text-violet-600" />
+          <h4 className="font-semibold text-foreground">Work Experience</h4>
+          <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">
+            {candidate.experienceDetails.totalYears} years total
+          </span>
+        </div>
+        <div className="space-y-3">
+          {(candidate.workExperiences || []).map((exp, index) => (
+            <WorkExperienceCard key={index} experience={exp} />
+          ))}
         </div>
       </div>
 
@@ -328,6 +377,41 @@ function ProfileTab({ candidate }: { candidate: Candidate }) {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function WorkExperienceCard({ experience }: { experience: WorkExperience }) {
+  const formatDate = (dateString: string) => {
+    if (dateString === 'Present') return 'Present';
+    const [year, month] = dateString.split('-');
+    return new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  };
+
+  return (
+    <div className="bg-violet-50 rounded-lg p-4 border border-violet-200">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div>
+          <p className="font-semibold text-foreground">{experience.position}</p>
+          <p className="text-sm text-violet-700">{experience.company}</p>
+        </div>
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {formatDate(experience.startDate)} - {formatDate(experience.endDate)}
+        </span>
+      </div>
+      <p className="text-sm text-slate-700 mb-2">{experience.summary}</p>
+      {experience.projects && experience.projects.length > 0 && (
+        <div className="mt-2">
+          <p className="text-xs font-medium text-violet-700 mb-1">Key Projects:</p>
+          <div className="flex flex-wrap gap-1.5">
+            {experience.projects.map((project, idx) => (
+              <span key={idx} className="text-xs bg-white px-2 py-1 rounded border border-violet-200">
+                {project}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, Briefcase, Edit, XCircle, Sparkles, RefreshCw, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Building, Clock } from 'lucide-react';
+import { Calendar, Briefcase, Edit, XCircle, Sparkles, RefreshCw, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Building, Clock, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/context/AppContext';
 import { JobOrder, joStatusLabels, levelLabels, employmentTypeLabels } from '@/data/mockData';
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useNavigate } from 'react-router-dom';
 import { EditJobOrderModal } from '@/components/modals/EditJobOrderModal';
+import { RichTextContent } from '@/components/ui/RichTextEditor';
 
 interface JobOrderDetailProps {
   jobOrder: JobOrder;
@@ -74,9 +75,9 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
     toast.success('Best matches updated based on latest AI analysis');
   };
 
-  const descriptionPreview = jobOrder.description.length > 120 
-    ? jobOrder.description.slice(0, 120) + '...' 
-    : jobOrder.description;
+  // Check if description is long (more than 150 chars of text content)
+  const plainTextDescription = jobOrder.description.replace(/<[^>]*>/g, '');
+  const isLongDescription = plainTextDescription.length > 150;
 
   const agingDays = getAgingDays(jobOrder.createdDate);
 
@@ -121,6 +122,12 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
                 <Calendar className="w-4 h-4" />
                 <span>Required by {formatDate(jobOrder.requiredDate)}</span>
               </div>
+              {jobOrder.requestorName && (
+                <div className="flex items-center gap-1">
+                  <User className="w-4 h-4" />
+                  <span>Requested by {jobOrder.requestorName}</span>
+                </div>
+              )}
             </div>
             
             {/* Created Date and Aging */}
@@ -188,20 +195,24 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
           </div>
         </div>
 
-        {/* Description with See More */}
+        {/* Description with See More - Rich Text */}
         <div className="mt-3">
-          {jobOrder.description.length > 120 ? (
+          {isLongDescription ? (
             <>
               {isExpanded ? (
-                <div className="max-h-32 overflow-y-auto pr-2">
-                  <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                    {jobOrder.description}
-                  </p>
+                <div className="max-h-40 overflow-y-auto pr-2">
+                  <RichTextContent 
+                    content={jobOrder.description} 
+                    className="text-sm text-muted-foreground leading-relaxed"
+                  />
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {descriptionPreview}
-                </p>
+                <div className="overflow-hidden max-h-12">
+                  <RichTextContent 
+                    content={jobOrder.description} 
+                    className="text-sm text-muted-foreground leading-relaxed"
+                  />
+                </div>
               )}
               <button 
                 onClick={() => setIsExpanded(!isExpanded)}
@@ -215,9 +226,10 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
               </button>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {jobOrder.description}
-            </p>
+            <RichTextContent 
+              content={jobOrder.description} 
+              className="text-sm text-muted-foreground leading-relaxed"
+            />
           )}
         </div>
       </div>
