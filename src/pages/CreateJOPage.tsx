@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FilePlus, Calendar, Hash, Briefcase, Users, Building } from 'lucide-react';
+import { FilePlus, Calendar, Hash, Briefcase, Users, Building, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
 import { Level, EmploymentType, departmentOptions, levelLabels, employmentTypeLabels } from '@/data/mockData';
 import { cn } from '@/lib/utils';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 
 export default function CreateJOPage() {
   const navigate = useNavigate();
@@ -23,7 +23,8 @@ export default function CreateJOPage() {
     quantity: 1,
     requiredDate: '',
     department: '',
-    employmentType: '' as EmploymentType | ''
+    employmentType: '' as EmploymentType | '',
+    requestorName: ''
   });
 
   const [errors, setErrors] = useState<Record<string, boolean>>({});
@@ -40,6 +41,7 @@ export default function CreateJOPage() {
     if (!formData.requiredDate) newErrors.requiredDate = true;
     if (!formData.department) newErrors.department = true;
     if (!formData.employmentType) newErrors.employmentType = true;
+    if (!formData.requestorName) newErrors.requestorName = true;
     
     setErrors(newErrors);
     
@@ -56,7 +58,8 @@ export default function CreateJOPage() {
       requiredDate: formData.requiredDate,
       status: 'draft',
       department: formData.department,
-      employmentType: formData.employmentType as EmploymentType
+      employmentType: formData.employmentType as EmploymentType,
+      requestorName: formData.requestorName
     });
 
     toast.success('Job Order created successfully', {
@@ -116,6 +119,23 @@ export default function CreateJOPage() {
               />
             </div>
 
+            {/* Requestor Name */}
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2 text-sm">
+                <User className="w-4 h-4 text-muted-foreground" />
+                Requestor Name
+              </Label>
+              <Input
+                placeholder="e.g., John Smith"
+                value={formData.requestorName}
+                onChange={(e) => {
+                  setFormData({ ...formData, requestorName: e.target.value });
+                  if (e.target.value) setErrors(prev => ({ ...prev, requestorName: false }));
+                }}
+                className={cn(errors.requestorName && 'border-destructive focus-visible:ring-destructive')}
+              />
+            </div>
+
             {/* Department */}
             <div className="space-y-1.5">
               <Label className="flex items-center gap-2 text-sm">
@@ -143,20 +163,15 @@ export default function CreateJOPage() {
             {/* Job Description */}
             <div className="space-y-1.5">
               <Label className="text-sm">Job Description</Label>
-              <Textarea
-                placeholder="Describe the role, responsibilities, and requirements..."
+              <RichTextEditor
                 value={formData.description}
-                onChange={(e) => {
-                  setFormData({ ...formData, description: e.target.value });
-                  if (e.target.value) setErrors(prev => ({ ...prev, description: false }));
-                  // Auto-resize
-                  e.target.style.height = 'auto';
-                  e.target.style.height = e.target.scrollHeight + 'px';
+                onChange={(value) => {
+                  setFormData({ ...formData, description: value });
+                  if (value) setErrors(prev => ({ ...prev, description: false }));
                 }}
-                className={cn(
-                  'min-h-[80px] resize-none overflow-hidden',
-                  errors.description && 'border-destructive focus-visible:ring-destructive'
-                )}
+                placeholder="Describe the role, responsibilities, and requirements..."
+                error={errors.description}
+                minHeight="150px"
               />
             </div>
 
@@ -242,7 +257,7 @@ export default function CreateJOPage() {
             <Button 
               type="submit" 
               className="gap-2"
-              disabled={!formData.title || !formData.description || !formData.level || !formData.requiredDate || !formData.department || !formData.employmentType}
+              disabled={!formData.title || !formData.description || !formData.level || !formData.requiredDate || !formData.department || !formData.employmentType || !formData.requestorName}
             >
               <FilePlus className="w-4 h-4" />
               Create Job Order
