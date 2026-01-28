@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Bold, Italic, List, ListOrdered, Heading1, Heading2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -22,9 +22,28 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const isInitialMount = useRef(true);
 
-  const execCommand = useCallback((command: string, value?: string) => {
-    document.execCommand(command, false, value);
+  // Only set innerHTML on initial mount or when value changes externally
+  useEffect(() => {
+    if (editorRef.current && isInitialMount.current) {
+      editorRef.current.innerHTML = value || '';
+      isInitialMount.current = false;
+    }
+  }, []);
+
+  // Update content when value prop changes externally (not from user input)
+  useEffect(() => {
+    if (editorRef.current && !isFocused) {
+      const currentContent = editorRef.current.innerHTML;
+      if (currentContent !== value) {
+        editorRef.current.innerHTML = value || '';
+      }
+    }
+  }, [value, isFocused]);
+
+  const execCommand = useCallback((command: string, commandValue?: string) => {
+    document.execCommand(command, false, commandValue);
     editorRef.current?.focus();
     if (editorRef.current) {
       onChange(editorRef.current.innerHTML);
@@ -139,7 +158,6 @@ export function RichTextEditor({
           onPaste={handlePaste}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          dangerouslySetInnerHTML={{ __html: value }}
           suppressContentEditableWarning
         />
         {isEmpty && !isFocused && (

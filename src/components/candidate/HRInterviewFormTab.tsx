@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
 import { Candidate, HRInterviewForm, HRVerdict, hrVerdictLabels } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
@@ -76,11 +75,27 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
     setForm(prev => ({ ...prev, [key]: value }));
   };
 
-  const ScoreSlider = ({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) => (
+  // Selectable rating component with clickable buttons
+  const RatingSelector = ({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) => (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label className="text-xs">{label}</Label>
-        <div className="flex items-center gap-1">
+      <Label className="text-xs">{label}</Label>
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map(i => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onChange(i)}
+            className={cn(
+              'w-8 h-8 rounded-md border-2 flex items-center justify-center transition-all font-semibold text-sm',
+              i <= value 
+                ? 'bg-amber-100 border-amber-400 text-amber-700' 
+                : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted hover:border-amber-300'
+            )}
+          >
+            {i}
+          </button>
+        ))}
+        <div className="flex items-center gap-0.5 ml-2">
           {[1, 2, 3, 4, 5].map(i => (
             <Star 
               key={i} 
@@ -92,14 +107,6 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
           ))}
         </div>
       </div>
-      <Slider 
-        value={[value]} 
-        onValueChange={([v]) => onChange(v)} 
-        min={1} 
-        max={5} 
-        step={1}
-        className="w-full"
-      />
     </div>
   );
 
@@ -288,17 +295,17 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
           Competency & Culture Scoring (1-5)
         </h4>
         <div className="grid grid-cols-3 gap-4 mb-3">
-          <ScoreSlider 
+          <RatingSelector 
             label="Communication" 
             value={form.communicationScore} 
             onChange={v => updateField('communicationScore', v)} 
           />
-          <ScoreSlider 
+          <RatingSelector 
             label="Cultural Fit" 
             value={form.culturalFitScore} 
             onChange={v => updateField('culturalFitScore', v)} 
           />
-          <ScoreSlider 
+          <RatingSelector 
             label="Engagement" 
             value={form.engagementScore} 
             onChange={v => updateField('engagementScore', v)} 
