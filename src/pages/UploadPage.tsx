@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useCVUploaderNames, useCreateCVUploader } from '@/hooks/useCVUploaders';
 
 interface UploadedFile {
   id: string;
@@ -24,18 +25,6 @@ const demoFiles: UploadedFile[] = [
   { id: '5', name: 'Patricia_Reyes_CV.docx', size: '156 KB', status: 'ready' },
 ];
 
-// Mock list of uploaders for suggestions
-const existingUploaders = [
-  'John Smith',
-  'Jane Doe',
-  'Maria Garcia',
-  'David Chen',
-  'Sarah Johnson',
-  'Michael Brown',
-  'Emily Davis',
-  'Robert Wilson',
-];
-
 export default function UploadPage() {
   const navigate = useNavigate();
   const { isVectorized, setIsVectorized } = useApp();
@@ -48,6 +37,10 @@ export default function UploadPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
+  // Database hooks
+  const { data: existingUploaders = [], isLoading: loadingUploaders } = useCVUploaderNames();
+  const createUploader = useCreateCVUploader();
+
   // Filter suggestions based on input
   useEffect(() => {
     if (uploaderName.trim()) {
@@ -58,7 +51,7 @@ export default function UploadPage() {
     } else {
       setFilteredSuggestions(existingUploaders);
     }
-  }, [uploaderName]);
+  }, [uploaderName, existingUploaders]);
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -116,6 +109,13 @@ export default function UploadPage() {
       return;
     }
 
+    // Save the uploader name to the database
+    try {
+      await createUploader.mutateAsync(uploaderName.trim());
+    } catch (error) {
+      console.error('Error saving uploader:', error);
+    }
+
     setIsProcessing(true);
     
     for (let i = 0; i < files.length; i++) {
@@ -146,9 +146,14 @@ export default function UploadPage() {
     setShowSuggestions(false);
   };
 
-  const handleAddNewName = () => {
-    if (uploaderName.trim() && !existingUploaders.includes(uploaderName.trim())) {
-      toast.success(`"${uploaderName}" will be added as a new uploader`);
+  const handleAddNewName = async () => {
+    if (uploaderName.trim() && !existingUploaders.some(n => n.toLowerCase() === uploaderName.toLowerCase())) {
+      try {
+        await createUploader.mutateAsync(uploaderName.trim());
+        toast.success(`"${uploaderName}" added as a new uploader`);
+      } catch (error) {
+        console.error('Error adding uploader:', error);
+      }
     }
     setShowSuggestions(false);
   };
@@ -175,7 +180,7 @@ export default function UploadPage() {
             <div className="relative">
               <Input
                 ref={inputRef}
-                placeholder="Enter your name..."
+                placeholder={loadingUploaders ? "Loading..." : "Enter your name..."}
                 value={uploaderName}
                 onChange={(e) => setUploaderName(e.target.value)}
                 onFocus={() => setShowSuggestions(true)}
@@ -183,12 +188,12 @@ export default function UploadPage() {
                   "h-10",
                   isVectorized && "opacity-50"
                 )}
-                disabled={isVectorized}
+                disabled={isVectorized || loadingUploaders}
               />
               
               {/* Suggestions Dropdown */}
               <AnimatePresence>
-                {showSuggestions && !isVectorized && (
+                {showSuggestions && !isVectorized && !loadingUploaders && (
                   <motion.div
                     ref={suggestionsRef}
                     initial={{ opacity: 0, y: -10 }}

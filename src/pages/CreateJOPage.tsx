@@ -1,20 +1,25 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FilePlus, Calendar, Hash, Briefcase, Users, Building, User } from 'lucide-react';
+import { FilePlus, Calendar, Hash, Briefcase, Users, Building, User, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
-import { Level, EmploymentType, departmentOptions, levelLabels, employmentTypeLabels } from '@/data/mockData';
+import { Level, EmploymentType, levelLabels, employmentTypeLabels } from '@/data/mockData';
 import { cn } from '@/lib/utils';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
+import { useDepartmentNames } from '@/hooks/useDepartments';
+import { useJobOrderCount, useCreateJobOrder } from '@/hooks/useJobOrders';
+import { Enums } from '@/integrations/supabase/types';
 
 export default function CreateJOPage() {
   const navigate = useNavigate();
-  const { addJobOrder, jobOrders } = useApp();
+  const { data: departmentNames = [], isLoading: loadingDepartments } = useDepartmentNames();
+  const { data: joCount = 0, isLoading: loadingCount } = useJobOrderCount();
+  const createJobOrder = useCreateJobOrder();
   
   const [formData, setFormData] = useState({
     title: '',
@@ -29,9 +34,9 @@ export default function CreateJOPage() {
 
   const [errors, setErrors] = useState<Record<string, boolean>>({});
 
-  const nextJoNumber = `JO-2024-${String(jobOrders.length + 1).padStart(3, '0')}`;
+  const nextJoNumber = `JO-${new Date().getFullYear()}-${String(joCount + 1).padStart(3, '0')}`;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const newErrors: Record<string, boolean> = {};
@@ -50,24 +55,32 @@ export default function CreateJOPage() {
       return;
     }
 
-    addJobOrder({
-      title: formData.title,
-      description: formData.description,
-      level: formData.level as Level,
-      quantity: formData.quantity,
-      requiredDate: formData.requiredDate,
-      status: 'draft',
-      department: formData.department,
-      employmentType: formData.employmentType as EmploymentType,
-      requestorName: formData.requestorName
-    });
+    try {
+      await createJobOrder.mutateAsync({
+        jo_number: nextJoNumber,
+        title: formData.title,
+        description: formData.description,
+        level: formData.level as Enums<'job_level'>,
+        quantity: formData.quantity,
+        required_date: formData.requiredDate || null,
+        status: 'draft',
+        department_name: formData.department,
+        employment_type: (formData.employmentType === 'full-time' ? 'regular' : formData.employmentType) as Enums<'employment_type'>,
+        requestor_name: formData.requestorName
+      });
 
-    toast.success('Job Order created successfully', {
-      description: `${nextJoNumber} has been added to your dashboard.`
-    });
+      toast.success('Job Order created successfully', {
+        description: `${nextJoNumber} has been added to your dashboard.`
+      });
 
-    navigate('/dashboard');
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error creating job order:', error);
+      toast.error('Failed to create job order');
+    }
   };
+
+  const isLoading = loadingDepartments || loadingCount;
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
@@ -98,7 +111,7 @@ export default function CreateJOPage() {
                 <Hash className="w-4 h-4 text-muted-foreground" />
                 JO Number
               </Label>
-              <Input value={nextJoNumber} disabled className="bg-muted" />
+              <Input value={isLoading ? 'Loading...' : nextJoNumber} disabled className="bg-muted" />
               <p className="text-xs text-muted-foreground">Auto-generated</p>
             </div>
 
@@ -150,10 +163,10 @@ export default function CreateJOPage() {
                 }}
               >
                 <SelectTrigger className={cn(errors.department && 'border-destructive focus-visible:ring-destructive')}>
-                  <SelectValue placeholder="Select department" />
+                  <SelectValue placeholder={loadingDepartments ? "Loading..." : "Select department"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {departmentOptions.map(dept => (
+                  {departmentNames.map(dept => (
                     <SelectItem key={dept} value={dept}>{dept}</SelectItem>
                   ))}
                 </SelectContent>
@@ -257,10 +270,19 @@ export default function CreateJOPage() {
             <Button 
               type="submit" 
               className="gap-2"
-              disabled={!formData.title || !formData.description || !formData.level || !formData.requiredDate || !formData.department || !formData.employmentType || !formData.requestorName}
+              disabled={createJobOrder.isPending || !formData.title || !formData.description || !formData.level || !formData.requiredDate || !formData.department || !formData.employmentType || !formData.requestorName}
             >
-              <FilePlus className="w-4 h-4" />
-              Create Job Order
+              {createJobOrder.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <FilePlus className="w-4 h-4" />
+                  Create Job Order
+                </>
+              )}
             </Button>
           </div>
         </form>
