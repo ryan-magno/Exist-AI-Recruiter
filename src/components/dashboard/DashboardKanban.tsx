@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Candidate, PipelineStatus, pipelineStatusLabels, techInterviewLabels, techInterviewColors, TechInterviewResult } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
-import { CandidateModal } from '@/components/modals/CandidateModal';
+import { CandidateProfileView } from '@/components/candidate/CandidateProfileView';
 import { EmailModal } from '@/components/modals/EmailModal';
 import { CandidateTimeline } from './CandidateTimeline';
 import { cn } from '@/lib/utils';
@@ -271,7 +271,6 @@ export function DashboardKanban({ candidates }: DashboardKanbanProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [emailCandidate, setEmailCandidate] = useState<Candidate | null>(null);
-  const [initialTab, setInitialTab] = useState<string>('profile');
   const [expandedTimelineId, setExpandedTimelineId] = useState<string | null>(null);
 
   const sensors = useSensors(
@@ -302,12 +301,10 @@ export function DashboardKanban({ candidates }: DashboardKanbanProps) {
   };
 
   const handleOpenProfile = (candidate: Candidate) => {
-    setInitialTab('profile');
     setSelectedCandidate(candidate);
   };
 
   const handleOpenNotes = (candidate: Candidate) => {
-    setInitialTab('notes');
     setSelectedCandidate(candidate);
   };
 
@@ -322,6 +319,16 @@ export function DashboardKanban({ candidates }: DashboardKanbanProps) {
       .filter(c => c.pipelineStatus === status)
       .sort((a, b) => b.matchScore - a.matchScore);
   };
+
+  // If a candidate is selected, show the full-page profile view
+  if (selectedCandidate) {
+    return (
+      <CandidateProfileView 
+        candidate={selectedCandidate} 
+        onBack={() => setSelectedCandidate(null)} 
+      />
+    );
+  }
 
   return (
     <>
@@ -364,12 +371,6 @@ export function DashboardKanban({ candidates }: DashboardKanbanProps) {
           ) : null}
         </DragOverlay>
       </DndContext>
-
-      <CandidateModal 
-        candidate={selectedCandidate} 
-        onClose={() => setSelectedCandidate(null)}
-        initialTab={initialTab}
-      />
       
       <EmailModal
         open={!!emailCandidate}

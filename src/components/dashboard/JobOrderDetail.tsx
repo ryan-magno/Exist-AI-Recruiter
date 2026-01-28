@@ -200,14 +200,14 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
           {isLongDescription ? (
             <>
               {isExpanded ? (
-                <div className="max-h-40 overflow-y-auto pr-2">
+                <div className="max-h-64 overflow-y-auto pr-2">
                   <RichTextContent 
                     content={jobOrder.description} 
                     className="text-sm text-muted-foreground leading-relaxed"
                   />
                 </div>
               ) : (
-                <div className="overflow-hidden max-h-12">
+                <div className="overflow-hidden max-h-16">
                   <RichTextContent 
                     content={jobOrder.description} 
                     className="text-sm text-muted-foreground leading-relaxed"

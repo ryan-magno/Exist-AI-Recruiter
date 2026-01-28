@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
 import { Candidate, TechInterviewForm, TechVerdict, techVerdictLabels } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
@@ -72,11 +71,27 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
     setForm(prev => ({ ...prev, [key]: value }));
   };
 
-  const ScoreSlider = ({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) => (
+  // Selectable rating component with clickable buttons
+  const RatingSelector = ({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) => (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label className="text-xs">{label}</Label>
-        <div className="flex items-center gap-1">
+      <Label className="text-xs">{label}</Label>
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map(i => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onChange(i)}
+            className={cn(
+              'w-8 h-8 rounded-md border-2 flex items-center justify-center transition-all font-semibold text-sm',
+              i <= value 
+                ? 'bg-violet-100 border-violet-400 text-violet-700' 
+                : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted hover:border-violet-300'
+            )}
+          >
+            {i}
+          </button>
+        ))}
+        <div className="flex items-center gap-0.5 ml-2">
           {[1, 2, 3, 4, 5].map(i => (
             <Star 
               key={i} 
@@ -88,14 +103,6 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
           ))}
         </div>
       </div>
-      <Slider 
-        value={[value]} 
-        onValueChange={([v]) => onChange(v)} 
-        min={1} 
-        max={5} 
-        step={1}
-        className="w-full"
-      />
     </div>
   );
 
@@ -156,22 +163,22 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ScoreSlider 
+          <RatingSelector 
             label="Technical Skills" 
             value={form.technicalSkillsScore} 
             onChange={v => updateField('technicalSkillsScore', v)} 
           />
-          <ScoreSlider 
+          <RatingSelector 
             label="Problem Solving" 
             value={form.problemSolvingScore} 
             onChange={v => updateField('problemSolvingScore', v)} 
           />
-          <ScoreSlider 
+          <RatingSelector 
             label="System Design" 
             value={form.systemDesignScore} 
             onChange={v => updateField('systemDesignScore', v)} 
           />
-          <ScoreSlider 
+          <RatingSelector 
             label="Coding Challenge" 
             value={form.codingChallengeScore} 
             onChange={v => updateField('codingChallengeScore', v)} 
