@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { Pool } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
+import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,34 +7,50 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
-// Create connection pool
-const pool = new Pool({
-  hostname: Deno.env.get("AZURE_PG_HOST"),
-  user: Deno.env.get("AZURE_PG_USER"),
-  password: Deno.env.get("AZURE_PG_PASSWORD"),
-  database: Deno.env.get("AZURE_PG_DATABASE"),
-  port: parseInt(Deno.env.get("AZURE_PG_PORT") || "5432"),
-  tls: { enabled: true, enforce: false },
-}, 3);
+// Create a single client per request (lazy connection)
+function createClient() {
+  return new Client({
+    hostname: Deno.env.get("AZURE_PG_HOST"),
+    user: Deno.env.get("AZURE_PG_USER"),
+    password: Deno.env.get("AZURE_PG_PASSWORD"),
+    database: Deno.env.get("AZURE_PG_DATABASE"),
+    port: parseInt(Deno.env.get("AZURE_PG_PORT") || "5432"),
+    tls: { enabled: true, enforce: false },
+  });
+}
 
-async function query(sql: string, params: unknown[] = []) {
-  const client = await pool.connect();
-  try {
-    const result = await client.queryObject(sql, params);
-    return result.rows;
-  } finally {
-    client.release();
+// Request-scoped client holder
+let requestClient: Client | null = null;
+
+async function getClient(): Promise<Client> {
+  if (!requestClient) {
+    requestClient = createClient();
+    await requestClient.connect();
+  }
+  return requestClient;
+}
+
+async function closeClient() {
+  if (requestClient) {
+    try {
+      await requestClient.end();
+    } catch (e) {
+      console.error("Error closing client:", e);
+    }
+    requestClient = null;
   }
 }
 
+async function query(sql: string, params: unknown[] = []) {
+  const client = await getClient();
+  const result = await client.queryObject(sql, params);
+  return result.rows;
+}
+
 async function execute(sql: string, params: unknown[] = []) {
-  const client = await pool.connect();
-  try {
-    await client.queryObject(sql, params);
-    return { success: true };
-  } finally {
-    client.release();
-  }
+  const client = await getClient();
+  await client.queryObject(sql, params);
+  return { success: true };
 }
 
 // Initialize tables
@@ -656,4 +672,10 @@ function jsonResponse(data: unknown, status = 200): Response {
   });
 }
 
-serve(handleRequest);
+serve(async (req: Request) => {
+  try {
+    return await handleRequest(req);
+  } finally {
+    await closeClient();
+  }
+});
