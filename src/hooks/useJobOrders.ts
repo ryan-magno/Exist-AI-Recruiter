@@ -1,22 +1,44 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { azureDb } from '@/lib/azureDb';
 
-export type JobOrder = Tables<'job_orders'>;
-export type JobOrderInsert = TablesInsert<'job_orders'>;
-export type JobOrderUpdate = TablesUpdate<'job_orders'>;
+export interface JobOrder {
+  id: string;
+  jo_number: string;
+  title: string;
+  description: string | null;
+  department_name: string | null;
+  department_id: string | null;
+  level: 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
+  quantity: number;
+  hired_count: number;
+  employment_type: 'consultant' | 'project-based' | 'regular';
+  requestor_name: string | null;
+  required_date: string | null;
+  status: 'draft' | 'in-progress' | 'fulfilled' | 'closed';
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobOrderInsert {
+  jo_number: string;
+  title: string;
+  description?: string | null;
+  department_name?: string | null;
+  level: 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
+  quantity?: number;
+  employment_type: 'consultant' | 'project-based' | 'regular';
+  requestor_name?: string | null;
+  required_date?: string | null;
+  status?: 'draft' | 'in-progress' | 'fulfilled' | 'closed';
+}
+
+export type JobOrderUpdate = Partial<JobOrder>;
 
 export function useJobOrders() {
   return useQuery({
     queryKey: ['job-orders'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('job_orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    }
+    queryFn: () => azureDb.jobOrders.list() as Promise<JobOrder[]>
   });
 }
 
@@ -25,13 +47,8 @@ export function useJobOrder(id: string | null) {
     queryKey: ['job-orders', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase
-        .from('job_orders')
-        .select('*')
-        .eq('id', id)
-        .single();
-      if (error) throw error;
-      return data;
+      const orders = await azureDb.jobOrders.list();
+      return orders.find((jo: JobOrder) => jo.id === id) || null;
     },
     enabled: !!id
   });
@@ -40,15 +57,7 @@ export function useJobOrder(id: string | null) {
 export function useCreateJobOrder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (newJO: JobOrderInsert) => {
-      const { data, error } = await supabase
-        .from('job_orders')
-        .insert(newJO)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (newJO: JobOrderInsert) => azureDb.jobOrders.create(newJO),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job-orders'] });
     }
@@ -58,18 +67,11 @@ export function useCreateJobOrder() {
 export function useUpdateJobOrder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: JobOrderUpdate }) => {
-      const { data, error } = await supabase
-        .from('job_orders')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
+    mutationFn: ({ id, updates }: { id: string; updates: JobOrderUpdate }) => 
+      azureDb.jobOrders.update(id, updates),
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['job-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['job-orders', variables.id] });
     }
   });
 }
@@ -77,13 +79,7 @@ export function useUpdateJobOrder() {
 export function useDeleteJobOrder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('job_orders')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
-    },
+    mutationFn: (id: string) => azureDb.jobOrders.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['job-orders'] });
     }
@@ -94,11 +90,8 @@ export function useJobOrderCount() {
   return useQuery({
     queryKey: ['job-orders-count'],
     queryFn: async () => {
-      const { count, error } = await supabase
-        .from('job_orders')
-        .select('*', { count: 'exact', head: true });
-      if (error) throw error;
-      return count || 0;
+      const result = await azureDb.jobOrders.count();
+      return result.count;
     }
   });
 }

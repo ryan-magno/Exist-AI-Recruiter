@@ -1,23 +1,35 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Tables, TablesInsert, Enums } from '@/integrations/supabase/types';
+import { azureDb } from '@/lib/azureDb';
 
-export type TimelineEntry = Tables<'candidate_timeline'>;
-export type TimelineInsert = TablesInsert<'candidate_timeline'>;
-export type PipelineStatus = Enums<'pipeline_status'>;
+export type PipelineStatus = 'new' | 'screening' | 'for_hr_interview' | 'for_tech_interview' | 'offer' | 'hired' | 'rejected' | 'withdrawn';
+
+export interface TimelineEntry {
+  id: string;
+  application_id: string;
+  candidate_id: string;
+  from_status: PipelineStatus | null;
+  to_status: PipelineStatus;
+  changed_date: string;
+  changed_by: string | null;
+  duration_days: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface TimelineInsert {
+  application_id: string;
+  candidate_id: string;
+  from_status?: PipelineStatus | null;
+  to_status: PipelineStatus;
+  notes?: string | null;
+}
 
 export function useTimeline(applicationId: string | null) {
   return useQuery({
     queryKey: ['timeline', applicationId],
     queryFn: async () => {
       if (!applicationId) return [];
-      const { data, error } = await supabase
-        .from('candidate_timeline')
-        .select('*')
-        .eq('application_id', applicationId)
-        .order('changed_date', { ascending: true });
-      if (error) throw error;
-      return data;
+      return azureDb.timeline.list({ application_id: applicationId }) as Promise<TimelineEntry[]>;
     },
     enabled: !!applicationId
   });
@@ -28,13 +40,7 @@ export function useTimelineByCandidate(candidateId: string | null) {
     queryKey: ['timeline', 'candidate', candidateId],
     queryFn: async () => {
       if (!candidateId) return [];
-      const { data, error } = await supabase
-        .from('candidate_timeline')
-        .select('*')
-        .eq('candidate_id', candidateId)
-        .order('changed_date', { ascending: true });
-      if (error) throw error;
-      return data;
+      return azureDb.timeline.list({ candidate_id: candidateId }) as Promise<TimelineEntry[]>;
     },
     enabled: !!candidateId
   });
@@ -44,13 +50,9 @@ export function useCreateTimelineEntry() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (entry: TimelineInsert) => {
-      const { data, error } = await supabase
-        .from('candidate_timeline')
-        .insert(entry)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      // Timeline entries are created automatically by the edge function
+      // when application status changes
+      throw new Error('Timeline entries are created automatically on status change');
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['timeline'] });
@@ -65,13 +67,8 @@ export function useApplicationHistory(candidateId: string | null) {
     queryKey: ['application-history', candidateId],
     queryFn: async () => {
       if (!candidateId) return [];
-      const { data, error } = await supabase
-        .from('application_history')
-        .select('*')
-        .eq('candidate_id', candidateId)
-        .order('applied_date', { ascending: false });
-      if (error) throw error;
-      return data;
+      // For now, return timeline entries as history
+      return azureDb.timeline.list({ candidate_id: candidateId });
     },
     enabled: !!candidateId
   });
