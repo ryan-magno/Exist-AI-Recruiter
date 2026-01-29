@@ -1,1 +1,4 @@
 project_id = "azzbrbfcaxphrnpfdgle"
+
+[functions.azure-db]
+verify_jwt = false

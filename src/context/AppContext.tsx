@@ -1,15 +1,9 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useJobOrders, useUpdateJobOrder, useCreateJobOrder, useDeleteJobOrder } from '@/hooks/useJobOrders';
-import { useApplicationsForJobOrder, useUpdateApplicationStatus, PipelineStatus, TechInterviewResult } from '@/hooks/useApplications';
-import { supabase } from '@/integrations/supabase/client';
+import { useJobOrders, useUpdateJobOrder, useCreateJobOrder, useDeleteJobOrder, JobOrder as DBJobOrder, JobOrderInsert } from '@/hooks/useJobOrders';
+import { useUpdateApplicationStatus, PipelineStatus } from '@/hooks/useApplications';
+import { azureDb } from '@/lib/azureDb';
 import { toast } from 'sonner';
-import { Tables, Enums } from '@/integrations/supabase/types';
-
-// Re-export types from database
-export type DBJobOrder = Tables<'job_orders'>;
-export type DBCandidate = Tables<'candidates'>;
-export type DBApplication = Tables<'candidate_job_applications'>;
 
 // Legacy types for compatibility
 import { 
@@ -53,36 +47,10 @@ interface AppContextType {
   // Database state
   dbJobOrders: DBJobOrder[];
   isLoadingJobOrders: boolean;
+  initializeDatabase: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
-
-// Helper to map database pipeline status to legacy status
-function mapDbStatusToLegacy(dbStatus: PipelineStatus): LegacyPipelineStatus {
-  const mapping: Record<string, LegacyPipelineStatus> = {
-    'new': 'new-match',
-    'screening': 'new-match',
-    'for_hr_interview': 'new-match',
-    'for_tech_interview': 'hr-interview',
-    'offer': 'offer',
-    'hired': 'hired',
-    'rejected': 'rejected',
-    'withdrawn': 'rejected'
-  };
-  return mapping[dbStatus] || 'new-match';
-}
-
-// Helper to map legacy status to database status
-function mapLegacyStatusToDb(legacyStatus: LegacyPipelineStatus): PipelineStatus {
-  const mapping: Record<LegacyPipelineStatus, PipelineStatus> = {
-    'new-match': 'for_hr_interview',
-    'hr-interview': 'for_tech_interview',
-    'offer': 'offer',
-    'hired': 'hired',
-    'rejected': 'rejected'
-  };
-  return mapping[legacyStatus];
-}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -92,6 +60,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [selectedJoId, setSelectedJoId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isFindingMatches, setIsFindingMatches] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Database hooks
   const { data: dbJobOrders = [], isLoading: isLoadingJobOrders } = useJobOrders();
@@ -99,6 +68,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const createJobOrderMutation = useCreateJobOrder();
   const deleteJobOrderMutation = useDeleteJobOrder();
   const updateApplicationStatusMutation = useUpdateApplicationStatus();
+
+  // Initialize Azure PostgreSQL database
+  const initializeDatabase = async () => {
+    if (isInitialized) return;
+    try {
+      console.log('Initializing Azure PostgreSQL database...');
+      await azureDb.init();
+      setIsInitialized(true);
+      console.log('Database initialized successfully');
+      // Refresh data after init
+      queryClient.invalidateQueries({ queryKey: ['job-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
+    } catch (error) {
+      console.error('Failed to initialize database:', error);
+    }
+  };
+
+  // Auto-initialize on mount
+  useEffect(() => {
+    initializeDatabase();
+  }, []);
 
   // Sync database job orders to legacy state
   useEffect(() => {
@@ -162,7 +154,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const updateCandidatePipelineStatus = async (candidateId: string, status: LegacyPipelineStatus) => {
-    // Find the application for this candidate
     const candidate = candidates.find(c => c.id === candidateId);
     if (!candidate || candidate.pipelineStatus === status) return;
 
@@ -229,7 +220,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       await updateJobOrderMutation.mutateAsync({
         id: joId,
-        updates: { status: status as Enums<'job_order_status'> }
+        updates: { status: status as DBJobOrder['status'] }
       });
     } catch (error) {
       toast.error('Failed to update job order status');
@@ -238,16 +229,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateJobOrder = async (joId: string, updates: Partial<LegacyJobOrder>) => {
     try {
-      const dbUpdates: Partial<Tables<'job_orders'>> = {};
+      const dbUpdates: Partial<DBJobOrder> = {};
       if (updates.title) dbUpdates.title = updates.title;
       if (updates.description) dbUpdates.description = updates.description;
-      if (updates.level) dbUpdates.level = updates.level as Enums<'job_level'>;
+      if (updates.level) dbUpdates.level = updates.level as DBJobOrder['level'];
       if (updates.quantity) dbUpdates.quantity = updates.quantity;
       if (updates.requiredDate) dbUpdates.required_date = updates.requiredDate;
-      if (updates.status) dbUpdates.status = updates.status as Enums<'job_order_status'>;
+      if (updates.status) dbUpdates.status = updates.status as DBJobOrder['status'];
       if (updates.department) dbUpdates.department_name = updates.department;
       if (updates.employmentType) {
-        dbUpdates.employment_type = (updates.employmentType === 'full-time' ? 'regular' : updates.employmentType) as Enums<'employment_type'>;
+        dbUpdates.employment_type = (updates.employmentType === 'full-time' ? 'regular' : updates.employmentType) as DBJobOrder['employment_type'];
       }
       if (updates.requestorName) dbUpdates.requestor_name = updates.requestorName;
       
@@ -260,24 +251,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addJobOrder = async (jo: Omit<LegacyJobOrder, 'id' | 'joNumber' | 'createdDate' | 'candidateIds' | 'hiredCount'>) => {
     try {
       // Get the count for JO number generation
-      const { count } = await supabase
-        .from('job_orders')
-        .select('*', { count: 'exact', head: true });
+      const { count } = await azureDb.jobOrders.count();
       
-      const joNumber = `JO-${new Date().getFullYear()}-${String((count || 0) + 1).padStart(3, '0')}`;
+      const joNumber = `JO-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
       
-      await createJobOrderMutation.mutateAsync({
+      const newJO: JobOrderInsert = {
         jo_number: joNumber,
         title: jo.title,
         description: jo.description,
-        level: jo.level as Enums<'job_level'>,
+        level: jo.level as DBJobOrder['level'],
         quantity: jo.quantity,
         required_date: jo.requiredDate || null,
-        status: (jo.status || 'draft') as Enums<'job_order_status'>,
+        status: (jo.status || 'draft') as DBJobOrder['status'],
         department_name: jo.department,
-        employment_type: (jo.employmentType === 'full-time' ? 'regular' : jo.employmentType) as Enums<'employment_type'>,
+        employment_type: (jo.employmentType === 'full-time' ? 'regular' : jo.employmentType) as DBJobOrder['employment_type'],
         requestor_name: jo.requestorName
-      });
+      };
+
+      await createJobOrderMutation.mutateAsync(newJO);
     } catch (error) {
       console.error('Error creating job order:', error);
       toast.error('Failed to create job order');
@@ -307,7 +298,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deleteCandidate = async (candidateId: string) => {
     try {
-      await supabase.from('candidates').delete().eq('id', candidateId);
+      await azureDb.candidates.delete(candidateId);
       setCandidates(prev => prev.filter(c => c.id !== candidateId));
       toast.success('Candidate removed');
     } catch (error) {
@@ -357,7 +348,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setIsFindingMatches,
         markJoAsFulfilled,
         dbJobOrders,
-        isLoadingJobOrders
+        isLoadingJobOrders,
+        initializeDatabase
       }}
     >
       {children}

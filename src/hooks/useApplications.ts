@@ -1,29 +1,65 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Tables, TablesInsert, TablesUpdate, Enums } from '@/integrations/supabase/types';
+import { azureDb } from '@/lib/azureDb';
 
-export type Application = Tables<'candidate_job_applications'>;
-export type ApplicationInsert = TablesInsert<'candidate_job_applications'>;
-export type ApplicationUpdate = TablesUpdate<'candidate_job_applications'>;
-export type PipelineStatus = Enums<'pipeline_status'>;
-export type TechInterviewResult = Enums<'tech_interview_result'>;
+export type PipelineStatus = 'new' | 'screening' | 'for_hr_interview' | 'for_tech_interview' | 'offer' | 'hired' | 'rejected' | 'withdrawn';
+export type TechInterviewResult = 'pending' | 'passed' | 'failed';
+
+export interface Application {
+  id: string;
+  candidate_id: string;
+  job_order_id: string;
+  pipeline_status: PipelineStatus;
+  match_score: number | null;
+  tech_interview_result: TechInterviewResult | null;
+  working_conditions: string | null;
+  remarks: string | null;
+  applied_date: string;
+  status_changed_date: string;
+  created_at: string;
+  updated_at: string;
+  // Joined fields from API
+  candidate_name?: string;
+  candidate_email?: string;
+  skills?: string[];
+  years_of_experience?: number;
+  jo_number?: string;
+  job_title?: string;
+}
 
 export interface ApplicationWithDetails extends Application {
-  candidate: Tables<'candidates'>;
-  job_order: Tables<'job_orders'>;
+  candidate?: {
+    id: string;
+    full_name: string;
+    email: string | null;
+    skills: string[] | null;
+    years_of_experience: number | null;
+  };
+  job_order?: {
+    id: string;
+    jo_number: string;
+    title: string;
+  };
+}
+
+export interface ApplicationInsert {
+  candidate_id: string;
+  job_order_id: string;
+  pipeline_status?: PipelineStatus;
+  match_score?: number | null;
+  remarks?: string | null;
+}
+
+export interface ApplicationUpdate {
+  pipeline_status?: PipelineStatus;
+  tech_interview_result?: TechInterviewResult;
+  working_conditions?: string;
+  remarks?: string;
 }
 
 export function useApplications() {
   return useQuery({
     queryKey: ['applications'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('candidate_job_applications')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    }
+    queryFn: () => azureDb.applications.list() as Promise<Application[]>
   });
 }
 
@@ -32,17 +68,23 @@ export function useApplicationsForJobOrder(jobOrderId: string | null) {
     queryKey: ['applications', 'job-order', jobOrderId],
     queryFn: async () => {
       if (!jobOrderId) return [];
-      const { data, error } = await supabase
-        .from('candidate_job_applications')
-        .select(`
-          *,
-          candidate:candidates(*),
-          job_order:job_orders(*)
-        `)
-        .eq('job_order_id', jobOrderId)
-        .order('match_score', { ascending: false });
-      if (error) throw error;
-      return data as ApplicationWithDetails[];
+      const apps = await azureDb.applications.list({ job_order_id: jobOrderId });
+      // Transform to match expected structure
+      return apps.map((app: Application) => ({
+        ...app,
+        candidate: {
+          id: app.candidate_id,
+          full_name: app.candidate_name || 'Unknown',
+          email: app.candidate_email || null,
+          skills: app.skills || null,
+          years_of_experience: app.years_of_experience || null
+        },
+        job_order: {
+          id: app.job_order_id,
+          jo_number: app.jo_number || '',
+          title: app.job_title || ''
+        }
+      })) as ApplicationWithDetails[];
     },
     enabled: !!jobOrderId
   });
@@ -53,16 +95,15 @@ export function useApplicationsForCandidate(candidateId: string | null) {
     queryKey: ['applications', 'candidate', candidateId],
     queryFn: async () => {
       if (!candidateId) return [];
-      const { data, error } = await supabase
-        .from('candidate_job_applications')
-        .select(`
-          *,
-          job_order:job_orders(*)
-        `)
-        .eq('candidate_id', candidateId)
-        .order('applied_date', { ascending: false });
-      if (error) throw error;
-      return data;
+      const apps = await azureDb.applications.list({ candidate_id: candidateId });
+      return apps.map((app: Application) => ({
+        ...app,
+        job_order: {
+          id: app.job_order_id,
+          jo_number: app.jo_number || '',
+          title: app.job_title || ''
+        }
+      }));
     },
     enabled: !!candidateId
   });
@@ -73,17 +114,24 @@ export function useApplication(id: string | null) {
     queryKey: ['applications', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase
-        .from('candidate_job_applications')
-        .select(`
-          *,
-          candidate:candidates(*),
-          job_order:job_orders(*)
-        `)
-        .eq('id', id)
-        .single();
-      if (error) throw error;
-      return data as ApplicationWithDetails;
+      const apps = await azureDb.applications.list();
+      const app = apps.find((a: Application) => a.id === id);
+      if (!app) return null;
+      return {
+        ...app,
+        candidate: {
+          id: app.candidate_id,
+          full_name: app.candidate_name || 'Unknown',
+          email: app.candidate_email || null,
+          skills: app.skills || null,
+          years_of_experience: app.years_of_experience || null
+        },
+        job_order: {
+          id: app.job_order_id,
+          jo_number: app.jo_number || '',
+          title: app.job_title || ''
+        }
+      } as ApplicationWithDetails;
     },
     enabled: !!id
   });
@@ -92,15 +140,7 @@ export function useApplication(id: string | null) {
 export function useCreateApplication() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (newApp: ApplicationInsert) => {
-      const { data, error } = await supabase
-        .from('candidate_job_applications')
-        .insert(newApp)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (newApp: ApplicationInsert) => azureDb.applications.create(newApp),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
     }
@@ -110,19 +150,8 @@ export function useCreateApplication() {
 export function useUpdateApplication() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: ApplicationUpdate }) => {
-      const { data, error } = await supabase
-        .from('candidate_job_applications')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: ({ id, updates }: { id: string; updates: ApplicationUpdate }) => 
+      azureDb.applications.update(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
     }
@@ -141,36 +170,8 @@ export function useUpdateApplicationStatus() {
       status: PipelineStatus;
       previousStatus?: PipelineStatus;
     }) => {
-      const now = new Date().toISOString();
-      
-      // Update application status
-      const { data: appData, error: appError } = await supabase
-        .from('candidate_job_applications')
-        .update({
-          pipeline_status: status,
-          status_changed_date: now,
-          updated_at: now
-        })
-        .eq('id', id)
-        .select('*, candidate:candidates(*)')
-        .single();
-      
-      if (appError) throw appError;
-
-      // Create timeline entry
-      const { error: timelineError } = await supabase
-        .from('candidate_timeline')
-        .insert({
-          application_id: id,
-          candidate_id: appData.candidate_id,
-          from_status: previousStatus || null,
-          to_status: status,
-          changed_date: now
-        });
-      
-      if (timelineError) console.error('Timeline error:', timelineError);
-      
-      return appData;
+      // The edge function handles timeline creation automatically
+      return azureDb.applications.update(id, { pipeline_status: status });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
@@ -183,11 +184,8 @@ export function useDeleteApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('candidate_job_applications')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
+      // Note: Azure PostgreSQL edge function would need DELETE endpoint for applications
+      throw new Error('Delete not implemented');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['applications'] });

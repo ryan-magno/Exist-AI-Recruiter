@@ -1,24 +1,61 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { azureDb } from '@/lib/azureDb';
 
-export type Candidate = Tables<'candidates'>;
-export type CandidateInsert = TablesInsert<'candidates'>;
-export type CandidateUpdate = TablesUpdate<'candidates'>;
+export interface Candidate {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  applicant_type: 'internal' | 'external';
+  skills: string[] | null;
+  positions_fit_for: string[] | null;
+  years_of_experience: number | null;
+  educational_background: string | null;
+  cv_url: string | null;
+  cv_filename: string | null;
+  availability: string | null;
+  preferred_work_setup: string | null;
+  expected_salary: string | null;
+  earliest_start_date: string | null;
+  uploaded_by: string | null;
+  uploaded_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
-export type WorkExperience = Tables<'candidate_work_experience'>;
+export interface CandidateInsert {
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  applicant_type?: 'internal' | 'external';
+  skills?: string[] | null;
+  years_of_experience?: number | null;
+  educational_background?: string | null;
+  availability?: string | null;
+  preferred_work_setup?: string | null;
+  expected_salary?: string | null;
+  cv_url?: string | null;
+  cv_filename?: string | null;
+  uploaded_by?: string | null;
+}
+
+export interface CandidateUpdate {
+  full_name?: string;
+  email?: string | null;
+  phone?: string | null;
+  applicant_type?: 'internal' | 'external';
+  skills?: string[] | null;
+  years_of_experience?: number | null;
+  educational_background?: string | null;
+  availability?: string | null;
+  preferred_work_setup?: string | null;
+  expected_salary?: string | null;
+}
 
 export function useCandidates() {
   return useQuery({
     queryKey: ['candidates'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('candidates')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    }
+    queryFn: () => azureDb.candidates.list() as Promise<Candidate[]>
   });
 }
 
@@ -27,13 +64,7 @@ export function useCandidate(id: string | null) {
     queryKey: ['candidates', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase
-        .from('candidates')
-        .select('*')
-        .eq('id', id)
-        .single();
-      if (error) throw error;
-      return data;
+      return azureDb.candidates.get(id) as Promise<Candidate | null>;
     },
     enabled: !!id
   });
@@ -44,17 +75,10 @@ export function useCandidateWithDetails(id: string | null) {
     queryKey: ['candidates', id, 'details'],
     queryFn: async () => {
       if (!id) return null;
-      
-      const [candidateRes, workExpRes] = await Promise.all([
-        supabase.from('candidates').select('*').eq('id', id).single(),
-        supabase.from('candidate_work_experience').select('*').eq('candidate_id', id).order('start_date', { ascending: false })
-      ]);
-      
-      if (candidateRes.error) throw candidateRes.error;
-      
+      const candidate = await azureDb.candidates.get(id);
       return {
-        ...candidateRes.data,
-        workExperiences: workExpRes.data || []
+        ...candidate,
+        workExperiences: [] // Work experience would need separate endpoint
       };
     },
     enabled: !!id
@@ -64,15 +88,7 @@ export function useCandidateWithDetails(id: string | null) {
 export function useCreateCandidate() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (newCandidate: CandidateInsert) => {
-      const { data, error } = await supabase
-        .from('candidates')
-        .insert(newCandidate)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (newCandidate: CandidateInsert) => azureDb.candidates.create(newCandidate),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
     }
@@ -82,16 +98,8 @@ export function useCreateCandidate() {
 export function useUpdateCandidate() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: CandidateUpdate }) => {
-      const { data, error } = await supabase
-        .from('candidates')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: ({ id, updates }: { id: string; updates: CandidateUpdate }) => 
+      azureDb.candidates.update(id, updates),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
       queryClient.invalidateQueries({ queryKey: ['candidates', variables.id] });
@@ -102,13 +110,7 @@ export function useUpdateCandidate() {
 export function useDeleteCandidate() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('candidates')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
-    },
+    mutationFn: (id: string) => azureDb.candidates.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
     }

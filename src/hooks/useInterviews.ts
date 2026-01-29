@@ -1,16 +1,90 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Tables, TablesInsert, TablesUpdate, Enums } from '@/integrations/supabase/types';
+import { azureDb } from '@/lib/azureDb';
 
-export type HRInterview = Tables<'hr_interviews'>;
-export type HRInterviewInsert = TablesInsert<'hr_interviews'>;
-export type HRInterviewUpdate = TablesUpdate<'hr_interviews'>;
-export type HRVerdict = Enums<'hr_verdict'>;
+export type HRVerdict = 'proceed_to_tech' | 'hold' | 'reject';
+export type TechVerdict = 'recommend_hire' | 'consider' | 'do_not_hire';
 
-export type TechInterview = Tables<'tech_interviews'>;
-export type TechInterviewInsert = TablesInsert<'tech_interviews'>;
-export type TechInterviewUpdate = TablesUpdate<'tech_interviews'>;
-export type TechVerdict = Enums<'tech_verdict'>;
+export interface HRInterview {
+  id: string;
+  application_id: string;
+  candidate_id: string;
+  interview_date: string | null;
+  interviewer_name: string | null;
+  interview_mode: string | null;
+  availability: string | null;
+  expected_salary: string | null;
+  preferred_work_setup: string | null;
+  notice_period: string | null;
+  communication_rating: number | null;
+  motivation_rating: number | null;
+  cultural_fit_rating: number | null;
+  professionalism_rating: number | null;
+  strengths: string | null;
+  concerns: string | null;
+  verdict: HRVerdict | null;
+  verdict_rationale: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HRInterviewInsert {
+  application_id: string;
+  candidate_id: string;
+  interview_date?: string | null;
+  interviewer_name?: string | null;
+  interview_mode?: string | null;
+  availability?: string | null;
+  expected_salary?: string | null;
+  preferred_work_setup?: string | null;
+  notice_period?: string | null;
+  communication_rating?: number | null;
+  motivation_rating?: number | null;
+  cultural_fit_rating?: number | null;
+  professionalism_rating?: number | null;
+  strengths?: string | null;
+  concerns?: string | null;
+  verdict?: HRVerdict | null;
+  verdict_rationale?: string | null;
+}
+
+export interface TechInterview {
+  id: string;
+  application_id: string;
+  candidate_id: string;
+  interview_date: string | null;
+  interviewer_name: string | null;
+  interview_mode: string | null;
+  technical_knowledge_rating: number | null;
+  problem_solving_rating: number | null;
+  code_quality_rating: number | null;
+  system_design_rating: number | null;
+  coding_challenge_score: number | null;
+  coding_challenge_notes: string | null;
+  technical_strengths: string | null;
+  areas_for_improvement: string | null;
+  verdict: TechVerdict | null;
+  verdict_rationale: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TechInterviewInsert {
+  application_id: string;
+  candidate_id: string;
+  interview_date?: string | null;
+  interviewer_name?: string | null;
+  interview_mode?: string | null;
+  technical_knowledge_rating?: number | null;
+  problem_solving_rating?: number | null;
+  code_quality_rating?: number | null;
+  system_design_rating?: number | null;
+  coding_challenge_score?: number | null;
+  coding_challenge_notes?: string | null;
+  technical_strengths?: string | null;
+  areas_for_improvement?: string | null;
+  verdict?: TechVerdict | null;
+  verdict_rationale?: string | null;
+}
 
 // HR Interviews
 export function useHRInterview(applicationId: string | null) {
@@ -18,13 +92,7 @@ export function useHRInterview(applicationId: string | null) {
     queryKey: ['hr-interviews', applicationId],
     queryFn: async () => {
       if (!applicationId) return null;
-      const { data, error } = await supabase
-        .from('hr_interviews')
-        .select('*')
-        .eq('application_id', applicationId)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      return azureDb.hrInterviews.get(applicationId) as Promise<HRInterview | null>;
     },
     enabled: !!applicationId
   });
@@ -35,13 +103,7 @@ export function useHRInterviewByCandidate(candidateId: string | null) {
     queryKey: ['hr-interviews', 'candidate', candidateId],
     queryFn: async () => {
       if (!candidateId) return [];
-      const { data, error } = await supabase
-        .from('hr_interviews')
-        .select('*')
-        .eq('candidate_id', candidateId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
+      return azureDb.hrInterviews.listByCandidate(candidateId) as Promise<HRInterview[]>;
     },
     enabled: !!candidateId
   });
@@ -50,15 +112,7 @@ export function useHRInterviewByCandidate(candidateId: string | null) {
 export function useUpsertHRInterview() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (interview: HRInterviewInsert) => {
-      const { data, error } = await supabase
-        .from('hr_interviews')
-        .upsert(interview, { onConflict: 'application_id' })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (interview: HRInterviewInsert) => azureDb.hrInterviews.upsert(interview),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['hr-interviews'] });
       queryClient.invalidateQueries({ queryKey: ['hr-interviews', variables.application_id] });
@@ -69,16 +123,8 @@ export function useUpsertHRInterview() {
 export function useUpdateHRInterview() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: HRInterviewUpdate }) => {
-      const { data, error } = await supabase
-        .from('hr_interviews')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<HRInterview> }) => 
+      azureDb.hrInterviews.upsert({ ...updates, application_id: id } as HRInterviewInsert),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hr-interviews'] });
     }
@@ -91,13 +137,7 @@ export function useTechInterview(applicationId: string | null) {
     queryKey: ['tech-interviews', applicationId],
     queryFn: async () => {
       if (!applicationId) return null;
-      const { data, error } = await supabase
-        .from('tech_interviews')
-        .select('*')
-        .eq('application_id', applicationId)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      return azureDb.techInterviews.get(applicationId) as Promise<TechInterview | null>;
     },
     enabled: !!applicationId
   });
@@ -108,13 +148,7 @@ export function useTechInterviewByCandidate(candidateId: string | null) {
     queryKey: ['tech-interviews', 'candidate', candidateId],
     queryFn: async () => {
       if (!candidateId) return [];
-      const { data, error } = await supabase
-        .from('tech_interviews')
-        .select('*')
-        .eq('candidate_id', candidateId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
+      return azureDb.techInterviews.listByCandidate(candidateId) as Promise<TechInterview[]>;
     },
     enabled: !!candidateId
   });
@@ -123,15 +157,7 @@ export function useTechInterviewByCandidate(candidateId: string | null) {
 export function useUpsertTechInterview() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (interview: TechInterviewInsert) => {
-      const { data, error } = await supabase
-        .from('tech_interviews')
-        .upsert(interview, { onConflict: 'application_id' })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (interview: TechInterviewInsert) => azureDb.techInterviews.upsert(interview),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['tech-interviews'] });
       queryClient.invalidateQueries({ queryKey: ['tech-interviews', variables.application_id] });
@@ -142,16 +168,8 @@ export function useUpsertTechInterview() {
 export function useUpdateTechInterview() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: TechInterviewUpdate }) => {
-      const { data, error } = await supabase
-        .from('tech_interviews')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<TechInterview> }) => 
+      azureDb.techInterviews.upsert({ ...updates, application_id: id } as TechInterviewInsert),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tech-interviews'] });
     }
