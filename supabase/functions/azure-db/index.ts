@@ -240,10 +240,10 @@ async function initTables() {
 }
 
 // Seed initial data
-async function seedData() {
+async function seedData(forceReseed = false) {
   // Check if already seeded
-  const existing = await query("SELECT COUNT(*) as count FROM departments");
-  if (existing.length > 0 && (existing[0] as any).count > 0) {
+  const existing = await query("SELECT COUNT(*) as count FROM candidate_job_applications");
+  if (!forceReseed && existing.length > 0 && parseInt((existing[0] as any).count) > 0) {
     console.log("Data already seeded");
     return;
   }
@@ -308,12 +308,12 @@ async function seedData() {
       ($3, $2, 'for_tech_interview', 88),
       ($4, $5, 'for_hr_interview', 85),
       ($6, $2, 'screening', 78),
-      ($7, $5, 'for_hr_interview', 90),
+      ($7, $2, 'for_hr_interview', 90),
       ($8, $9, 'for_tech_interview', 87),
       ($10, $11, 'for_hr_interview', 82),
       ($12, $2, 'offer', 95)
       ON CONFLICT (candidate_id, job_order_id) DO NOTHING
-    `, [c1, jo1, c2, c3, jo2, c4, c5, jo1, c6, jo4, c7, jo5, c8]);
+    `, [c1, jo1, c2, c4, jo2, c5, c6, c7, jo4, c8, jo5, c3]);
   }
 
   console.log("Synthetic data seeded successfully");
