@@ -1,25 +1,25 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { FilePlus, Calendar, Hash, Briefcase, Users, Building, User, Loader2, ExternalLink } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useApp } from '@/context/AppContext';
-import { toast } from 'sonner';
-import { Level, EmploymentType, levelLabels, employmentTypeLabels } from '@/data/mockData';
-import { cn } from '@/lib/utils';
-import { RichTextEditor } from '@/components/ui/RichTextEditor';
-import { useDepartmentNames } from '@/hooks/useDepartments';
-import { useJobOrderCount, useCreateJobOrder } from '@/hooks/useJobOrders';
-import { Enums } from '@/integrations/supabase/types';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { FilePlus, Calendar, Hash, Briefcase, Users, Building, User, Loader2, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useApp } from "@/context/AppContext";
+import { toast } from "sonner";
+import { Level, EmploymentType, levelLabels, employmentTypeLabels } from "@/data/mockData";
+import { cn } from "@/lib/utils";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { useDepartmentNames } from "@/hooks/useDepartments";
+import { useJobOrderCount, useCreateJobOrder } from "@/hooks/useJobOrders";
+import { Enums } from "@/integrations/supabase/types";
 
 const JOB_POSTING_SITES = [
-  { id: 'linkedin', name: 'LinkedIn', icon: '💼' },
-  { id: 'indeed', name: 'Indeed', icon: '🔍' },
-  { id: 'jobstreet', name: 'JobStreet', icon: '📋' },
+  { id: "linkedin", name: "LinkedIn" },
+  { id: "indeed", name: "Indeed" },
+  { id: "jobstreet", name: "JobStreet" },
 ];
 
 export default function CreateJOPage() {
@@ -27,27 +27,27 @@ export default function CreateJOPage() {
   const { data: departmentNames = [], isLoading: loadingDepartments } = useDepartmentNames();
   const { data: joCount = 0, isLoading: loadingCount } = useJobOrderCount();
   const createJobOrder = useCreateJobOrder();
-  
+
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    level: '' as Level | '',
+    title: "",
+    description: "",
+    level: "" as Level | "",
     quantity: 1,
-    requiredDate: '',
-    department: '',
-    employmentType: '' as EmploymentType | '',
-    requestorName: ''
+    requiredDate: "",
+    department: "",
+    employmentType: "" as EmploymentType | "",
+    requestorName: "",
   });
 
   const [postingSites, setPostingSites] = useState<string[]>([]);
 
   const [errors, setErrors] = useState<Record<string, boolean>>({});
 
-  const nextJoNumber = `JO-${new Date().getFullYear()}-${String(joCount + 1).padStart(3, '0')}`;
+  const nextJoNumber = `JO-${new Date().getFullYear()}-${String(joCount + 1).padStart(3, "0")}`;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const newErrors: Record<string, boolean> = {};
     if (!formData.title) newErrors.title = true;
     if (!formData.description) newErrors.description = true;
@@ -56,11 +56,11 @@ export default function CreateJOPage() {
     if (!formData.department) newErrors.department = true;
     if (!formData.employmentType) newErrors.employmentType = true;
     if (!formData.requestorName) newErrors.requestorName = true;
-    
+
     setErrors(newErrors);
-    
+
     if (Object.keys(newErrors).length > 0) {
-      toast.error('Please fill in all required fields');
+      toast.error("Please fill in all required fields");
       return;
     }
 
@@ -69,23 +69,25 @@ export default function CreateJOPage() {
         jo_number: nextJoNumber,
         title: formData.title,
         description: formData.description,
-        level: formData.level as Enums<'job_level'>,
+        level: formData.level as Enums<"job_level">,
         quantity: formData.quantity,
         required_date: formData.requiredDate || null,
-        status: 'draft',
+        status: "draft",
         department_name: formData.department,
-        employment_type: (formData.employmentType === 'full-time' ? 'regular' : formData.employmentType) as Enums<'employment_type'>,
-        requestor_name: formData.requestorName
+        employment_type: (formData.employmentType === "full-time"
+          ? "regular"
+          : formData.employmentType) as Enums<"employment_type">,
+        requestor_name: formData.requestorName,
       });
 
-      toast.success('Job Order created successfully', {
-        description: `${nextJoNumber} has been added to your dashboard.`
+      toast.success("Job Order created successfully", {
+        description: `${nextJoNumber} has been added to your dashboard.`,
       });
 
-      navigate('/dashboard');
+      navigate("/dashboard");
     } catch (error) {
-      console.error('Error creating job order:', error);
-      toast.error('Failed to create job order');
+      console.error("Error creating job order:", error);
+      toast.error("Failed to create job order");
     }
   };
 
@@ -93,11 +95,7 @@ export default function CreateJOPage() {
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
@@ -120,7 +118,7 @@ export default function CreateJOPage() {
                 <Hash className="w-4 h-4 text-muted-foreground" />
                 JO Number
               </Label>
-              <Input value={isLoading ? 'Loading...' : nextJoNumber} disabled className="bg-muted" />
+              <Input value={isLoading ? "Loading..." : nextJoNumber} disabled className="bg-muted" />
               <p className="text-xs text-muted-foreground">Auto-generated</p>
             </div>
 
@@ -135,9 +133,9 @@ export default function CreateJOPage() {
                 value={formData.title}
                 onChange={(e) => {
                   setFormData({ ...formData, title: e.target.value });
-                  if (e.target.value) setErrors(prev => ({ ...prev, title: false }));
+                  if (e.target.value) setErrors((prev) => ({ ...prev, title: false }));
                 }}
-                className={cn(errors.title && 'border-destructive focus-visible:ring-destructive')}
+                className={cn(errors.title && "border-destructive focus-visible:ring-destructive")}
               />
             </div>
 
@@ -152,9 +150,9 @@ export default function CreateJOPage() {
                 value={formData.requestorName}
                 onChange={(e) => {
                   setFormData({ ...formData, requestorName: e.target.value });
-                  if (e.target.value) setErrors(prev => ({ ...prev, requestorName: false }));
+                  if (e.target.value) setErrors((prev) => ({ ...prev, requestorName: false }));
                 }}
-                className={cn(errors.requestorName && 'border-destructive focus-visible:ring-destructive')}
+                className={cn(errors.requestorName && "border-destructive focus-visible:ring-destructive")}
               />
             </div>
 
@@ -168,15 +166,17 @@ export default function CreateJOPage() {
                 value={formData.department}
                 onValueChange={(value) => {
                   setFormData({ ...formData, department: value });
-                  setErrors(prev => ({ ...prev, department: false }));
+                  setErrors((prev) => ({ ...prev, department: false }));
                 }}
               >
-                <SelectTrigger className={cn(errors.department && 'border-destructive focus-visible:ring-destructive')}>
+                <SelectTrigger className={cn(errors.department && "border-destructive focus-visible:ring-destructive")}>
                   <SelectValue placeholder={loadingDepartments ? "Loading..." : "Select department"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {departmentNames.map(dept => (
-                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                  {departmentNames.map((dept) => (
+                    <SelectItem key={dept} value={dept}>
+                      {dept}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -189,7 +189,7 @@ export default function CreateJOPage() {
                 value={formData.description}
                 onChange={(value) => {
                   setFormData({ ...formData, description: value });
-                  if (value) setErrors(prev => ({ ...prev, description: false }));
+                  if (value) setErrors((prev) => ({ ...prev, description: false }));
                 }}
                 placeholder="Describe the role, responsibilities, and requirements..."
                 error={errors.description}
@@ -205,15 +205,17 @@ export default function CreateJOPage() {
                   value={formData.level}
                   onValueChange={(value) => {
                     setFormData({ ...formData, level: value as Level });
-                    setErrors(prev => ({ ...prev, level: false }));
+                    setErrors((prev) => ({ ...prev, level: false }));
                   }}
                 >
-                  <SelectTrigger className={cn(errors.level && 'border-destructive focus-visible:ring-destructive')}>
+                  <SelectTrigger className={cn(errors.level && "border-destructive focus-visible:ring-destructive")}>
                     <SelectValue placeholder="Select level" />
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(levelLabels).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -225,15 +227,19 @@ export default function CreateJOPage() {
                   value={formData.employmentType}
                   onValueChange={(value) => {
                     setFormData({ ...formData, employmentType: value as EmploymentType });
-                    setErrors(prev => ({ ...prev, employmentType: false }));
+                    setErrors((prev) => ({ ...prev, employmentType: false }));
                   }}
                 >
-                  <SelectTrigger className={cn(errors.employmentType && 'border-destructive focus-visible:ring-destructive')}>
+                  <SelectTrigger
+                    className={cn(errors.employmentType && "border-destructive focus-visible:ring-destructive")}
+                  >
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(employmentTypeLabels).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -264,10 +270,10 @@ export default function CreateJOPage() {
                   <label
                     key={site.id}
                     className={cn(
-                      'flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all',
+                      "flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all",
                       postingSites.includes(site.id)
-                        ? 'bg-primary/10 border-primary text-primary'
-                        : 'bg-muted/50 border-border hover:border-primary/50'
+                        ? "bg-primary/10 border-primary text-primary"
+                        : "bg-muted/50 border-border hover:border-primary/50",
                     )}
                   >
                     <Checkbox
@@ -276,7 +282,7 @@ export default function CreateJOPage() {
                         if (checked) {
                           setPostingSites([...postingSites, site.id]);
                         } else {
-                          setPostingSites(postingSites.filter(id => id !== site.id));
+                          setPostingSites(postingSites.filter((id) => id !== site.id));
                         }
                       }}
                     />
@@ -299,22 +305,31 @@ export default function CreateJOPage() {
                 value={formData.requiredDate}
                 onChange={(e) => {
                   setFormData({ ...formData, requiredDate: e.target.value });
-                  if (e.target.value) setErrors(prev => ({ ...prev, requiredDate: false }));
+                  if (e.target.value) setErrors((prev) => ({ ...prev, requiredDate: false }));
                 }}
-                className={cn(errors.requiredDate && 'border-destructive focus-visible:ring-destructive')}
+                className={cn(errors.requiredDate && "border-destructive focus-visible:ring-destructive")}
               />
             </div>
           </div>
 
           {/* Submit */}
           <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={() => navigate('/dashboard')}>
+            <Button type="button" variant="outline" onClick={() => navigate("/dashboard")}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="gap-2"
-              disabled={createJobOrder.isPending || !formData.title || !formData.description || !formData.level || !formData.requiredDate || !formData.department || !formData.employmentType || !formData.requestorName}
+              disabled={
+                createJobOrder.isPending ||
+                !formData.title ||
+                !formData.description ||
+                !formData.level ||
+                !formData.requiredDate ||
+                !formData.department ||
+                !formData.employmentType ||
+                !formData.requestorName
+              }
             >
               {createJobOrder.isPending ? (
                 <>
