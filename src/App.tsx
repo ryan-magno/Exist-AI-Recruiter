@@ -10,6 +10,8 @@ import DashboardPage from "./pages/DashboardPage";
 import CreateJOPage from "./pages/CreateJOPage";
 import ArchivePage from "./pages/ArchivePage";
 import CandidatesPage from "./pages/CandidatesPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
+import ChatbotPage from "./pages/ChatbotPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +31,8 @@ const App = () => (
               <Route path="/create-jo" element={<CreateJOPage />} />
               <Route path="/archive" element={<ArchivePage />} />
               <Route path="/candidates" element={<CandidatesPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/chatbot" element={<ChatbotPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppLayout>

@@ -1,28 +1,44 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, FileText, Check, Loader2, Sparkles, RotateCcw, User, Plus } from 'lucide-react';
+import { Upload, FileText, Check, Loader2, Sparkles, RotateCcw, User, Plus, Building, Calendar, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useCVUploaderNames, useCreateCVUploader } from '@/hooks/useCVUploaders';
+import { useDepartmentNames } from '@/hooks/useDepartments';
+import { ApplicantType } from '@/data/mockData';
 
 interface UploadedFile {
   id: string;
   name: string;
   size: string;
   status: 'ready' | 'processing' | 'complete';
+  isInternal: boolean;
+  department?: string;
+  fromDate?: string;
+  toDate?: string;
+  uploadReason?: 'role-change' | 'benched' | 'other';
+  otherReason?: string;
 }
 
-const demoFiles: UploadedFile[] = [
+const demoFiles: Omit<UploadedFile, 'isInternal'>[] = [
   { id: '1', name: 'Maria_Santos_CV.pdf', size: '245 KB', status: 'ready' },
   { id: '2', name: 'John_Rodriguez_Resume.docx', size: '189 KB', status: 'ready' },
   { id: '3', name: 'Angela_Cruz_CV.pdf', size: '312 KB', status: 'ready' },
   { id: '4', name: 'Michael_Tan_Resume.pdf', size: '278 KB', status: 'ready' },
   { id: '5', name: 'Patricia_Reyes_CV.docx', size: '156 KB', status: 'ready' },
+];
+
+const UPLOAD_REASONS = [
+  { value: 'role-change', label: 'Looking for Role Change' },
+  { value: 'benched', label: 'Benched' },
+  { value: 'other', label: 'Other' },
 ];
 
 export default function UploadPage() {
@@ -34,11 +50,13 @@ export default function UploadPage() {
   const [uploaderName, setUploaderName] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
+  const [defaultIsInternal, setDefaultIsInternal] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   // Database hooks
   const { data: existingUploaders = [], isLoading: loadingUploaders } = useCVUploaderNames();
+  const { data: departmentNames = [], isLoading: loadingDepartments } = useDepartmentNames();
   const createUploader = useCreateCVUploader();
 
   // Filter suggestions based on input
@@ -89,9 +107,9 @@ export default function UploadPage() {
       return;
     }
     
-    setFiles(demoFiles);
+    setFiles(demoFiles.map(f => ({ ...f, isInternal: defaultIsInternal })));
     toast.success('Files uploaded successfully');
-  }, [uploaderName]);
+  }, [uploaderName, defaultIsInternal]);
 
   const handleClick = () => {
     if (!uploaderName.trim()) {
@@ -99,8 +117,12 @@ export default function UploadPage() {
       return;
     }
     
-    setFiles(demoFiles);
+    setFiles(demoFiles.map(f => ({ ...f, isInternal: defaultIsInternal })));
     toast.success('Files uploaded successfully');
+  };
+
+  const updateFile = (fileId: string, updates: Partial<UploadedFile>) => {
+    setFiles(prev => prev.map(f => f.id === fileId ? { ...f, ...updates } : f));
   };
 
   const handleVectorize = async () => {
@@ -138,6 +160,7 @@ export default function UploadPage() {
     setFiles([]);
     setIsVectorized(false);
     setUploaderName('');
+    setDefaultIsInternal(false);
     toast.info('Ready for new uploads');
   };
 
@@ -242,6 +265,36 @@ export default function UploadPage() {
           </div>
         </div>
 
+        {/* Internal/External Classification */}
+        <div className="bg-card rounded-xl border shadow-sm p-4 mb-6">
+          <Label className="flex items-center gap-2 text-sm font-medium mb-3">
+            <User className="w-4 h-4 text-muted-foreground" />
+            Default Applicant Type
+          </Label>
+          <RadioGroup
+            value={defaultIsInternal ? 'internal' : 'external'}
+            onValueChange={(val) => {
+              setDefaultIsInternal(val === 'internal');
+              // Update existing files
+              setFiles(prev => prev.map(f => ({ ...f, isInternal: val === 'internal' })));
+            }}
+            className="flex gap-4"
+            disabled={isVectorized}
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="external" id="external" />
+              <Label htmlFor="external" className="cursor-pointer">External Applicant</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="internal" id="internal" />
+              <Label htmlFor="internal" className="cursor-pointer">Internal Employee</Label>
+            </div>
+          </RadioGroup>
+          <p className="text-xs text-muted-foreground mt-2">
+            Internal employees will have additional fields for dates and department
+          </p>
+        </div>
+
         <div
           className={cn(
             'dropzone text-center mb-6',
@@ -279,20 +332,14 @@ export default function UploadPage() {
               </div>
               <div className="divide-y">
                 {files.map((file, index) => (
-                  <motion.div key={file.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.1 }} className="flex items-center gap-4 p-4">
-                    <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center">
-                      <FileText className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-foreground">{file.name}</p>
-                      <p className="text-sm text-muted-foreground">{file.size}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {file.status === 'ready' && <span className="status-badge bg-secondary text-secondary-foreground">Ready</span>}
-                      {file.status === 'processing' && <span className="status-badge bg-primary/10 text-primary"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Processing</span>}
-                      {file.status === 'complete' && <span className="status-badge bg-primary text-primary-foreground"><Check className="w-3 h-3 mr-1" />Complete</span>}
-                    </div>
-                  </motion.div>
+                  <FileRow 
+                    key={file.id} 
+                    file={file} 
+                    index={index} 
+                    onUpdate={(updates) => updateFile(file.id, updates)}
+                    departments={departmentNames}
+                    disabled={isVectorized || file.status !== 'ready'}
+                  />
                 ))}
               </div>
             </motion.div>
@@ -313,5 +360,146 @@ export default function UploadPage() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+interface FileRowProps {
+  file: UploadedFile;
+  index: number;
+  onUpdate: (updates: Partial<UploadedFile>) => void;
+  departments: string[];
+  disabled: boolean;
+}
+
+function FileRow({ file, index, onUpdate, departments, disabled }: FileRowProps) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, x: -20 }} 
+      animate={{ opacity: 1, x: 0 }} 
+      transition={{ delay: index * 0.1 }} 
+      className="p-4"
+    >
+      <div className="flex items-start gap-4">
+        <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center shrink-0">
+          <FileText className="w-5 h-5 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="font-medium text-foreground">{file.name}</p>
+              <p className="text-sm text-muted-foreground">{file.size}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {file.status === 'ready' && <span className="status-badge bg-secondary text-secondary-foreground">Ready</span>}
+              {file.status === 'processing' && <span className="status-badge bg-primary/10 text-primary"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Processing</span>}
+              {file.status === 'complete' && <span className="status-badge bg-primary text-primary-foreground"><Check className="w-3 h-3 mr-1" />Complete</span>}
+            </div>
+          </div>
+
+          {/* Classification Row */}
+          <div className="flex flex-wrap items-center gap-3 mb-2">
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground">Type:</Label>
+              <Select
+                value={file.isInternal ? 'internal' : 'external'}
+                onValueChange={(val) => onUpdate({ isInternal: val === 'internal' })}
+                disabled={disabled}
+              >
+                <SelectTrigger className="h-7 text-xs w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="external">External</SelectItem>
+                  <SelectItem value="internal">Internal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {file.isInternal && (
+              <>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                    <Calendar className="w-3 h-3 inline mr-1" />
+                    From:
+                  </Label>
+                  <Input
+                    type="date"
+                    value={file.fromDate || ''}
+                    onChange={(e) => onUpdate({ fromDate: e.target.value })}
+                    className="h-7 text-xs w-32"
+                    disabled={disabled}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">To:</Label>
+                  <Input
+                    type="date"
+                    value={file.toDate || ''}
+                    onChange={(e) => onUpdate({ toDate: e.target.value })}
+                    className="h-7 text-xs w-32"
+                    disabled={disabled}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">
+                    <Building className="w-3 h-3 inline mr-1" />
+                    Dept:
+                  </Label>
+                  <Select
+                    value={file.department || ''}
+                    onValueChange={(val) => onUpdate({ department: val })}
+                    disabled={disabled}
+                  >
+                    <SelectTrigger className="h-7 text-xs w-32">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map(dept => (
+                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Reason Row (for internal) */}
+          {file.isInternal && (
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground">
+                  <MessageSquare className="w-3 h-3 inline mr-1" />
+                  Reason:
+                </Label>
+                <Select
+                  value={file.uploadReason || ''}
+                  onValueChange={(val) => onUpdate({ uploadReason: val as any })}
+                  disabled={disabled}
+                >
+                  <SelectTrigger className="h-7 text-xs w-40">
+                    <SelectValue placeholder="Select reason" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UPLOAD_REASONS.map(r => (
+                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {file.uploadReason === 'other' && (
+                <Input
+                  placeholder="Specify reason..."
+                  value={file.otherReason || ''}
+                  onChange={(e) => onUpdate({ otherReason: e.target.value })}
+                  className="h-7 text-xs flex-1 min-w-[150px]"
+                  disabled={disabled}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
   );
 }

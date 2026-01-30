@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Mail, Phone, Linkedin, FileText, Sparkles, ExternalLink, Download, Briefcase, Calendar, DollarSign, User, Code, GraduationCap, Clock, Target, History, UserCheck, Building, Tag } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Linkedin, FileText, Sparkles, ExternalLink, Download, Briefcase, Calendar, DollarSign, User, Code, GraduationCap, Clock, Target, History, UserCheck, Building, Tag, FileCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,6 +10,7 @@ import { EmailModal } from '@/components/modals/EmailModal';
 import { TypewriterText } from '@/components/ui/TypewriterText';
 import { HRInterviewFormTab } from '@/components/candidate/HRInterviewFormTab';
 import { TechInterviewFormTab } from '@/components/candidate/TechInterviewFormTab';
+import { OfferFormTab } from '@/components/candidate/OfferFormTab';
 import { ApplicationHistoryTab } from '@/components/candidate/ApplicationHistoryTab';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -122,8 +123,9 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
           </div>
         </div>
 
+        {/* Main Tabs - Profile sections only */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-6 flex-shrink-0 mx-4 mt-2" style={{width: 'calc(100% - 32px)'}}>
+          <TabsList className="grid w-full grid-cols-4 flex-shrink-0 mx-4 mt-2" style={{width: 'calc(100% - 32px)'}}>
             <TabsTrigger value="profile" className="gap-1.5 text-xs">
               <User className="w-3.5 h-3.5" />
               Profile
@@ -131,14 +133,6 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
             <TabsTrigger value="analysis" className="gap-1.5 text-xs">
               <Sparkles className="w-3.5 h-3.5" />
               Match
-            </TabsTrigger>
-            <TabsTrigger value="hr-form" className="gap-1.5 text-xs">
-              <UserCheck className="w-3.5 h-3.5" />
-              HR Form
-            </TabsTrigger>
-            <TabsTrigger value="tech-form" className="gap-1.5 text-xs">
-              <Code className="w-3.5 h-3.5" />
-              Tech Form
             </TabsTrigger>
             <TabsTrigger value="cv" className="gap-1.5 text-xs">
               <FileText className="w-3.5 h-3.5" />
@@ -164,6 +158,14 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
               />
             </TabsContent>
 
+            <TabsContent value="cv" className="m-0 h-full pb-4">
+              <CVPreview candidate={currentCandidate} />
+            </TabsContent>
+
+            <TabsContent value="history" className="m-0 h-full">
+              <ApplicationHistoryTab candidate={currentCandidate} />
+            </TabsContent>
+
             <TabsContent value="hr-form" className="m-0 h-full">
               <HRInterviewFormTab candidate={currentCandidate} />
             </TabsContent>
@@ -172,15 +174,45 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
               <TechInterviewFormTab candidate={currentCandidate} />
             </TabsContent>
 
-            <TabsContent value="cv" className="m-0 h-full pb-4">
-              <CVPreview candidate={currentCandidate} />
-            </TabsContent>
-
-            <TabsContent value="history" className="m-0 h-full">
-              <ApplicationHistoryTab candidate={currentCandidate} />
+            <TabsContent value="offer-form" className="m-0 h-full">
+              <OfferFormTab candidate={currentCandidate} />
             </TabsContent>
           </div>
         </Tabs>
+
+        {/* Interview Forms - Separate section below */}
+        <div className="border-t bg-muted/30 p-3 flex-shrink-0">
+          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Interview Forms</p>
+          <div className="flex gap-2">
+            <Button
+              variant={activeTab === 'hr-form' ? 'default' : 'outline'}
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => setActiveTab('hr-form')}
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              HR Form
+            </Button>
+            <Button
+              variant={activeTab === 'tech-form' ? 'default' : 'outline'}
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => setActiveTab('tech-form')}
+            >
+              <Code className="w-3.5 h-3.5" />
+              Tech Form
+            </Button>
+            <Button
+              variant={activeTab === 'offer-form' ? 'default' : 'outline'}
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => setActiveTab('offer-form')}
+            >
+              <FileCheck className="w-3.5 h-3.5" />
+              Offer Form
+            </Button>
+          </div>
+        </div>
       </div>
 
       <EmailModal

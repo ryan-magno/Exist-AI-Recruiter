@@ -1,0 +1,253 @@
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Save, FileCheck, AlertCircle, Calendar, DollarSign, Briefcase, Clock, MessageSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Candidate } from '@/data/mockData';
+import { useApp } from '@/context/AppContext';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+
+export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'negotiating' | 'unresponsive' | '';
+
+export interface OfferForm {
+  offerDate: string;
+  offerAmount: string;
+  position: string;
+  startDate: string;
+  status: OfferStatus;
+  remarks: string;
+  expiryDate: string;
+  benefits: string;
+  negotiationNotes: string;
+}
+
+const offerStatusLabels: Record<OfferStatus, string> = {
+  '': 'Not Set',
+  'pending': 'Pending Response',
+  'accepted': 'Accepted',
+  'rejected': 'Rejected',
+  'negotiating': 'Negotiating',
+  'unresponsive': 'Unresponsive'
+};
+
+const offerStatusColors: Record<OfferStatus, string> = {
+  '': 'bg-slate-100 text-slate-600 border-slate-300',
+  'pending': 'bg-amber-100 text-amber-700 border-amber-300',
+  'accepted': 'bg-emerald-100 text-emerald-700 border-emerald-300',
+  'rejected': 'bg-red-100 text-red-700 border-red-300',
+  'negotiating': 'bg-blue-100 text-blue-700 border-blue-300',
+  'unresponsive': 'bg-slate-100 text-slate-600 border-slate-300'
+};
+
+interface OfferFormTabProps {
+  candidate: Candidate;
+}
+
+export function OfferFormTab({ candidate }: OfferFormTabProps) {
+  const { candidates, updateCandidatePipelineStatus } = useApp();
+  const currentCandidate = candidates.find(c => c.id === candidate.id) || candidate;
+  
+  const isOfferStage = currentCandidate.pipelineStatus === 'offer' || currentCandidate.pipelineStatus === 'hired';
+
+  const [formData, setFormData] = useState<OfferForm>({
+    offerDate: '',
+    offerAmount: '',
+    position: currentCandidate.positionApplied || '',
+    startDate: '',
+    status: '',
+    remarks: '',
+    expiryDate: '',
+    benefits: '',
+    negotiationNotes: ''
+  });
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Update form when candidate data changes
+  useEffect(() => {
+    if ((currentCandidate as any).offerForm) {
+      setFormData((currentCandidate as any).offerForm);
+    }
+  }, [currentCandidate]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    
+    // Simulate save
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // If offer is accepted, move to hired
+    if (formData.status === 'accepted' && currentCandidate.pipelineStatus !== 'hired') {
+      updateCandidatePipelineStatus(currentCandidate.id, 'hired');
+      toast.success('Offer accepted! Candidate moved to Hired.');
+    } else if (formData.status === 'rejected') {
+      toast.success('Offer form saved. Candidate rejected the offer.');
+    } else {
+      toast.success('Offer form saved successfully');
+    }
+    
+    setIsSaving(false);
+  };
+
+  if (!isOfferStage) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full py-12 text-center">
+        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+          <AlertCircle className="w-8 h-8 text-muted-foreground" />
+        </div>
+        <h3 className="text-lg font-semibold text-foreground mb-2">Not Yet at Offer Stage</h3>
+        <p className="text-muted-foreground text-sm max-w-md">
+          This form will be available once the candidate reaches the Offer stage.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-2xl">
+      <div className="bg-card rounded-xl border p-4">
+        <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+          <FileCheck className="w-5 h-5 text-primary" />
+          Offer Details
+        </h3>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+              Offer Date
+            </Label>
+            <Input
+              type="date"
+              value={formData.offerDate}
+              onChange={(e) => setFormData({ ...formData, offerDate: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+              Expiry Date
+            </Label>
+            <Input
+              type="date"
+              value={formData.expiryDate}
+              onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm">
+              <DollarSign className="w-4 h-4 text-muted-foreground" />
+              Offer Amount
+            </Label>
+            <Input
+              placeholder="e.g., ₱150,000/month"
+              value={formData.offerAmount}
+              onChange={(e) => setFormData({ ...formData, offerAmount: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm">
+              <Briefcase className="w-4 h-4 text-muted-foreground" />
+              Position
+            </Label>
+            <Input
+              placeholder="Position offered"
+              value={formData.position}
+              onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm">
+              <Clock className="w-4 h-4 text-muted-foreground" />
+              Start Date
+            </Label>
+            <Input
+              type="date"
+              value={formData.startDate}
+              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm">Offer Status</Label>
+            <Select
+              value={formData.status}
+              onValueChange={(value) => setFormData({ ...formData, status: value as OfferStatus })}
+            >
+              <SelectTrigger className={cn("border", formData.status && offerStatusColors[formData.status])}>
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(offerStatusLabels).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <Label className="text-sm">Benefits Package</Label>
+          <Textarea
+            placeholder="Health insurance, bonuses, allowances, etc."
+            value={formData.benefits}
+            onChange={(e) => setFormData({ ...formData, benefits: e.target.value })}
+            rows={2}
+          />
+        </div>
+      </div>
+
+      {/* Remarks & Notes */}
+      <div className="bg-card rounded-xl border p-4">
+        <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+          <MessageSquare className="w-5 h-5 text-primary" />
+          Remarks & Notes
+        </h3>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm">Remarks</Label>
+            <Textarea
+              placeholder="General remarks about the offer..."
+              value={formData.remarks}
+              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+              rows={3}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm">Negotiation Notes</Label>
+            <Textarea
+              placeholder="Notes from any negotiation discussions..."
+              value={formData.negotiationNotes}
+              onChange={(e) => setFormData({ ...formData, negotiationNotes: e.target.value })}
+              rows={3}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Save Button */}
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+          {isSaving ? (
+            <>Saving...</>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              Save Offer Form
+            </>
+          )}
+        </Button>
+      </div>
+    </motion.div>
+  );
+}

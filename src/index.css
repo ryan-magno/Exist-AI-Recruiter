@@ -6,29 +6,29 @@
 
 @layer base {
   :root {
-    /* Exist AI Brand Colors */
-    --background: 210 17% 97%; /* #f4f6f8 */
-    --foreground: 0 0% 20%; /* #333333 */
+    /* Exist AI Brand Colors - Increased Contrast */
+    --background: 210 20% 96%; /* Slightly darker background */
+    --foreground: 0 0% 12%; /* Darker text for better contrast */
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 20%;
+    --card-foreground: 0 0% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 20%;
+    --popover-foreground: 0 0% 12%;
 
     /* Primary: Exist Green #69a927 */
     --primary: 86 61% 41%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary: Professional gray tones */
-    --secondary: 210 14% 93%;
-    --secondary-foreground: 0 0% 20%;
+    /* Secondary: Professional gray tones - more contrast */
+    --secondary: 210 14% 89%;
+    --secondary-foreground: 0 0% 15%;
 
-    --muted: 210 14% 95%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 210 14% 92%;
+    --muted-foreground: 215 16% 40%; /* Darker for better readability */
 
-    --accent: 86 61% 95%;
-    --accent-foreground: 86 61% 35%;
+    --accent: 86 61% 93%;
+    --accent-foreground: 86 61% 30%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -48,8 +48,8 @@
     --aging-moderate: 38 92% 50%;
     --aging-urgent: 0 84% 60%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
+    --border: 214 25% 85%; /* More visible borders */
+    --input: 214 25% 85%;
     --ring: 86 61% 41%;
 
     --radius: 0.5rem;
