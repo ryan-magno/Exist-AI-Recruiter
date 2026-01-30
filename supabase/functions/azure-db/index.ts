@@ -1,10 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
@@ -84,31 +83,6 @@ async function execute(sql: string, params: unknown[] = []) {
   const client = await getClient();
   await client.queryObject(sql, params);
   return { success: true };
-}
-
-// Authentication helper
-async function authenticateRequest(req: Request): Promise<{ userId: string | null; error: string | null }> {
-  const authHeader = req.headers.get('Authorization');
-  
-  if (!authHeader?.startsWith('Bearer ')) {
-    return { userId: null, error: 'Missing or invalid authorization header' };
-  }
-
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_ANON_KEY')!,
-    { global: { headers: { Authorization: authHeader } } }
-  );
-
-  const token = authHeader.replace('Bearer ', '');
-  const { data, error } = await supabase.auth.getUser(token);
-  
-  if (error || !data?.user) {
-    console.error('Auth error:', error?.message || 'No user found');
-    return { userId: null, error: 'Unauthorized' };
-  }
-
-  return { userId: data.user.id, error: null };
 }
 
 // Initialize tables
@@ -405,14 +379,6 @@ async function handleRequest(req: Request): Promise<Response> {
   if (method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
-
-  // Authenticate all requests
-  const { userId, error: authError } = await authenticateRequest(req);
-  if (authError) {
-    console.error('Authentication failed:', authError);
-    return jsonResponse({ error: authError }, 401);
-  }
-  console.log(`Authenticated user: ${userId}`);
 
   try {
     // Initialize tables endpoint
