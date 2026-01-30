@@ -286,7 +286,6 @@ export default function CreateJOPage() {
                         }
                       }}
                     />
-                    <span className="text-lg">{site.icon}</span>
                     <span className="text-sm font-medium">{site.name}</span>
                   </label>
                 ))}
