@@ -13,8 +13,7 @@ import { Level, EmploymentType, levelLabels, employmentTypeLabels } from "@/data
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { useDepartmentNames } from "@/hooks/useDepartments";
-import { useJobOrderCount, useCreateJobOrder } from "@/hooks/useJobOrders";
-import { Enums } from "@/integrations/supabase/types";
+import { useJobOrderCount, useCreateJobOrder, JobOrderInsert } from "@/hooks/useJobOrders";
 
 const JOB_POSTING_SITES = [
   { id: "linkedin", name: "LinkedIn" },
@@ -69,14 +68,14 @@ export default function CreateJOPage() {
         jo_number: nextJoNumber,
         title: formData.title,
         description: formData.description,
-        level: formData.level as Enums<"job_level">,
+        level: formData.level as JobOrderInsert['level'],
         quantity: formData.quantity,
         required_date: formData.requiredDate || null,
         status: "draft",
         department_name: formData.department,
         employment_type: (formData.employmentType === "full-time"
           ? "regular"
-          : formData.employmentType) as Enums<"employment_type">,
+          : formData.employmentType) as JobOrderInsert['employment_type'],
         requestor_name: formData.requestorName,
       });
 

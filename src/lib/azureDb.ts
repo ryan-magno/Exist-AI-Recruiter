@@ -1,5 +1,5 @@
 // Azure PostgreSQL API client
-// This replaces direct Supabase calls with our Edge Function API
+// This is the sole data layer - no Supabase, just direct API calls to Edge Function
 
 const AZURE_DB_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/azure-db`;
 
@@ -8,7 +8,6 @@ async function apiCall<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       ...options.headers,
     },
   });
