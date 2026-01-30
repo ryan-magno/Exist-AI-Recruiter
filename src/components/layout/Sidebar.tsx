@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Upload, Briefcase, FilePlus, Archive, Users } from 'lucide-react';
+import { Upload, Briefcase, FilePlus, Archive, Users, BarChart3, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import existLogo from '@/assets/exist-logo.png';
 
 const navItems = [
   { path: '/dashboard', label: 'Job Orders', icon: Briefcase },
-  { path: '/create-jo', label: 'Create JO', icon: FilePlus },
-  { path: '/archive', label: 'Archive', icon: Archive },
+  { path: '/analytics', label: 'Analytics', icon: BarChart3 },
   { path: '/candidates', label: 'Candidates', icon: Users },
+  { path: '/create-jo', label: 'Create JO', icon: FilePlus },
   { path: '/upload', label: 'Upload CV', icon: Upload },
+  { path: '/archive', label: 'Archive', icon: Archive },
+  { path: '/chatbot', label: 'AI Assistant', icon: Bot },
 ];
 
 export function Sidebar() {

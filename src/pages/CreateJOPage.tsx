@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FilePlus, Calendar, Hash, Briefcase, Users, Building, User, Loader2 } from 'lucide-react';
+import { FilePlus, Calendar, Hash, Briefcase, Users, Building, User, Loader2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
@@ -14,6 +15,12 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { useDepartmentNames } from '@/hooks/useDepartments';
 import { useJobOrderCount, useCreateJobOrder } from '@/hooks/useJobOrders';
 import { Enums } from '@/integrations/supabase/types';
+
+const JOB_POSTING_SITES = [
+  { id: 'linkedin', name: 'LinkedIn', icon: '💼' },
+  { id: 'indeed', name: 'Indeed', icon: '🔍' },
+  { id: 'jobstreet', name: 'JobStreet', icon: '📋' },
+];
 
 export default function CreateJOPage() {
   const navigate = useNavigate();
@@ -31,6 +38,8 @@ export default function CreateJOPage() {
     employmentType: '' as EmploymentType | '',
     requestorName: ''
   });
+
+  const [postingSites, setPostingSites] = useState<string[]>([]);
 
   const [errors, setErrors] = useState<Record<string, boolean>>({});
 
@@ -242,6 +251,41 @@ export default function CreateJOPage() {
                   onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
                 />
               </div>
+            </div>
+
+            {/* Job Posting Sites */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm">
+                <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                Post To Job Sites
+              </Label>
+              <div className="flex flex-wrap gap-3">
+                {JOB_POSTING_SITES.map((site) => (
+                  <label
+                    key={site.id}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all',
+                      postingSites.includes(site.id)
+                        ? 'bg-primary/10 border-primary text-primary'
+                        : 'bg-muted/50 border-border hover:border-primary/50'
+                    )}
+                  >
+                    <Checkbox
+                      checked={postingSites.includes(site.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setPostingSites([...postingSites, site.id]);
+                        } else {
+                          setPostingSites(postingSites.filter(id => id !== site.id));
+                        }
+                      }}
+                    />
+                    <span className="text-lg">{site.icon}</span>
+                    <span className="text-sm font-medium">{site.name}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">Select platforms to post this job order</p>
             </div>
 
             {/* Required Date */}
