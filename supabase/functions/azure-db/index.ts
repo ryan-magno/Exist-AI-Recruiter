@@ -1,14 +1,47 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
+// Column whitelists for SQL injection prevention
+const ALLOWED_JOB_ORDER_COLUMNS = [
+  'jo_number', 'title', 'description', 'department_name', 'department_id',
+  'level', 'quantity', 'hired_count', 'employment_type', 'requestor_name',
+  'required_date', 'status', 'created_by'
+];
+
+const ALLOWED_CANDIDATE_COLUMNS = [
+  'full_name', 'email', 'phone', 'applicant_type', 'skills', 'positions_fit_for',
+  'years_of_experience', 'educational_background', 'cv_url', 'cv_filename',
+  'availability', 'preferred_work_setup', 'expected_salary', 'earliest_start_date',
+  'uploaded_by', 'uploaded_by_user_id'
+];
+
+const ALLOWED_APPLICATION_COLUMNS = [
+  'pipeline_status', 'match_score', 'tech_interview_result', 'working_conditions',
+  'remarks', 'applied_date'
+];
+
+// Validate column name against whitelist
+function validateColumns(body: Record<string, unknown>, allowedColumns: string[]): Record<string, unknown> {
+  const validated: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (allowedColumns.includes(key)) {
+      validated[key] = value;
+    } else {
+      console.warn(`Blocked invalid column name: ${key}`);
+    }
+  }
+  return validated;
+}
+
 // Create a single client per request (lazy connection)
-function createClient() {
+function createPgClient() {
   return new Client({
     hostname: Deno.env.get("AZURE_PG_HOST"),
     user: Deno.env.get("AZURE_PG_USER"),
@@ -24,7 +57,7 @@ let requestClient: Client | null = null;
 
 async function getClient(): Promise<Client> {
   if (!requestClient) {
-    requestClient = createClient();
+    requestClient = createPgClient();
     await requestClient.connect();
   }
   return requestClient;
@@ -51,6 +84,31 @@ async function execute(sql: string, params: unknown[] = []) {
   const client = await getClient();
   await client.queryObject(sql, params);
   return { success: true };
+}
+
+// Authentication helper
+async function authenticateRequest(req: Request): Promise<{ userId: string | null; error: string | null }> {
+  const authHeader = req.headers.get('Authorization');
+  
+  if (!authHeader?.startsWith('Bearer ')) {
+    return { userId: null, error: 'Missing or invalid authorization header' };
+  }
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_ANON_KEY')!,
+    { global: { headers: { Authorization: authHeader } } }
+  );
+
+  const token = authHeader.replace('Bearer ', '');
+  const { data, error } = await supabase.auth.getUser(token);
+  
+  if (error || !data?.user) {
+    console.error('Auth error:', error?.message || 'No user found');
+    return { userId: null, error: 'Unauthorized' };
+  }
+
+  return { userId: data.user.id, error: null };
 }
 
 // Initialize tables
@@ -348,6 +406,14 @@ async function handleRequest(req: Request): Promise<Response> {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Authenticate all requests
+  const { userId, error: authError } = await authenticateRequest(req);
+  if (authError) {
+    console.error('Authentication failed:', authError);
+    return jsonResponse({ error: authError }, 401);
+  }
+  console.log(`Authenticated user: ${userId}`);
+
   try {
     // Initialize tables endpoint
     if (path === '/init' && method === 'POST') {
@@ -376,11 +442,19 @@ async function handleRequest(req: Request): Promise<Response> {
     if (path.startsWith('/job-orders/') && method === 'PUT') {
       const id = path.split('/')[2];
       const body = await req.json();
+      
+      // Validate columns against whitelist to prevent SQL injection
+      const validatedBody = validateColumns(body, ALLOWED_JOB_ORDER_COLUMNS);
+      
+      if (Object.keys(validatedBody).length === 0) {
+        return jsonResponse({ error: 'No valid columns to update' }, 400);
+      }
+      
       const updates: string[] = [];
       const values: unknown[] = [];
       let idx = 1;
       
-      for (const [key, value] of Object.entries(body)) {
+      for (const [key, value] of Object.entries(validatedBody)) {
         updates.push(`${key} = $${idx}`);
         values.push(value);
         idx++;
@@ -424,11 +498,19 @@ async function handleRequest(req: Request): Promise<Response> {
     if (path.startsWith('/candidates/') && !path.includes('/work-experience') && method === 'PUT') {
       const id = path.split('/')[2];
       const body = await req.json();
+      
+      // Validate columns against whitelist to prevent SQL injection
+      const validatedBody = validateColumns(body, ALLOWED_CANDIDATE_COLUMNS);
+      
+      if (Object.keys(validatedBody).length === 0) {
+        return jsonResponse({ error: 'No valid columns to update' }, 400);
+      }
+      
       const updates: string[] = [];
       const values: unknown[] = [];
       let idx = 1;
       
-      for (const [key, value] of Object.entries(body)) {
+      for (const [key, value] of Object.entries(validatedBody)) {
         updates.push(`${key} = $${idx}`);
         values.push(value);
         idx++;
@@ -499,17 +581,24 @@ async function handleRequest(req: Request): Promise<Response> {
       const fromStatus = current.length > 0 ? (current[0] as any).pipeline_status : null;
       const candidateId = current.length > 0 ? (current[0] as any).candidate_id : null;
       
+      // Validate columns against whitelist to prevent SQL injection
+      const validatedBody = validateColumns(body, ALLOWED_APPLICATION_COLUMNS);
+      
+      if (Object.keys(validatedBody).length === 0) {
+        return jsonResponse({ error: 'No valid columns to update' }, 400);
+      }
+      
       const updates: string[] = [];
       const values: unknown[] = [];
       let idx = 1;
       
-      for (const [key, value] of Object.entries(body)) {
+      for (const [key, value] of Object.entries(validatedBody)) {
         updates.push(`${key} = $${idx}`);
         values.push(value);
         idx++;
       }
       
-      if (body.pipeline_status && body.pipeline_status !== fromStatus) {
+      if (validatedBody.pipeline_status && validatedBody.pipeline_status !== fromStatus) {
         updates.push(`status_changed_date = now()`);
       }
       updates.push(`updated_at = now()`);
@@ -518,11 +607,11 @@ async function handleRequest(req: Request): Promise<Response> {
       const result = await query(`UPDATE candidate_job_applications SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`, values);
       
       // Create timeline entry if status changed
-      if (body.pipeline_status && body.pipeline_status !== fromStatus && candidateId) {
+      if (validatedBody.pipeline_status && validatedBody.pipeline_status !== fromStatus && candidateId) {
         await execute(`
           INSERT INTO candidate_timeline (application_id, candidate_id, from_status, to_status)
           VALUES ($1, $2, $3, $4)
-        `, [id, candidateId, fromStatus, body.pipeline_status]);
+        `, [id, candidateId, fromStatus, validatedBody.pipeline_status]);
       }
       
       return jsonResponse(result[0]);
