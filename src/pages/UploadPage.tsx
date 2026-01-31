@@ -1,17 +1,19 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, FileText, Check, Loader2, Sparkles, RotateCcw, User, Plus, Building, Calendar, MessageSquare, X, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Check, Loader2, Sparkles, User, Plus, Building, Calendar, MessageSquare, X, AlertCircle, ChevronDown, ChevronUp, Briefcase } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Switch } from '@/components/ui/switch';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useCVUploaderNames, useCreateCVUploader } from '@/hooks/useCVUploaders';
 import { useDepartmentNames } from '@/hooks/useDepartments';
+import { useJobOrders } from '@/hooks/useJobOrders';
 
 interface UploadedFile {
   id: string;
@@ -25,6 +27,7 @@ interface UploadedFile {
   toDate?: string;
   uploadReason?: 'role-change' | 'benched' | 'other';
   otherReason?: string;
+  applyingFor?: string; // 'ai-decide' or job order id
 }
 
 const UPLOAD_REASONS = [
@@ -59,7 +62,18 @@ export default function UploadPage() {
   // Database hooks
   const { data: existingUploaders = [], isLoading: loadingUploaders } = useCVUploaderNames();
   const { data: departmentNames = [], isLoading: loadingDepartments } = useDepartmentNames();
+  const { data: jobOrders = [], isLoading: loadingJobOrders } = useJobOrders();
   const createUploader = useCreateCVUploader();
+
+  // Auto-reset on page load (unless processing)
+  useEffect(() => {
+    if (!isProcessing) {
+      setFiles([]);
+      setIsVectorized(false);
+      setUploaderName('');
+      setDefaultIsInternal(false);
+    }
+  }, []); // Only run on mount
 
   // Filter suggestions based on input
   useEffect(() => {
@@ -125,6 +139,7 @@ export default function UploadPage() {
       size: formatFileSize(file.size),
       status: 'ready',
       isInternal: defaultIsInternal,
+      applyingFor: 'ai-decide',
     }));
     
     setFiles(prev => [...prev, ...newFiles]);
@@ -189,20 +204,31 @@ export default function UploadPage() {
     // Append all files
     files.forEach(f => formData.append('files', f.file));
     
-    // Build metadata array
-    const metadata = files.map((f, index) => ({
-      index,
-      filename: f.name,
-      size_bytes: f.file.size,
-      applicant_type: f.isInternal ? 'internal' : 'external',
-      ...(f.isInternal && {
-        from_date: f.fromDate || null,
-        to_date: f.toDate || null,
-        department: f.department || null,
-        upload_reason: f.uploadReason || null,
-        other_reason: f.uploadReason === 'other' ? f.otherReason : null,
-      }),
-    }));
+    // Build metadata array with job order info
+    const metadata = files.map((f, index) => {
+      const jobOrder = f.applyingFor && f.applyingFor !== 'ai-decide' 
+        ? jobOrders.find(jo => jo.id === f.applyingFor) 
+        : null;
+      
+      return {
+        index,
+        filename: f.name,
+        size_bytes: f.file.size,
+        applicant_type: f.isInternal ? 'internal' : 'external',
+        applying_for: f.applyingFor === 'ai-decide' ? 'ai-decide' : {
+          job_order_id: jobOrder?.id || null,
+          job_order_title: jobOrder?.title || null,
+          jo_number: jobOrder?.jo_number || null,
+        },
+        ...(f.isInternal && {
+          from_date: f.fromDate || null,
+          to_date: f.toDate || null,
+          department: f.department || null,
+          upload_reason: f.uploadReason || null,
+          other_reason: f.uploadReason === 'other' ? f.otherReason : null,
+        }),
+      };
+    });
     formData.append('metadata', JSON.stringify(metadata));
     
     // Update all files to processing status
@@ -249,14 +275,6 @@ export default function UploadPage() {
     }
   };
 
-  const handleStartOver = () => {
-    setFiles([]);
-    setIsVectorized(false);
-    setUploaderName('');
-    setDefaultIsInternal(false);
-    toast.info('Ready for new uploads');
-  };
-
   const handleSelectSuggestion = (name: string) => {
     setUploaderName(name);
     setShowSuggestions(false);
@@ -278,8 +296,11 @@ export default function UploadPage() {
     name => name.toLowerCase() === uploaderName.toLowerCase()
   );
 
+  // Get active job orders for the dropdown
+  const activeJobOrders = jobOrders.filter(jo => jo.status === 'in-progress' || jo.status === 'draft');
+
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-6 md:p-8 max-w-4xl mx-auto">
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -297,11 +318,11 @@ export default function UploadPage() {
         </div>
 
         {/* Uploader Name Field */}
-        <div className="bg-card rounded-xl border shadow-sm p-4 mb-6">
-          <div className="space-y-2">
+        <div className="bg-card rounded-xl border shadow-sm p-5 mb-6">
+          <div className="space-y-3">
             <Label className="flex items-center gap-2 text-sm font-medium">
               <User className="w-4 h-4 text-muted-foreground" />
-              Uploaded By *
+              Uploaded By <span className="text-destructive">*</span>
             </Label>
             <div className="relative">
               <Input
@@ -311,7 +332,7 @@ export default function UploadPage() {
                 onChange={(e) => setUploaderName(e.target.value)}
                 onFocus={() => setShowSuggestions(true)}
                 className={cn(
-                  "h-10",
+                  "h-11",
                   isVectorized && "opacity-50"
                 )}
                 disabled={isVectorized || loadingUploaders}
@@ -334,14 +355,14 @@ export default function UploadPage() {
                             key={name}
                             type="button"
                             onClick={() => handleSelectSuggestion(name)}
-                            className="w-full px-3 py-2 text-left text-sm hover:bg-muted transition-colors flex items-center gap-2"
+                            className="w-full px-4 py-2.5 text-left text-sm hover:bg-muted transition-colors flex items-center gap-2"
                           >
                             <User className="w-4 h-4 text-muted-foreground" />
                             {name}
                           </button>
                         ))
                       ) : (
-                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                        <div className="px-4 py-2.5 text-sm text-muted-foreground">
                           No matching names found
                         </div>
                       )}
@@ -351,7 +372,7 @@ export default function UploadPage() {
                         <button
                           type="button"
                           onClick={handleAddNewName}
-                          className="w-full px-3 py-2 text-left text-sm hover:bg-primary/10 transition-colors flex items-center gap-2 border-t text-primary font-medium"
+                          className="w-full px-4 py-2.5 text-left text-sm hover:bg-primary/10 transition-colors flex items-center gap-2 border-t text-primary font-medium"
                         >
                           <Plus className="w-4 h-4" />
                           Add "{uploaderName}" as new uploader
@@ -369,8 +390,8 @@ export default function UploadPage() {
         </div>
 
         {/* Internal/External Classification */}
-        <div className="bg-card rounded-xl border shadow-sm p-4 mb-6">
-          <Label className="flex items-center gap-2 text-sm font-medium mb-3">
+        <div className="bg-card rounded-xl border shadow-sm p-5 mb-6">
+          <Label className="flex items-center gap-2 text-sm font-medium mb-4">
             <User className="w-4 h-4 text-muted-foreground" />
             Default Applicant Type
           </Label>
@@ -381,19 +402,19 @@ export default function UploadPage() {
               // Update existing files
               setFiles(prev => prev.map(f => ({ ...f, isInternal: val === 'internal' })));
             }}
-            className="flex gap-4"
+            className="flex gap-6"
             disabled={isVectorized}
           >
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="external" id="external" />
-              <Label htmlFor="external" className="cursor-pointer">External Applicant</Label>
+              <Label htmlFor="external" className="cursor-pointer font-normal">External Applicant</Label>
             </div>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="internal" id="internal" />
-              <Label htmlFor="internal" className="cursor-pointer">Internal Employee</Label>
+              <Label htmlFor="internal" className="cursor-pointer font-normal">Internal Employee</Label>
             </div>
           </RadioGroup>
-          <p className="text-xs text-muted-foreground mt-2">
+          <p className="text-xs text-muted-foreground mt-3">
             Internal employees will have additional fields for dates and department
           </p>
         </div>
@@ -427,10 +448,10 @@ export default function UploadPage() {
         <AnimatePresence>
           {files.length > 0 && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="bg-card rounded-xl border shadow-sm mb-6 overflow-hidden">
-              <div className="p-4 border-b bg-muted/30">
+              <div className="p-5 border-b bg-muted/30">
                 <h3 className="font-medium text-foreground">Uploaded Files ({files.length})</h3>
                 {uploaderName && (
-                  <p className="text-xs text-muted-foreground mt-1">Uploaded by: {uploaderName}</p>
+                  <p className="text-sm text-muted-foreground mt-1">Uploaded by: {uploaderName}</p>
                 )}
               </div>
               <div className="divide-y">
@@ -442,6 +463,7 @@ export default function UploadPage() {
                     onUpdate={(updates) => updateFile(file.id, updates)}
                     onRemove={() => removeFile(file.id)}
                     departments={departmentNames}
+                    jobOrders={activeJobOrders}
                     disabled={isVectorized || file.status !== 'ready'}
                   />
                 ))}
@@ -451,16 +473,24 @@ export default function UploadPage() {
         </AnimatePresence>
 
         <div className="flex justify-center gap-4">
-          {isVectorized ? (
-            <Button size="lg" variant="outline" onClick={handleStartOver} className="gap-2 px-8">
-              <RotateCcw className="w-5 h-5" />
-              Start Over
-            </Button>
-          ) : (
-            <Button size="lg" onClick={handleVectorize} disabled={files.length === 0 || isProcessing || !uploaderName.trim()} className="gap-2 px-8">
-              {isProcessing ? <><Loader2 className="w-5 h-5 animate-spin" />Processing...</> : <><Sparkles className="w-5 h-5" />Vectorize Documents</>}
-            </Button>
-          )}
+          <Button 
+            size="lg" 
+            onClick={handleVectorize} 
+            disabled={files.length === 0 || isProcessing || !uploaderName.trim()} 
+            className="gap-2 px-8"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-5 h-5" />
+                Vectorize Documents
+              </>
+            )}
+          </Button>
         </div>
       </motion.div>
     </div>
@@ -473,102 +503,179 @@ interface FileRowProps {
   onUpdate: (updates: Partial<UploadedFile>) => void;
   onRemove: () => void;
   departments: string[];
+  jobOrders: Array<{ id: string; title: string; jo_number: string }>;
   disabled: boolean;
 }
 
-function FileRow({ file, index, onUpdate, onRemove, departments, disabled }: FileRowProps) {
+function FileRow({ file, index, onUpdate, onRemove, departments, jobOrders, disabled }: FileRowProps) {
+  const [isExpanded, setIsExpanded] = useState(true);
+
   return (
     <motion.div 
       initial={{ opacity: 0, x: -20 }} 
       animate={{ opacity: 1, x: 0 }} 
-      transition={{ delay: index * 0.1 }} 
-      className="p-4"
+      transition={{ delay: index * 0.05 }} 
+      className="p-5"
     >
-      <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center shrink-0">
-          <FileText className="w-5 h-5 text-primary" />
+      {/* File Header */}
+      <div className="flex items-center gap-4 mb-4">
+        <div className="w-12 h-12 rounded-lg bg-accent flex items-center justify-center shrink-0">
+          <FileText className="w-6 h-6 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <p className="font-medium text-foreground">{file.name}</p>
-              <p className="text-sm text-muted-foreground">{file.size}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {file.status === 'ready' && (
-                <>
-                  <span className="status-badge bg-secondary text-secondary-foreground">Ready</span>
-                  <button
-                    onClick={onRemove}
-                    className="p-1 hover:bg-muted rounded-md transition-colors"
-                    title="Remove file"
-                  >
-                    <X className="w-4 h-4 text-muted-foreground hover:text-destructive" />
-                  </button>
-                </>
-              )}
-              {file.status === 'processing' && <span className="status-badge bg-primary/10 text-primary"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Processing</span>}
-              {file.status === 'complete' && <span className="status-badge bg-primary text-primary-foreground"><Check className="w-3 h-3 mr-1" />Complete</span>}
-              {file.status === 'error' && <span className="status-badge bg-destructive text-destructive-foreground"><AlertCircle className="w-3 h-3 mr-1" />Error</span>}
-            </div>
-          </div>
+          <p className="font-medium text-foreground truncate">{file.name}</p>
+          <p className="text-sm text-muted-foreground">{file.size}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {file.status === 'ready' && (
+            <>
+              <span className="status-badge bg-secondary text-secondary-foreground">Ready</span>
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="p-2 hover:bg-muted rounded-md transition-colors"
+                title={isExpanded ? "Collapse settings" : "Expand settings"}
+              >
+                {isExpanded ? (
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                )}
+              </button>
+              <button
+                onClick={onRemove}
+                className="p-2 hover:bg-destructive/10 rounded-md transition-colors"
+                title="Remove file"
+              >
+                <X className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+              </button>
+            </>
+          )}
+          {file.status === 'processing' && (
+            <span className="status-badge bg-primary/10 text-primary">
+              <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+              Processing
+            </span>
+          )}
+          {file.status === 'complete' && (
+            <span className="status-badge bg-primary text-primary-foreground">
+              <Check className="w-3 h-3 mr-1.5" />
+              Complete
+            </span>
+          )}
+          {file.status === 'error' && (
+            <span className="status-badge bg-destructive text-destructive-foreground">
+              <AlertCircle className="w-3 h-3 mr-1.5" />
+              Error
+            </span>
+          )}
+        </div>
+      </div>
 
-          {/* Classification Row */}
-          <div className="flex flex-wrap items-center gap-3 mb-2">
-            <div className="flex items-center gap-2">
-              <Label className="text-xs text-muted-foreground">Type:</Label>
+      {/* Expandable Settings */}
+      <AnimatePresence>
+        {isExpanded && file.status === 'ready' && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="ml-16 space-y-5 border-l-2 border-muted pl-5"
+          >
+            {/* Applicant Type Toggle */}
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                <User className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <Label className="text-sm font-medium">Internal Employee</Label>
+                  <p className="text-xs text-muted-foreground">Toggle on if this is an internal applicant</p>
+                </div>
+              </div>
+              <Switch
+                checked={file.isInternal}
+                onCheckedChange={(checked) => onUpdate({ isInternal: checked })}
+                disabled={disabled}
+              />
+            </div>
+
+            {/* Applying For / Fit For */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Briefcase className="w-4 h-4 text-muted-foreground" />
+                <Label className="text-sm font-medium">Applying / Fit For</Label>
+                <span className="text-xs text-muted-foreground">(Optional)</span>
+              </div>
               <Select
-                value={file.isInternal ? 'internal' : 'external'}
-                onValueChange={(val) => onUpdate({ isInternal: val === 'internal' })}
+                value={file.applyingFor || 'ai-decide'}
+                onValueChange={(val) => onUpdate({ applyingFor: val })}
                 disabled={disabled}
               >
-                <SelectTrigger className="h-7 text-xs w-28">
-                  <SelectValue />
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Let AI decide" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="external">External</SelectItem>
-                  <SelectItem value="internal">Internal</SelectItem>
+                  <SelectItem value="ai-decide">
+                    <span className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-primary" />
+                      Let AI decide
+                    </span>
+                  </SelectItem>
+                  {jobOrders.map(jo => (
+                    <SelectItem key={jo.id} value={jo.id}>
+                      {jo.jo_number} - {jo.title}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Select a specific job order or let AI match based on skills
+              </p>
             </div>
 
+            {/* Internal Employee Fields */}
             {file.isInternal && (
               <>
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs text-muted-foreground whitespace-nowrap">
-                    <Calendar className="w-3 h-3 inline mr-1" />
-                    From:
-                  </Label>
-                  <Input
-                    type="date"
-                    value={file.fromDate || ''}
-                    onChange={(e) => onUpdate({ fromDate: e.target.value })}
-                    className="h-7 text-xs w-32"
-                    disabled={disabled}
-                  />
+                {/* Employment Dates */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <Label className="text-sm font-medium">From Date</Label>
+                    </div>
+                    <Input
+                      type="date"
+                      value={file.fromDate || ''}
+                      onChange={(e) => onUpdate({ fromDate: e.target.value })}
+                      className="h-10"
+                      disabled={disabled}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <Label className="text-sm font-medium">To Date</Label>
+                    </div>
+                    <Input
+                      type="date"
+                      value={file.toDate || ''}
+                      onChange={(e) => onUpdate({ toDate: e.target.value })}
+                      className="h-10"
+                      disabled={disabled}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs text-muted-foreground">To:</Label>
-                  <Input
-                    type="date"
-                    value={file.toDate || ''}
-                    onChange={(e) => onUpdate({ toDate: e.target.value })}
-                    className="h-7 text-xs w-32"
-                    disabled={disabled}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs text-muted-foreground">
-                    <Building className="w-3 h-3 inline mr-1" />
-                    Dept:
-                  </Label>
+
+                {/* Department */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Building className="w-4 h-4 text-muted-foreground" />
+                    <Label className="text-sm font-medium">Department</Label>
+                  </div>
                   <Select
                     value={file.department || ''}
                     onValueChange={(val) => onUpdate({ department: val })}
                     disabled={disabled}
                   >
-                    <SelectTrigger className="h-7 text-xs w-32">
-                      <SelectValue placeholder="Select" />
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Select department" />
                     </SelectTrigger>
                     <SelectContent>
                       {departments.map(dept => (
@@ -577,46 +684,47 @@ function FileRow({ file, index, onUpdate, onRemove, departments, disabled }: Fil
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Upload Reason */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                    <Label className="text-sm font-medium">Reason for Upload</Label>
+                  </div>
+                  <Select
+                    value={file.uploadReason || ''}
+                    onValueChange={(val) => onUpdate({ uploadReason: val as UploadedFile['uploadReason'] })}
+                    disabled={disabled}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Select reason" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {UPLOAD_REASONS.map(r => (
+                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Other Reason Input */}
+                {file.uploadReason === 'other' && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Specify Reason</Label>
+                    <Input
+                      placeholder="Enter the reason..."
+                      value={file.otherReason || ''}
+                      onChange={(e) => onUpdate({ otherReason: e.target.value })}
+                      className="h-10"
+                      disabled={disabled}
+                    />
+                  </div>
+                )}
               </>
             )}
-          </div>
-
-          {/* Reason Row (for internal) */}
-          {file.isInternal && (
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-muted-foreground">
-                  <MessageSquare className="w-3 h-3 inline mr-1" />
-                  Reason:
-                </Label>
-                <Select
-                  value={file.uploadReason || ''}
-                  onValueChange={(val) => onUpdate({ uploadReason: val as any })}
-                  disabled={disabled}
-                >
-                  <SelectTrigger className="h-7 text-xs w-40">
-                    <SelectValue placeholder="Select reason" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {UPLOAD_REASONS.map(r => (
-                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {file.uploadReason === 'other' && (
-                <Input
-                  placeholder="Specify reason..."
-                  value={file.otherReason || ''}
-                  onChange={(e) => onUpdate({ otherReason: e.target.value })}
-                  className="h-7 text-xs flex-1 min-w-[150px]"
-                  disabled={disabled}
-                />
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
