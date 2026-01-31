@@ -1,203 +1,254 @@
 
 
-# Database Integration Plan
+# CV Upload with n8n Webhook Integration
 
-This plan will connect your application to the database so that all data (job orders, candidates, interviews, etc.) is persisted and any new data is automatically saved.
+## Summary
+Replace the simulated CV upload process with real file uploads from the user's local machine. When files are uploaded and the "Vectorize" button is clicked, send the CVs and their metadata to the n8n webhook at `https://workflow.exist.com.ph/webhook/vector-db-loader` using FormData. The app will wait for the webhook response before showing success/failure.
 
-## Current State
+## User Flow
 
-The app currently uses:
-- **Mock data** stored in `src/data/mockData.ts` (hardcoded candidates and job orders)
-- **React Context** (`AppContext.tsx`) that loads mock data into state on app start
-- All changes are lost on page refresh since nothing is saved to the database
+1. User enters their name in "Uploaded By" field
+2. User selects default applicant type (External/Internal)
+3. User drags and drops or clicks to select CV files (PDF, DOCX) from their local machine
+4. Files appear in the list with editable metadata per file:
+   - Type (Internal/External) - can override per file
+   - For Internal: From Date, To Date, Department, Reason
+5. User clicks "Vectorize Documents" button
+6. App sends files + metadata to n8n webhook as FormData
+7. App shows processing status while waiting for webhook response
+8. On success: Shows success message and navigates to dashboard
+9. On failure: Shows error message from webhook
 
-## What Will Change
+## Changes Overview
 
-After implementation:
-- Data will be loaded from the database on app start
-- All create/update/delete operations will save to the database immediately
-- Data persists across sessions and page refreshes
+### 1. Update UploadPage.tsx
+- **Remove**: The `demoFiles` mock data array
+- **Add**: Hidden file input element with `accept=".pdf,.docx"`
+- **Add**: State to store actual `File` objects alongside metadata
+- **Modify**: `handleDrop` to process actual dropped files from `e.dataTransfer.files`
+- **Modify**: `handleClick` to trigger the hidden file input
+- **Add**: `handleFileSelect` to process files from the file input
+- **Modify**: `handleVectorize` to call the n8n webhook with FormData
 
----
+### 2. Update UploadedFile Interface
+```text
+interface UploadedFile {
+  id: string;
+  file: File;           // Add: actual File object
+  name: string;
+  size: string;
+  status: 'ready' | 'processing' | 'complete' | 'error';  // Add 'error' status
+  isInternal: boolean;
+  department?: string;
+  fromDate?: string;
+  toDate?: string;
+  uploadReason?: 'role-change' | 'benched' | 'other';
+  otherReason?: string;
+}
+```
 
-## Implementation Steps
-
-### Step 1: Create Database Hook Files
-
-Create custom React hooks to interact with each database table:
-
-| Hook File | Purpose |
-|-----------|---------|
-| `src/hooks/useJobOrders.ts` | Fetch, create, update, delete job orders |
-| `src/hooks/useCandidates.ts` | Fetch, create, update candidates |
-| `src/hooks/useApplications.ts` | Manage candidate-job application links |
-| `src/hooks/useInterviews.ts` | HR and Tech interview CRUD operations |
-| `src/hooks/useDepartments.ts` | Fetch department options |
-| `src/hooks/useCVUploaders.ts` | Fetch and add CV uploader names |
-
-Each hook will use **TanStack React Query** (already installed) for:
-- Automatic caching
-- Background refetching
-- Loading and error states
-
-### Step 2: Update the App Context
-
-Modify `src/context/AppContext.tsx` to:
-1. Remove mock data initialization
-2. Use the database hooks to fetch real data
-3. Update all mutation functions (e.g., `addJobOrder`, `updateCandidatePipelineStatus`) to call database operations
-4. Add loading states for the initial data fetch
-
-### Step 3: Update Create Job Order Page
-
-Modify `src/pages/CreateJOPage.tsx`:
-- Generate JO numbers based on database count (not local array length)
-- Call database insert when form is submitted
-- Fetch departments from the database for the dropdown
-
-### Step 4: Update CV Upload Page
-
-Modify `src/pages/UploadPage.tsx`:
-- Fetch existing uploader names from `cv_uploaders` table
-- Save new uploader names to the database
-- When CVs are processed, create candidate records in the database
-
-### Step 5: Update Candidate Forms
-
-Modify `HRInterviewFormTab.tsx` and `TechInterviewFormTab.tsx`:
-- Save interview forms to `hr_interviews` and `tech_interviews` tables
-- Update candidate profile fields when HR form is saved
-- Update pipeline status in the database when verdict is selected
-
-### Step 6: Update Kanban Board
-
-Modify `KanbanBoard.tsx` and related components:
-- Drag-and-drop status changes update the `candidate_job_applications` table
-- Pipeline status changes create timeline entries in `candidate_timeline` table
-- Candidate cards display real-time database data
-
-### Step 7: Seed Initial Data (Optional)
-
-If you want the existing mock data to appear:
-- Create a one-time migration to insert the mock candidates and job orders
-- This gives you sample data to work with immediately
-
----
-
-## Technical Details
-
-### Database Table Mappings
+### 3. Webhook Payload Structure
+The FormData will be structured to allow n8n to iterate over each file with its metadata:
 
 ```text
-+----------------------+     +---------------------------+
-|     job_orders       |     |        candidates         |
-+----------------------+     +---------------------------+
-| id, jo_number, title |     | id, full_name, email      |
-| department_name      |     | skills[], cv_url          |
-| level, quantity      |     | educational_background    |
-| status, hired_count  |     | years_of_experience       |
-+----------------------+     +---------------------------+
-          |                            |
-          |   +------------------------+
-          |   |
-          v   v
-+----------------------------------+
-|   candidate_job_applications     |
-+----------------------------------+
-| id, candidate_id, job_order_id   |
-| pipeline_status, match_score     |
-| tech_interview_result, remarks   |
-+----------------------------------+
-          |
-          v
-+-------------------+     +-------------------+
-|   hr_interviews   |     |  tech_interviews  |
-+-------------------+     +-------------------+
-| application_id    |     | application_id    |
-| candidate_id      |     | candidate_id      |
-| ratings (1-5)     |     | ratings (1-5)     |
-| verdict           |     | verdict           |
-+-------------------+     +-------------------+
-```
-
-### Example Hook Structure
-
-```typescript
-// src/hooks/useJobOrders.ts
-export function useJobOrders() {
-  return useQuery({
-    queryKey: ['job-orders'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('job_orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    }
-  });
-}
-
-export function useCreateJobOrder() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (newJO) => {
-      const { data, error } = await supabase
-        .from('job_orders')
-        .insert(newJO)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+FormData {
+  // Global metadata
+  "uploader_name": "Gabriel Magno"
+  "upload_timestamp": "2026-01-31T10:30:00.000Z"
+  "total_files": "3"
+  
+  // Per-file data (indexed for easy iteration)
+  "files": [File, File, File]  // Array of actual files
+  
+  // Metadata as JSON array (parallel to files array)
+  "metadata": JSON.stringify([
+    {
+      "index": 0,
+      "filename": "John_Doe_CV.pdf",
+      "size_bytes": 245000,
+      "applicant_type": "external"
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['job-orders'] });
+    {
+      "index": 1,
+      "filename": "Jane_Smith_CV.pdf", 
+      "size_bytes": 312000,
+      "applicant_type": "internal",
+      "from_date": "2024-01-15",
+      "to_date": "2026-01-31",
+      "department": "Engineering",
+      "upload_reason": "role-change",
+      "other_reason": null
+    },
+    {
+      "index": 2,
+      "filename": "Mike_Johnson_CV.docx",
+      "size_bytes": 189000,
+      "applicant_type": "internal",
+      "from_date": "2023-06-01",
+      "to_date": null,
+      "department": "Product",
+      "upload_reason": "other",
+      "other_reason": "Career development"
     }
-  });
+  ])
 }
 ```
 
-### Data Type Mapping
+### 4. Updated handleVectorize Function
+```text
+const handleVectorize = async () => {
+  // Validation
+  if (!uploaderName.trim()) { show error; return; }
+  if (files.length === 0) { show error; return; }
 
-| Mock Data Type | Database Enum |
-|----------------|---------------|
-| `PipelineStatus` | `pipeline_status` |
-| `EmploymentType` | `employment_type` |
-| `Level` | `job_level` |
-| `HRVerdict` | `hr_verdict` |
-| `TechVerdict` | `tech_verdict` |
+  setIsProcessing(true);
+  
+  // Build FormData
+  const formData = new FormData();
+  formData.append('uploader_name', uploaderName.trim());
+  formData.append('upload_timestamp', new Date().toISOString());
+  formData.append('total_files', files.length.toString());
+  
+  // Append all files
+  files.forEach(f => formData.append('files', f.file));
+  
+  // Build metadata array
+  const metadata = files.map((f, index) => ({
+    index,
+    filename: f.name,
+    size_bytes: f.file.size,
+    applicant_type: f.isInternal ? 'internal' : 'external',
+    ...(f.isInternal && {
+      from_date: f.fromDate || null,
+      to_date: f.toDate || null,
+      department: f.department || null,
+      upload_reason: f.uploadReason || null,
+      other_reason: f.uploadReason === 'other' ? f.otherReason : null,
+    }),
+  }));
+  formData.append('metadata', JSON.stringify(metadata));
+  
+  // Update status to processing
+  setFiles(prev => prev.map(f => ({ ...f, status: 'processing' })));
+  
+  try {
+    const response = await fetch('https://workflow.exist.com.ph/webhook/vector-db-loader', {
+      method: 'POST',
+      body: formData,  // No Content-Type header - browser sets it with boundary
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Webhook failed: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    // Mark all as complete
+    setFiles(prev => prev.map(f => ({ ...f, status: 'complete' })));
+    setIsVectorized(true);
+    toast.success(`Vectorization Complete: ${files.length} CVs Processed`);
+    
+    // Save uploader name to database
+    await createUploader.mutateAsync(uploaderName.trim());
+    
+    setTimeout(() => navigate('/dashboard'), 1000);
+  } catch (error) {
+    // Mark as error
+    setFiles(prev => prev.map(f => ({ ...f, status: 'error' })));
+    toast.error(error.message || 'Failed to process CVs');
+  } finally {
+    setIsProcessing(false);
+  }
+};
+```
 
----
+### 5. File Selection Handlers
+```text
+// Hidden file input ref
+const fileInputRef = useRef<HTMLInputElement>(null);
 
-## Files to Create
+// Handle file selection from input
+const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const selectedFiles = e.target.files;
+  if (!selectedFiles || selectedFiles.length === 0) return;
+  
+  const newFiles: UploadedFile[] = Array.from(selectedFiles).map((file, idx) => ({
+    id: `${Date.now()}-${idx}`,
+    file,
+    name: file.name,
+    size: formatFileSize(file.size),
+    status: 'ready',
+    isInternal: defaultIsInternal,
+  }));
+  
+  setFiles(prev => [...prev, ...newFiles]);
+  toast.success(`${newFiles.length} file(s) added`);
+  e.target.value = '';  // Reset input
+};
 
-1. `src/hooks/useJobOrders.ts`
-2. `src/hooks/useCandidates.ts`
-3. `src/hooks/useApplications.ts`
-4. `src/hooks/useInterviews.ts`
-5. `src/hooks/useDepartments.ts`
-6. `src/hooks/useCVUploaders.ts`
-7. `src/hooks/useTimeline.ts`
+// Handle drag and drop
+const handleDrop = (e: React.DragEvent) => {
+  e.preventDefault();
+  setIsDragging(false);
+  
+  if (!uploaderName.trim()) {
+    toast.error('Please enter the uploader name first');
+    return;
+  }
+  
+  const droppedFiles = e.dataTransfer.files;
+  const validFiles = Array.from(droppedFiles).filter(f => 
+    f.type === 'application/pdf' || 
+    f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  );
+  
+  if (validFiles.length === 0) {
+    toast.error('Please upload PDF or DOCX files only');
+    return;
+  }
+  
+  const newFiles: UploadedFile[] = validFiles.map((file, idx) => ({
+    id: `${Date.now()}-${idx}`,
+    file,
+    name: file.name,
+    size: formatFileSize(file.size),
+    status: 'ready',
+    isInternal: defaultIsInternal,
+  }));
+  
+  setFiles(prev => [...prev, ...newFiles]);
+  toast.success(`${newFiles.length} file(s) uploaded`);
+};
 
-## Files to Modify
+// Format file size helper
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+```
 
-1. `src/context/AppContext.tsx` - Use database hooks instead of mock data
-2. `src/pages/CreateJOPage.tsx` - Database integration
-3. `src/pages/UploadPage.tsx` - Database integration
-4. `src/components/candidate/HRInterviewFormTab.tsx` - Save to database
-5. `src/components/candidate/TechInterviewFormTab.tsx` - Save to database
-6. `src/components/dashboard/KanbanBoard.tsx` - Database status updates
-7. `src/data/mockData.ts` - Keep only type definitions and labels (remove mock data arrays)
+### 6. UI Updates
+- Add hidden file input that triggers on dropzone click
+- Add "Remove" button for each file row to allow removing files before submission
+- Update status badge to show "Error" state in red
+- Keep existing metadata fields (type, dates, department, reason)
 
----
+## Technical Notes
 
-## Expected Outcome
+### CORS Consideration
+The n8n webhook must have CORS enabled to accept requests from the app's origin. If CORS issues occur, you may need to:
+1. Configure n8n to accept the app's origin, OR
+2. Proxy the request through the existing backend edge function
 
-After implementation:
-- Opening the app loads data from the database
-- Creating a job order saves it to `job_orders` table
-- Uploading CVs creates records in `candidates` table
-- Moving candidates on the Kanban board updates `candidate_job_applications`
-- Saving HR/Tech forms creates records in respective interview tables
-- All data persists across browser sessions
+### File Size Limits
+FormData file uploads have no built-in browser limit, but n8n or the server may have limits. The current implementation sends files directly.
+
+### Error Handling
+- Network errors show generic failure message
+- Webhook errors (4xx, 5xx) show status code
+- Individual file status is tracked but currently all succeed/fail together
+
+## Files Modified
+1. `src/pages/UploadPage.tsx` - Main implementation changes
 
