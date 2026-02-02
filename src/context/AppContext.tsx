@@ -105,8 +105,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const legacyCandidates: LegacyCandidate[] = applicationsData.map((app: any) => {
         const candidate = candidateMap.get(app.candidate_id) || {};
         
+        // Format expected salary with PHP currency if not already formatted
+        let expectedSalary = candidate.expected_salary || '';
+        if (expectedSalary && !expectedSalary.includes('₱') && !expectedSalary.toLowerCase().includes('php')) {
+          expectedSalary = `₱${expectedSalary}`;
+        }
+        
         return {
           id: app.candidate_id,
+          applicationId: app.id, // Store application ID for timeline and forms
           name: app.candidate_name || candidate.full_name || 'Unknown',
           email: app.candidate_email || candidate.email || '',
           phone: candidate.phone || '',
@@ -131,8 +138,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           remarks: app.remarks || '',
           techNotes: '',
           employmentType: 'full-time',
-          positionApplied: app.job_title || '',
-          expectedSalary: candidate.expected_salary || '',
+          positionApplied: app.job_title || candidate.target_role || '',
+          expectedSalary: expectedSalary,
           earliestStartDate: candidate.earliest_start_date || '',
           currentOccupation: app.current_occupation || candidate.current_occupation || '',
           assignedJoId: app.job_order_id,

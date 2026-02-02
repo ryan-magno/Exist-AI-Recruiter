@@ -513,6 +513,72 @@ export type Database = {
           },
         ]
       }
+      offers: {
+        Row: {
+          application_id: string
+          benefits: string | null
+          candidate_id: string
+          created_at: string
+          expiry_date: string | null
+          id: string
+          negotiation_notes: string | null
+          offer_amount: string | null
+          offer_date: string | null
+          position: string | null
+          remarks: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["offer_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          benefits?: string | null
+          candidate_id: string
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          negotiation_notes?: string | null
+          offer_amount?: string | null
+          offer_date?: string | null
+          position?: string | null
+          remarks?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["offer_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          benefits?: string | null
+          candidate_id?: string
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          negotiation_notes?: string | null
+          offer_amount?: string | null
+          offer_date?: string | null
+          position?: string | null
+          remarks?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["offer_status"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offers_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: true
+            referencedRelation: "candidate_job_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offers_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -662,6 +728,12 @@ export type Database = {
       hr_verdict: "proceed_to_tech" | "hold" | "reject"
       job_level: "L1" | "L2" | "L3" | "L4" | "L5"
       job_order_status: "draft" | "in-progress" | "fulfilled" | "closed"
+      offer_status:
+        | "pending"
+        | "accepted"
+        | "rejected"
+        | "negotiating"
+        | "unresponsive"
       pipeline_status:
         | "new"
         | "screening"
@@ -806,6 +878,13 @@ export const Constants = {
       hr_verdict: ["proceed_to_tech", "hold", "reject"],
       job_level: ["L1", "L2", "L3", "L4", "L5"],
       job_order_status: ["draft", "in-progress", "fulfilled", "closed"],
+      offer_status: [
+        "pending",
+        "accepted",
+        "rejected",
+        "negotiating",
+        "unresponsive",
+      ],
       pipeline_status: [
         "new",
         "screening",

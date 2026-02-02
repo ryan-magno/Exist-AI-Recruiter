@@ -1021,6 +1021,39 @@ async function handleRequest(req: Request): Promise<Response> {
       }
     }
 
+    // Offers
+    if (path === '/offers') {
+      if (method === 'GET') {
+        const applicationId = url.searchParams.get('application_id');
+        const candidateId = url.searchParams.get('candidate_id');
+        
+        if (applicationId) {
+          const rows = await query("SELECT * FROM offers WHERE application_id = $1", [applicationId]);
+          return jsonResponse(rows[0] || null);
+        }
+        if (candidateId) {
+          const rows = await query("SELECT * FROM offers WHERE candidate_id = $1 ORDER BY created_at DESC", [candidateId]);
+          return jsonResponse(rows);
+        }
+        const rows = await query("SELECT * FROM offers ORDER BY created_at DESC");
+        return jsonResponse(rows);
+      }
+      if (method === 'POST') {
+        const body = await req.json();
+        const result = await query(`
+          INSERT INTO offers (application_id, candidate_id, offer_date, expiry_date, offer_amount, position, start_date, status, benefits, remarks, negotiation_notes)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          ON CONFLICT (application_id) DO UPDATE SET
+            offer_date = EXCLUDED.offer_date, expiry_date = EXCLUDED.expiry_date, offer_amount = EXCLUDED.offer_amount,
+            position = EXCLUDED.position, start_date = EXCLUDED.start_date, status = EXCLUDED.status,
+            benefits = EXCLUDED.benefits, remarks = EXCLUDED.remarks, negotiation_notes = EXCLUDED.negotiation_notes,
+            updated_at = now()
+          RETURNING *
+        `, [body.application_id, body.candidate_id, body.offer_date || null, body.expiry_date || null, body.offer_amount || null, body.position || null, body.start_date || null, body.status || 'pending', body.benefits || null, body.remarks || null, body.negotiation_notes || null]);
+        return jsonResponse(result[0]);
+      }
+    }
+
     // Timeline
     if (path === '/timeline') {
       const applicationId = url.searchParams.get('application_id');

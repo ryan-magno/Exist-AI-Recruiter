@@ -92,4 +92,11 @@ export const azureDb = {
       return apiCall<any[]>(`/timeline${query ? `?${query}` : ''}`);
     },
   },
+  
+  // Offers
+  offers: {
+    get: (applicationId: string) => apiCall<any>(`/offers?application_id=${applicationId}`),
+    listByCandidate: (candidateId: string) => apiCall<any[]>(`/offers?candidate_id=${candidateId}`),
+    upsert: (data: any) => apiCall<any>('/offers', { method: 'POST', body: JSON.stringify(data) }),
+  },
 };

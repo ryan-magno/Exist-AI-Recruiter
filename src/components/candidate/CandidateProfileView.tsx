@@ -21,7 +21,7 @@ interface CandidateProfileViewProps {
 }
 
 export function CandidateProfileView({ candidate, onBack }: CandidateProfileViewProps) {
-  const { updateCandidatePipelineStatus, updateCandidateTechInterviewResult, candidates } = useApp();
+  const { updateCandidatePipelineStatus, candidates } = useApp();
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [hasPlayedAnimation, setHasPlayedAnimation] = useState(false);
@@ -96,20 +96,13 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
             </Select>
           </div>
           <div className="min-w-[140px]">
-            <label className="text-xs text-muted-foreground mb-1 block">Tech Interview Status</label>
-            <Select
-              value={currentCandidate.techInterviewResult}
-              onValueChange={(value) => updateCandidateTechInterviewResult(currentCandidate.id, value as TechInterviewResult)}
-            >
-              <SelectTrigger className={cn("h-9 text-sm border", techInterviewColors[currentCandidate.techInterviewResult])}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(techInterviewLabels).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="text-xs text-muted-foreground mb-1 block">Tech Interview Result</label>
+            <div className={cn(
+              "h-9 px-3 flex items-center text-sm border rounded-md",
+              techInterviewColors[currentCandidate.techInterviewResult]
+            )}>
+              {techInterviewLabels[currentCandidate.techInterviewResult]}
+            </div>
           </div>
           <div className="flex items-center gap-2 ml-auto">
             <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => setShowEmailModal(true)}>

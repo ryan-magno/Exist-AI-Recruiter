@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, FileCheck, AlertCircle, Calendar, DollarSign, Briefcase, Clock, MessageSquare } from 'lucide-react';
+import { Save, FileCheck, AlertCircle, Calendar, DollarSign, Briefcase, Clock, MessageSquare, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Candidate } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
+import { useOffer, useUpsertOffer, OfferStatus as DBOfferStatus } from '@/hooks/useOffers';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -51,6 +52,10 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
   const { candidates, updateCandidatePipelineStatus } = useApp();
   const currentCandidate = candidates.find(c => c.id === candidate.id) || candidate;
   
+  const applicationId = (currentCandidate as any).applicationId;
+  const { data: existingOffer, isLoading: isLoadingOffer } = useOffer(applicationId);
+  const upsertOfferMutation = useUpsertOffer();
+  
   const isOfferStage = currentCandidate.pipelineStatus === 'offer' || currentCandidate.pipelineStatus === 'hired';
 
   const [formData, setFormData] = useState<OfferForm>({
@@ -65,32 +70,56 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
     negotiationNotes: ''
   });
 
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Update form when candidate data changes
+  // Load existing offer data when available
   useEffect(() => {
-    if ((currentCandidate as any).offerForm) {
-      setFormData((currentCandidate as any).offerForm);
+    if (existingOffer) {
+      setFormData({
+        offerDate: existingOffer.offer_date?.split('T')[0] || '',
+        offerAmount: existingOffer.offer_amount || '',
+        position: existingOffer.position || currentCandidate.positionApplied || '',
+        startDate: existingOffer.start_date?.split('T')[0] || '',
+        status: (existingOffer.status as OfferStatus) || '',
+        remarks: existingOffer.remarks || '',
+        expiryDate: existingOffer.expiry_date?.split('T')[0] || '',
+        benefits: existingOffer.benefits || '',
+        negotiationNotes: existingOffer.negotiation_notes || ''
+      });
     }
-  }, [currentCandidate]);
+  }, [existingOffer, currentCandidate.positionApplied]);
 
   const handleSave = async () => {
-    setIsSaving(true);
-    
-    // Simulate save
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // If offer is accepted, move to hired
-    if (formData.status === 'accepted' && currentCandidate.pipelineStatus !== 'hired') {
-      updateCandidatePipelineStatus(currentCandidate.id, 'hired');
-      toast.success('Offer accepted! Candidate moved to Hired.');
-    } else if (formData.status === 'rejected') {
-      toast.success('Offer form saved. Candidate rejected the offer.');
-    } else {
-      toast.success('Offer form saved successfully');
+    if (!applicationId) {
+      toast.error('Cannot save: No application ID found');
+      return;
     }
     
-    setIsSaving(false);
+    try {
+      await upsertOfferMutation.mutateAsync({
+        application_id: applicationId,
+        candidate_id: currentCandidate.id,
+        offer_date: formData.offerDate || null,
+        expiry_date: formData.expiryDate || null,
+        offer_amount: formData.offerAmount || null,
+        position: formData.position || null,
+        start_date: formData.startDate || null,
+        status: (formData.status || 'pending') as DBOfferStatus,
+        benefits: formData.benefits || null,
+        remarks: formData.remarks || null,
+        negotiation_notes: formData.negotiationNotes || null
+      });
+      
+      // If offer is accepted, move to hired
+      if (formData.status === 'accepted' && currentCandidate.pipelineStatus !== 'hired') {
+        updateCandidatePipelineStatus(currentCandidate.id, 'hired');
+        toast.success('Offer accepted! Candidate moved to Hired.');
+      } else if (formData.status === 'rejected') {
+        toast.success('Offer form saved. Candidate rejected the offer.');
+      } else {
+        toast.success('Offer form saved successfully');
+      }
+    } catch (error) {
+      toast.error('Failed to save offer form');
+    }
   };
 
   if (!isOfferStage) {
@@ -103,6 +132,15 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
         <p className="text-muted-foreground text-sm max-w-md">
           This form will be available once the candidate reaches the Offer stage.
         </p>
+      </div>
+    );
+  }
+
+  if (isLoadingOffer) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading offer data...</span>
       </div>
     );
   }
@@ -143,7 +181,7 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-sm">
               <DollarSign className="w-4 h-4 text-muted-foreground" />
-              Offer Amount
+              Offer Amount (PHP)
             </Label>
             <Input
               placeholder="e.g., ₱150,000/month"
@@ -237,9 +275,12 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={isSaving} className="gap-2">
-          {isSaving ? (
-            <>Saving...</>
+        <Button onClick={handleSave} disabled={upsertOfferMutation.isPending} className="gap-2">
+          {upsertOfferMutation.isPending ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Saving...
+            </>
           ) : (
             <>
               <Save className="w-4 h-4" />

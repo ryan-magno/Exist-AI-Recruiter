@@ -175,13 +175,6 @@ function KanbanCard({
                   <p className="font-semibold text-sm text-foreground truncate">
                     {candidate.name}
                   </p>
-                  {/* Internal Badge */}
-                  {isInternal && (
-                    <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 border border-blue-300 flex items-center gap-0.5">
-                      <Tag className="w-2.5 h-2.5" />
-                      Internal
-                    </span>
-                  )}
                 </div>
                 <span className={cn('px-2 py-0.5 rounded-full text-xs font-bold border shrink-0', getScoreClass(candidate.matchScore))}>
                   {candidate.matchScore}%
@@ -205,25 +198,12 @@ function KanbanCard({
             </div>
           </div>
 
-          {/* Tech Interview Status - only show if not in For HR Interview */}
-          {showTechInterview && !isOfferStage && !isHiredStage && (
-            <div className="mb-2" onClick={(e) => e.stopPropagation()}>
-              <label className="text-[10px] font-medium text-muted-foreground mb-1 block uppercase tracking-wide">
-                Tech Interview Status
-              </label>
-              <Select
-                value={candidate.techInterviewResult}
-                onValueChange={(value) => onTechInterviewChange(candidate.id, value as TechInterviewResult)}
-              >
-                <SelectTrigger className={cn("h-7 text-xs border w-full", techInterviewColors[candidate.techInterviewResult])}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(techInterviewLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {/* Tech Interview Result - Display only (read-only badge), not editable */}
+          {showTechInterview && !isOfferStage && !isHiredStage && candidate.techInterviewResult !== 'pending' && (
+            <div className="mb-2">
+              <span className={cn('inline-flex items-center px-2 py-1 rounded text-xs font-medium border', techInterviewColors[candidate.techInterviewResult])}>
+                Tech: {techInterviewLabels[candidate.techInterviewResult]}
+              </span>
             </div>
           )}
 
@@ -261,26 +241,39 @@ function KanbanCard({
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-1 pt-1 border-t" onClick={(e) => e.stopPropagation()}>
-            <Button 
-              size="icon" 
-              variant="ghost" 
-              className={cn("h-7 w-7", showTimeline && "bg-primary/10 text-primary")} 
-              onClick={() => onToggleTimeline(candidate.id)} 
-              title="View timeline"
-            >
-              <History className="w-3.5 h-3.5" />
-            </Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEmail(candidate)} title="Send email">
-              <Mail className="w-3.5 h-3.5" />
-            </Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onOpenNotes(candidate)} title="View notes">
-              <MessageSquare className="w-3.5 h-3.5" />
-            </Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(candidate.id)} title="Delete">
-              <Trash2 className="w-3.5 h-3.5" />
-            </Button>
+          {/* Actions Row with Internal Badge */}
+          <div className="flex items-center justify-between gap-1 pt-1 border-t" onClick={(e) => e.stopPropagation()}>
+            {/* Internal/External Badge */}
+            <span className={cn(
+              'px-1.5 py-0.5 rounded text-[10px] font-medium border flex items-center gap-0.5',
+              isInternal 
+                ? 'bg-blue-100 text-blue-700 border-blue-300' 
+                : 'bg-slate-100 text-slate-600 border-slate-300'
+            )}>
+              <Tag className="w-2.5 h-2.5" />
+              {isInternal ? 'Internal' : 'External'}
+            </span>
+            
+            <div className="flex items-center gap-1">
+              <Button 
+                size="icon" 
+                variant="ghost" 
+                className={cn("h-7 w-7", showTimeline && "bg-primary/10 text-primary")} 
+                onClick={() => onToggleTimeline(candidate.id)} 
+                title="View timeline"
+              >
+                <History className="w-3.5 h-3.5" />
+              </Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEmail(candidate)} title="Send email">
+                <Mail className="w-3.5 h-3.5" />
+              </Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onOpenNotes(candidate)} title="View notes">
+                <MessageSquare className="w-3.5 h-3.5" />
+              </Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(candidate.id)} title="Delete">
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -288,7 +281,7 @@ function KanbanCard({
         {showTimeline && (
           <div className="border-t bg-muted/30">
             <CandidateTimeline 
-              timeline={candidate.timeline || []} 
+              applicationId={(candidate as any).applicationId || candidate.id} 
               appliedDate={candidate.appliedDate} 
             />
           </div>
