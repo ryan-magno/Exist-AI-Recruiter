@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { useCVUploaderNames, useCreateCVUploader } from '@/hooks/useCVUploaders';
 import { useDepartmentNames } from '@/hooks/useDepartments';
 import { useJobOrders } from '@/hooks/useJobOrders';
+import { useCreateCandidateFromWebhook } from '@/hooks/useCandidates';
 
 interface UploadedFile {
   id: string;
@@ -64,6 +65,7 @@ export default function UploadPage() {
   const { data: departmentNames = [], isLoading: loadingDepartments } = useDepartmentNames();
   const { data: jobOrders = [], isLoading: loadingJobOrders } = useJobOrders();
   const createUploader = useCreateCVUploader();
+  const createCandidateFromWebhook = useCreateCandidateFromWebhook();
 
   // Auto-reset on page load (unless processing)
   useEffect(() => {
@@ -248,14 +250,45 @@ export default function UploadPage() {
       let result;
       try {
         result = await response.json();
+        console.log('Webhook response:', result);
       } catch {
-        result = { success: true };
+        result = null;
+      }
+      
+      // Process webhook response and store candidates in database
+      if (result && Array.isArray(result)) {
+        let successCount = 0;
+        for (let i = 0; i < result.length; i++) {
+          const webhookOutput = result[i]?.output;
+          if (!webhookOutput) continue;
+          
+          const fileMeta = metadata[i];
+          try {
+            await createCandidateFromWebhook.mutateAsync({
+              webhook_output: webhookOutput,
+              uploader_name: uploaderName.trim(),
+              applicant_type: fileMeta.applicant_type === 'internal' ? 'internal' : 'external',
+              job_order_id: typeof fileMeta.applying_for === 'object' 
+                ? fileMeta.applying_for?.job_order_id 
+                : null,
+              internal_metadata: fileMeta.applicant_type === 'internal' ? {
+                from_date: fileMeta.from_date || undefined,
+                to_date: fileMeta.to_date || undefined,
+                department: fileMeta.department || undefined,
+                upload_reason: fileMeta.upload_reason || undefined,
+              } : null
+            });
+            successCount++;
+          } catch (err) {
+            console.error(`Error storing candidate ${i}:`, err);
+          }
+        }
+        toast.success(`${successCount} candidate(s) processed and stored`);
       }
       
       // Mark all as complete
       setFiles(prev => prev.map(f => ({ ...f, status: 'complete' as const })));
       setIsVectorized(true);
-      toast.success(`Vectorization Complete: ${files.length} CVs Processed`);
       
       // Save uploader name to database
       try {
@@ -264,7 +297,7 @@ export default function UploadPage() {
         console.error('Error saving uploader:', error);
       }
       
-      setTimeout(() => navigate('/dashboard'), 1000);
+      setTimeout(() => navigate('/dashboard'), 1500);
     } catch (error) {
       // Mark all as error
       setFiles(prev => prev.map(f => ({ ...f, status: 'error' as const })));

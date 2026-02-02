@@ -37,7 +37,9 @@ export const azureDb = {
   candidates: {
     list: () => apiCall<any[]>('/candidates'),
     get: (id: string) => apiCall<any>(`/candidates/${id}`),
+    getFull: (id: string) => apiCall<any>(`/candidates/${id}/full`),
     create: (data: any) => apiCall<any>('/candidates', { method: 'POST', body: JSON.stringify(data) }),
+    createFromWebhook: (data: any) => apiCall<any>('/candidates/from-webhook', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: any) => apiCall<any>(`/candidates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => apiCall<{ success: boolean }>(`/candidates/${id}`, { method: 'DELETE' }),
   },
