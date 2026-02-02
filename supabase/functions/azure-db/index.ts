@@ -528,6 +528,36 @@ async function handleRequest(req: Request): Promise<Response> {
   }
 
   try {
+    // Webhook proxy endpoint - bypasses CORS by proxying through edge function
+    if (path === '/webhook-proxy' && method === 'POST') {
+      const formData = await req.formData();
+      const webhookUrl = 'https://workflow.exist.com.ph/webhook/vector-db-loader';
+      
+      console.log('Proxying webhook request to:', webhookUrl);
+      
+      try {
+        const webhookResponse = await fetch(webhookUrl, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!webhookResponse.ok) {
+          console.error('Webhook failed with status:', webhookResponse.status);
+          return jsonResponse({ 
+            error: `Webhook failed with status: ${webhookResponse.status}` 
+          }, webhookResponse.status);
+        }
+        
+        const result = await webhookResponse.json();
+        console.log('Webhook response received, candidates:', Array.isArray(result) ? result.length : 'N/A');
+        return jsonResponse(result);
+      } catch (webhookError) {
+        console.error('Webhook proxy error:', webhookError);
+        const message = webhookError instanceof Error ? webhookError.message : 'Webhook request failed';
+        return jsonResponse({ error: message }, 502);
+      }
+    }
+
     // Initialize tables endpoint
     if (path === '/init' && method === 'POST') {
       await initTables();
