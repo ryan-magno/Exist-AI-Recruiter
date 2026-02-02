@@ -37,7 +37,8 @@ const UPLOAD_REASONS = [
   { value: 'other', label: 'Other' },
 ];
 
-const N8N_WEBHOOK_URL = 'https://workflow.exist.com.ph/webhook/vector-db-loader';
+// Use our edge function as a proxy to bypass CORS issues with the n8n webhook
+const WEBHOOK_PROXY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/azure-db/webhook-proxy`;
 
 // Helper to format file size
 const formatFileSize = (bytes: number): string => {
@@ -248,7 +249,7 @@ export default function UploadPage() {
       
       let response: Response;
       try {
-        response = await fetch(N8N_WEBHOOK_URL, {
+        response = await fetch(WEBHOOK_PROXY_URL, {
           method: 'POST',
           body: formData,
           signal: controller.signal
