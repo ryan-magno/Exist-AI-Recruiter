@@ -266,22 +266,47 @@ export default function UploadPage() {
       }
       
       if (!response.ok) {
-        throw new Error(`Webhook failed with status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Request failed with status: ${response.status}`);
       }
       
       // Parse response
       let result;
       try {
         result = await response.json();
-        console.log('Webhook response:', result);
+        console.log('Proxy response:', result);
       } catch {
-        console.log('Webhook returned non-JSON response');
+        console.log('Proxy returned non-JSON response');
         result = null;
       }
       
       toast.dismiss(loadingToastId);
       
-      // Process webhook response and store candidates in database
+      // Check if it's a background processing response (new async flow)
+      if (result?.status === 'processing') {
+        console.log('Background processing started, batch:', result.batch_id);
+        
+        // Mark all files as complete (processing started successfully)
+        setFiles(prev => prev.map(f => ({ ...f, status: 'complete' as const })));
+        setIsVectorized(true);
+        
+        toast.success('CVs submitted for AI processing!', {
+          description: 'Candidates will appear in the dashboard shortly as they are processed.',
+          duration: 5000
+        });
+        
+        // Save uploader name to database
+        try {
+          await createUploader.mutateAsync(uploaderName.trim());
+        } catch (error) {
+          console.error('Error saving uploader:', error);
+        }
+        
+        setTimeout(() => navigate('/dashboard'), 2000);
+        return;
+      }
+      
+      // Legacy flow: direct response with candidate data (fallback)
       if (result && Array.isArray(result)) {
         let successCount = 0;
         let errorCount = 0;
@@ -311,14 +336,12 @@ export default function UploadPage() {
               } : null
             });
             successCount++;
-            // Mark this file as complete
             setFiles(prev => prev.map((f, idx) => 
               idx === i ? { ...f, status: 'complete' as const } : f
             ));
           } catch (err) {
             console.error(`Error storing candidate ${i}:`, err);
             errorCount++;
-            // Mark this file as error
             setFiles(prev => prev.map((f, idx) => 
               idx === i ? { ...f, status: 'error' as const } : f
             ));
@@ -332,9 +355,8 @@ export default function UploadPage() {
           toast.warning(`${errorCount} candidate(s) failed to store`);
         }
       } else {
-        // Mark all as complete even if no structured response (webhook succeeded)
         setFiles(prev => prev.map(f => ({ ...f, status: 'complete' as const })));
-        toast.success('CVs processed successfully');
+        toast.success('CVs submitted successfully');
       }
       
       setIsVectorized(true);

@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 
+// Declare EdgeRuntime for background tasks
+declare const EdgeRuntime: {
+  waitUntil: (promise: Promise<unknown>) => void;
+} | undefined;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -528,34 +533,182 @@ async function handleRequest(req: Request): Promise<Response> {
   }
 
   try {
-    // Webhook proxy endpoint - bypasses CORS by proxying through edge function
+    // Webhook proxy with background processing - returns immediately, processes in background
     if (path === '/webhook-proxy' && method === 'POST') {
       const formData = await req.formData();
       const webhookUrl = 'https://workflow.exist.com.ph/webhook/vector-db-loader';
       
-      console.log('Proxying webhook request to:', webhookUrl);
-      
+      // Extract metadata from formData for later use
+      const metadataStr = formData.get('metadata') as string;
+      const uploaderName = formData.get('uploader_name') as string;
+      let metadata: any[] = [];
       try {
-        const webhookResponse = await fetch(webhookUrl, {
-          method: 'POST',
-          body: formData,
-        });
-        
-        if (!webhookResponse.ok) {
-          console.error('Webhook failed with status:', webhookResponse.status);
-          return jsonResponse({ 
-            error: `Webhook failed with status: ${webhookResponse.status}` 
-          }, webhookResponse.status);
-        }
-        
-        const result = await webhookResponse.json();
-        console.log('Webhook response received, candidates:', Array.isArray(result) ? result.length : 'N/A');
-        return jsonResponse(result);
-      } catch (webhookError) {
-        console.error('Webhook proxy error:', webhookError);
-        const message = webhookError instanceof Error ? webhookError.message : 'Webhook request failed';
-        return jsonResponse({ error: message }, 502);
+        metadata = JSON.parse(metadataStr || '[]');
+      } catch (e) {
+        console.error('Failed to parse metadata:', e);
       }
+      
+      // Generate a batch ID to track this upload
+      const batchId = crypto.randomUUID();
+      console.log(`Starting webhook proxy, batch: ${batchId}, files: ${metadata.length}`);
+      
+      // Background task to call webhook and store results
+      const backgroundTask = async () => {
+        try {
+          console.log(`[${batchId}] Calling webhook: ${webhookUrl}`);
+          
+          const webhookResponse = await fetch(webhookUrl, {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (!webhookResponse.ok) {
+            console.error(`[${batchId}] Webhook failed with status: ${webhookResponse.status}`);
+            return;
+          }
+          
+          const result = await webhookResponse.json();
+          console.log(`[${batchId}] Webhook response received, candidates: ${Array.isArray(result) ? result.length : 'N/A'}`);
+          
+          // Process each candidate and store in database
+          if (result && Array.isArray(result)) {
+            for (let i = 0; i < result.length; i++) {
+              const webhookOutput = result[i]?.output;
+              if (!webhookOutput) {
+                console.warn(`[${batchId}] Skipping result ${i}: no output field`);
+                continue;
+              }
+              
+              const fileMeta = metadata[i] || {};
+              const jobOrderId = typeof fileMeta.applying_for === 'object' 
+                ? fileMeta.applying_for?.job_order_id 
+                : null;
+              
+              try {
+                // Create a new client for background task
+                const bgClient = createPgClient();
+                await bgClient.connect();
+                
+                const candidateInfo = webhookOutput.candidate_info || {};
+                const workHistory = webhookOutput.work_history || {};
+                const currentOcc = candidateInfo.current_occupation;
+                const currentOccupation = currentOcc 
+                  ? `${currentOcc.title || ''} at ${currentOcc.company || ''}`.trim()
+                  : null;
+                
+                // Insert candidate
+                const candidateResult = await bgClient.queryObject(`
+                  INSERT INTO candidates (
+                    full_name, email, phone, applicant_type, skills, linkedin,
+                    current_occupation, years_of_experience_text, target_role, target_role_source,
+                    overall_summary, strengths, weaknesses, uploaded_by
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                  RETURNING *
+                `, [
+                  candidateInfo.full_name || 'Unknown',
+                  candidateInfo.email || null,
+                  candidateInfo.phone || null,
+                  fileMeta.applicant_type || 'external',
+                  webhookOutput.key_skills || workHistory.key_skills || [],
+                  candidateInfo.linkedin || null,
+                  currentOccupation,
+                  candidateInfo.years_of_experience || workHistory.total_experience || null,
+                  webhookOutput.target_role?.position || null,
+                  webhookOutput.target_role?.source || null,
+                  webhookOutput.overall_summary || null,
+                  webhookOutput.strengths || [],
+                  webhookOutput.weaknesses || [],
+                  uploaderName || null
+                ]);
+                
+                const candidate = candidateResult.rows[0] as any;
+                const candidateId = candidate.id;
+                console.log(`[${batchId}] Created candidate: ${candidateId} - ${candidateInfo.full_name}`);
+                
+                // Insert education
+                if (webhookOutput.education && Array.isArray(webhookOutput.education)) {
+                  for (const edu of webhookOutput.education) {
+                    await bgClient.queryObject(`
+                      INSERT INTO candidate_education (candidate_id, degree, institution, year)
+                      VALUES ($1, $2, $3, $4)
+                    `, [candidateId, edu.degree || 'Unknown', edu.institution || 'Unknown', edu.year || null]);
+                  }
+                }
+                
+                // Insert certifications
+                if (webhookOutput.certifications && Array.isArray(webhookOutput.certifications)) {
+                  for (const cert of webhookOutput.certifications) {
+                    await bgClient.queryObject(`
+                      INSERT INTO candidate_certifications (candidate_id, name, issuer, year)
+                      VALUES ($1, $2, $3, $4)
+                    `, [candidateId, cert.name || 'Unknown', cert.issuer || null, cert.year || null]);
+                  }
+                }
+                
+                // Insert work experiences
+                if (workHistory.work_experience && Array.isArray(workHistory.work_experience)) {
+                  for (const exp of workHistory.work_experience) {
+                    const isCurrent = exp.duration?.toLowerCase().includes('present') || false;
+                    await bgClient.queryObject(`
+                      INSERT INTO candidate_work_experience (
+                        candidate_id, company_name, job_title, description, duration, key_projects, is_current
+                      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    `, [
+                      candidateId, 
+                      exp.company || 'Unknown', 
+                      exp.job_title || 'Unknown', 
+                      exp.summary || null,
+                      exp.duration || null,
+                      exp.key_projects || [],
+                      isCurrent
+                    ]);
+                  }
+                }
+                
+                // Create application if job_order_id provided
+                if (jobOrderId) {
+                  const appResult = await bgClient.queryObject(`
+                    INSERT INTO candidate_job_applications (candidate_id, job_order_id, match_score, pipeline_status)
+                    VALUES ($1, $2, $3, 'new')
+                    RETURNING *
+                  `, [candidateId, jobOrderId, webhookOutput.qualification_score || null]);
+                  const application = appResult.rows[0] as any;
+                  
+                  // Create timeline entry
+                  await bgClient.queryObject(`
+                    INSERT INTO candidate_timeline (application_id, candidate_id, to_status)
+                    VALUES ($1, $2, 'new')
+                  `, [application.id, candidateId]);
+                }
+                
+                await bgClient.end();
+              } catch (dbError) {
+                console.error(`[${batchId}] Error storing candidate ${i}:`, dbError);
+              }
+            }
+          }
+          
+          console.log(`[${batchId}] Background processing complete`);
+        } catch (error) {
+          console.error(`[${batchId}] Background task error:`, error);
+        }
+      };
+      
+      // Start background task without waiting
+      // @ts-ignore - EdgeRuntime is available in Supabase edge functions
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+        EdgeRuntime.waitUntil(backgroundTask());
+      } else {
+        // Fallback: just fire and forget (not ideal but works)
+        backgroundTask();
+      }
+      
+      // Return immediately with batch ID
+      return jsonResponse({ 
+        status: 'processing',
+        batch_id: batchId,
+        message: 'CVs are being processed. Candidates will appear shortly.'
+      });
     }
 
     // Initialize tables endpoint
