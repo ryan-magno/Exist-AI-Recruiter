@@ -1,11 +1,13 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { useApp } from '@/context/AppContext';
 
 export function useRealtimeCandidates() {
   const [newCandidatesCount, setNewCandidatesCount] = useState(0);
   const [showRefreshPrompt, setShowRefreshPrompt] = useState(false);
   const queryClient = useQueryClient();
+  const { refreshCandidates } = useApp();
   const lastSeenRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -38,16 +40,19 @@ export function useRealtimeCandidates() {
   }, []);
 
   const refreshData = useCallback(async () => {
-    // Invalidate all relevant queries to fetch fresh data
+    // Invalidate React Query caches
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['candidates'] }),
       queryClient.invalidateQueries({ queryKey: ['applications'] }),
       queryClient.invalidateQueries({ queryKey: ['job-orders'] }),
     ]);
     
+    // Refresh candidates in AppContext from Azure DB
+    await refreshCandidates();
+    
     setNewCandidatesCount(0);
     setShowRefreshPrompt(false);
-  }, [queryClient]);
+  }, [queryClient, refreshCandidates]);
 
   const dismissPrompt = useCallback(() => {
     setShowRefreshPrompt(false);
