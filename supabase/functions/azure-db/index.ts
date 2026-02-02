@@ -128,6 +128,10 @@ async function initTables() {
     DO $$ BEGIN
       CREATE TYPE tech_verdict AS ENUM ('recommend_hire', 'consider', 'do_not_hire');
     EXCEPTION WHEN duplicate_object THEN null; END $$;
+    
+    DO $$ BEGIN
+      CREATE TYPE offer_status AS ENUM ('pending', 'accepted', 'rejected', 'negotiating', 'unresponsive');
+    EXCEPTION WHEN duplicate_object THEN null; END $$;
 
     -- Departments table
     CREATE TABLE IF NOT EXISTS departments (
@@ -319,6 +323,24 @@ async function initTables() {
       outcome TEXT,
       historical_notes TEXT,
       created_at TIMESTAMPTZ DEFAULT now()
+    );
+
+    -- Offers table
+    CREATE TABLE IF NOT EXISTS offers (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      application_id UUID NOT NULL UNIQUE REFERENCES candidate_job_applications(id) ON DELETE CASCADE,
+      candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+      offer_date DATE,
+      expiry_date DATE,
+      offer_amount TEXT,
+      position TEXT,
+      start_date DATE,
+      status offer_status DEFAULT 'pending',
+      benefits TEXT,
+      remarks TEXT,
+      negotiation_notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      updated_at TIMESTAMPTZ DEFAULT now()
     );
 
     -- Add new columns if they don't exist (for existing tables)
