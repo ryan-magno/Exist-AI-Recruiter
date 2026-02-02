@@ -1,6 +1,39 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { azureDb } from '@/lib/azureDb';
 
+// New interfaces for webhook-extracted data
+export interface CandidateEducation {
+  id: string;
+  candidate_id: string;
+  degree: string;
+  institution: string;
+  year: string | null;
+  created_at: string;
+}
+
+export interface CandidateCertification {
+  id: string;
+  candidate_id: string;
+  name: string;
+  issuer: string | null;
+  year: string | null;
+  created_at: string;
+}
+
+export interface CandidateWorkExperience {
+  id: string;
+  candidate_id: string;
+  company_name: string;
+  job_title: string;
+  start_date: string | null;
+  end_date: string | null;
+  is_current: boolean;
+  description: string | null;
+  duration: string | null;
+  key_projects: string[] | null;
+  created_at: string;
+}
+
 export interface Candidate {
   id: string;
   full_name: string;
@@ -21,6 +54,21 @@ export interface Candidate {
   uploaded_by_user_id: string | null;
   created_at: string;
   updated_at: string;
+  // New webhook-extracted fields
+  linkedin: string | null;
+  current_occupation: string | null;
+  years_of_experience_text: string | null;
+  target_role: string | null;
+  target_role_source: string | null;
+  overall_summary: string | null;
+  strengths: string[] | null;
+  weaknesses: string[] | null;
+}
+
+export interface CandidateFull extends Candidate {
+  education: CandidateEducation[];
+  certifications: CandidateCertification[];
+  work_experiences: CandidateWorkExperience[];
 }
 
 export interface CandidateInsert {
@@ -52,6 +100,19 @@ export interface CandidateUpdate {
   expected_salary?: string | null;
 }
 
+export interface WebhookCandidateData {
+  webhook_output: any;
+  uploader_name: string;
+  applicant_type: 'internal' | 'external';
+  job_order_id?: string | null;
+  internal_metadata?: {
+    from_date?: string;
+    to_date?: string;
+    department?: string;
+    upload_reason?: string;
+  } | null;
+}
+
 export function useCandidates() {
   return useQuery({
     queryKey: ['candidates'],
@@ -70,16 +131,23 @@ export function useCandidate(id: string | null) {
   });
 }
 
+export function useCandidateFull(id: string | null) {
+  return useQuery({
+    queryKey: ['candidates', id, 'full'],
+    queryFn: async () => {
+      if (!id) return null;
+      return azureDb.candidates.getFull(id) as Promise<CandidateFull | null>;
+    },
+    enabled: !!id
+  });
+}
+
 export function useCandidateWithDetails(id: string | null) {
   return useQuery({
     queryKey: ['candidates', id, 'details'],
     queryFn: async () => {
       if (!id) return null;
-      const candidate = await azureDb.candidates.get(id);
-      return {
-        ...candidate,
-        workExperiences: [] // Work experience would need separate endpoint
-      };
+      return azureDb.candidates.getFull(id) as Promise<CandidateFull | null>;
     },
     enabled: !!id
   });
@@ -91,6 +159,17 @@ export function useCreateCandidate() {
     mutationFn: (newCandidate: CandidateInsert) => azureDb.candidates.create(newCandidate),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
+    }
+  });
+}
+
+export function useCreateCandidateFromWebhook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: WebhookCandidateData) => azureDb.candidates.createFromWebhook(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
     }
   });
 }

@@ -18,7 +18,10 @@ const ALLOWED_CANDIDATE_COLUMNS = [
   'full_name', 'email', 'phone', 'applicant_type', 'skills', 'positions_fit_for',
   'years_of_experience', 'educational_background', 'cv_url', 'cv_filename',
   'availability', 'preferred_work_setup', 'expected_salary', 'earliest_start_date',
-  'uploaded_by', 'uploaded_by_user_id'
+  'uploaded_by', 'uploaded_by_user_id',
+  // New webhook fields
+  'linkedin', 'current_occupation', 'years_of_experience_text', 'target_role',
+  'target_role_source', 'overall_summary', 'strengths', 'weaknesses'
 ];
 
 const ALLOWED_APPLICATION_COLUMNS = [
@@ -174,8 +177,37 @@ async function initTables() {
       earliest_start_date DATE,
       uploaded_by TEXT,
       uploaded_by_user_id UUID,
+      -- New webhook fields
+      linkedin TEXT,
+      current_occupation TEXT,
+      years_of_experience_text TEXT,
+      target_role TEXT,
+      target_role_source TEXT,
+      overall_summary TEXT,
+      strengths TEXT[],
+      weaknesses TEXT[],
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
+    );
+
+    -- Candidate Education table (new)
+    CREATE TABLE IF NOT EXISTS candidate_education (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+      degree TEXT NOT NULL,
+      institution TEXT NOT NULL,
+      year TEXT,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
+
+    -- Candidate Certifications table (new)
+    CREATE TABLE IF NOT EXISTS candidate_certifications (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      issuer TEXT,
+      year TEXT,
+      created_at TIMESTAMPTZ DEFAULT now()
     );
 
     -- Candidate Work Experience table
@@ -188,6 +220,8 @@ async function initTables() {
       end_date DATE,
       is_current BOOLEAN DEFAULT false,
       description TEXT,
+      duration TEXT,
+      key_projects TEXT[],
       created_at TIMESTAMPTZ DEFAULT now()
     );
 
@@ -281,6 +315,23 @@ async function initTables() {
       historical_notes TEXT,
       created_at TIMESTAMPTZ DEFAULT now()
     );
+
+    -- Add new columns if they don't exist (for existing tables)
+    DO $$ BEGIN
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS linkedin TEXT;
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS current_occupation TEXT;
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS years_of_experience_text TEXT;
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS target_role TEXT;
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS target_role_source TEXT;
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS overall_summary TEXT;
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS strengths TEXT[];
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS weaknesses TEXT[];
+    EXCEPTION WHEN duplicate_column THEN null; END $$;
+
+    DO $$ BEGIN
+      ALTER TABLE candidate_work_experience ADD COLUMN IF NOT EXISTS duration TEXT;
+      ALTER TABLE candidate_work_experience ADD COLUMN IF NOT EXISTS key_projects TEXT[];
+    EXCEPTION WHEN duplicate_column THEN null; END $$;
   `;
   
   await execute(createTablesSql);
@@ -316,55 +367,151 @@ async function seedData(forceReseed = false) {
     ON CONFLICT (jo_number) DO NOTHING
   `);
 
-  // Seed candidates
-  await execute(`
-    INSERT INTO candidates (full_name, email, phone, applicant_type, skills, years_of_experience, educational_background, availability, preferred_work_setup, expected_salary)
-    VALUES 
-    ('Alice Rodriguez', 'alice.rodriguez@email.com', '+1-555-0101', 'external', ARRAY['React', 'TypeScript', 'Node.js', 'PostgreSQL'], 5, 'BS Computer Science, Stanford University', 'Immediate', 'Remote', '120000'),
-    ('Bob Thompson', 'bob.thompson@email.com', '+1-555-0102', 'external', ARRAY['Python', 'Machine Learning', 'AWS', 'Docker'], 7, 'MS Computer Science, MIT', '2 weeks notice', 'Hybrid', '150000'),
-    ('Carol Martinez', 'carol.martinez@email.com', '+1-555-0103', 'internal', ARRAY['Product Strategy', 'Agile', 'Data Analysis', 'User Research'], 4, 'MBA, Harvard Business School', 'Immediate', 'On-site', '130000'),
-    ('David Kim', 'david.kim@email.com', '+1-555-0104', 'external', ARRAY['UI/UX Design', 'Figma', 'Adobe Creative Suite', 'Prototyping'], 3, 'BFA Design, Rhode Island School of Design', '1 month notice', 'Remote', '95000'),
-    ('Emma Wilson', 'emma.wilson@email.com', '+1-555-0105', 'external', ARRAY['Java', 'Spring Boot', 'Kubernetes', 'Microservices'], 8, 'BS Software Engineering, Georgia Tech', 'Immediate', 'Hybrid', '140000'),
-    ('Frank Chen', 'frank.chen@email.com', '+1-555-0106', 'external', ARRAY['Sales', 'Negotiation', 'CRM', 'Enterprise Software'], 6, 'BA Business Administration, UC Berkeley', '2 weeks notice', 'On-site', '85000'),
-    ('Grace Lee', 'grace.lee@email.com', '+1-555-0107', 'internal', ARRAY['DevOps', 'Terraform', 'AWS', 'Linux'], 5, 'BS Computer Engineering, UCLA', 'Immediate', 'Remote', '125000'),
-    ('Henry Davis', 'henry.davis@email.com', '+1-555-0108', 'external', ARRAY['React Native', 'iOS', 'Android', 'Flutter'], 4, 'BS Computer Science, University of Washington', '3 weeks notice', 'Hybrid', '115000')
-  `);
+  console.log("Synthetic data seeded successfully (job orders only - candidates from webhook)");
+}
 
-  // Create applications linking candidates to job orders
-  const jobOrders = await query("SELECT id, jo_number FROM job_orders");
-  const candidates = await query("SELECT id, full_name FROM candidates");
+// Create candidate from webhook data
+async function createCandidateFromWebhook(body: any) {
+  const { webhook_output, uploader_name, applicant_type, job_order_id, internal_metadata } = body;
+  const output = webhook_output;
   
-  if (jobOrders.length > 0 && candidates.length > 0) {
-    const jo1 = (jobOrders[0] as any).id;
-    const jo2 = (jobOrders[1] as any).id;
-    const jo4 = (jobOrders[3] as any).id;
-    const jo5 = (jobOrders[4] as any).id;
-    
-    const c1 = (candidates[0] as any).id;
-    const c2 = (candidates[1] as any).id;
-    const c3 = (candidates[2] as any).id;
-    const c4 = (candidates[3] as any).id;
-    const c5 = (candidates[4] as any).id;
-    const c6 = (candidates[5] as any).id;
-    const c7 = (candidates[6] as any).id;
-    const c8 = (candidates[7] as any).id;
-
-    await execute(`
-      INSERT INTO candidate_job_applications (candidate_id, job_order_id, pipeline_status, match_score)
-      VALUES 
-      ($1, $2, 'for_hr_interview', 92),
-      ($3, $2, 'for_tech_interview', 88),
-      ($4, $5, 'for_hr_interview', 85),
-      ($6, $2, 'screening', 78),
-      ($7, $2, 'for_hr_interview', 90),
-      ($8, $9, 'for_tech_interview', 87),
-      ($10, $11, 'for_hr_interview', 82),
-      ($12, $2, 'offer', 95)
-      ON CONFLICT (candidate_id, job_order_id) DO NOTHING
-    `, [c1, jo1, c2, c4, jo2, c5, c6, c7, jo4, c8, jo5, c3]);
+  console.log("Processing webhook candidate:", output.candidate_info?.full_name);
+  
+  // Extract data from webhook output
+  const candidateInfo = output.candidate_info || {};
+  const workHistory = output.work_history || {};
+  const currentOcc = candidateInfo.current_occupation || workHistory.current_occupation || {};
+  
+  // Build current occupation string
+  const currentOccupation = currentOcc.title && currentOcc.company 
+    ? `${currentOcc.title} at ${currentOcc.company}` 
+    : null;
+  
+  // Insert candidate
+  const candidateResult = await query(`
+    INSERT INTO candidates (
+      full_name, email, phone, applicant_type, skills, 
+      linkedin, current_occupation, years_of_experience_text,
+      target_role, target_role_source, overall_summary, strengths, weaknesses,
+      uploaded_by
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    RETURNING *
+  `, [
+    candidateInfo.full_name || 'Unknown',
+    candidateInfo.email || null,
+    candidateInfo.phone || null,
+    applicant_type || 'external',
+    output.key_skills || workHistory.key_skills || [],
+    candidateInfo.linkedin || null,
+    currentOccupation,
+    candidateInfo.years_of_experience || workHistory.total_experience || null,
+    output.target_role?.position || null,
+    output.target_role?.source || null,
+    output.overall_summary || null,
+    output.strengths || [],
+    output.weaknesses || [],
+    uploader_name || null
+  ]);
+  
+  const candidate = candidateResult[0] as any;
+  const candidateId = candidate.id;
+  
+  // Insert education records
+  if (output.education && Array.isArray(output.education)) {
+    for (const edu of output.education) {
+      await execute(`
+        INSERT INTO candidate_education (candidate_id, degree, institution, year)
+        VALUES ($1, $2, $3, $4)
+      `, [candidateId, edu.degree || 'Unknown', edu.institution || 'Unknown', edu.year || null]);
+    }
   }
+  
+  // Insert certification records
+  if (output.certifications && Array.isArray(output.certifications)) {
+    for (const cert of output.certifications) {
+      await execute(`
+        INSERT INTO candidate_certifications (candidate_id, name, issuer, year)
+        VALUES ($1, $2, $3, $4)
+      `, [candidateId, cert.name || 'Unknown', cert.issuer || null, cert.year || null]);
+    }
+  }
+  
+  // Insert work experience records
+  if (workHistory.work_experience && Array.isArray(workHistory.work_experience)) {
+    for (const exp of workHistory.work_experience) {
+      const isCurrent = exp.duration?.toLowerCase().includes('present') || false;
+      await execute(`
+        INSERT INTO candidate_work_experience (
+          candidate_id, company_name, job_title, description, duration, key_projects, is_current
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [
+        candidateId, 
+        exp.company || 'Unknown', 
+        exp.job_title || 'Unknown', 
+        exp.summary || null,
+        exp.duration || null,
+        exp.key_projects || [],
+        isCurrent
+      ]);
+    }
+  }
+  
+  // Create application if job_order_id provided
+  let application = null;
+  if (job_order_id) {
+    try {
+      const appResult = await query(`
+        INSERT INTO candidate_job_applications (candidate_id, job_order_id, match_score, pipeline_status)
+        VALUES ($1, $2, $3, 'for_hr_interview')
+        RETURNING *
+      `, [candidateId, job_order_id, output.qualification_score || null]);
+      application = appResult[0];
+      
+      // Create initial timeline entry
+      await execute(`
+        INSERT INTO candidate_timeline (application_id, candidate_id, to_status)
+        VALUES ($1, $2, 'for_hr_interview')
+      `, [(application as any).id, candidateId]);
+    } catch (err) {
+      console.error("Error creating application:", err);
+    }
+  }
+  
+  return { candidate, application };
+}
 
-  console.log("Synthetic data seeded successfully");
+// Get candidate with full details (education, certifications, work experience)
+async function getCandidateFull(id: string) {
+  // Get candidate
+  const candidates = await query("SELECT * FROM candidates WHERE id = $1", [id]);
+  if (candidates.length === 0) return null;
+  
+  const candidate = candidates[0] as any;
+  
+  // Get education
+  const education = await query(
+    "SELECT * FROM candidate_education WHERE candidate_id = $1 ORDER BY year DESC NULLS LAST",
+    [id]
+  );
+  
+  // Get certifications
+  const certifications = await query(
+    "SELECT * FROM candidate_certifications WHERE candidate_id = $1 ORDER BY year DESC NULLS LAST",
+    [id]
+  );
+  
+  // Get work experiences
+  const workExperiences = await query(
+    "SELECT * FROM candidate_work_experience WHERE candidate_id = $1 ORDER BY is_current DESC, created_at DESC",
+    [id]
+  );
+  
+  return {
+    ...candidate,
+    education,
+    certifications,
+    work_experiences: workExperiences
+  };
 }
 
 // Route handlers
@@ -438,6 +585,13 @@ async function handleRequest(req: Request): Promise<Response> {
       return jsonResponse({ success: true });
     }
 
+    // Candidates - NEW: from-webhook endpoint
+    if (path === '/candidates/from-webhook' && method === 'POST') {
+      const body = await req.json();
+      const result = await createCandidateFromWebhook(body);
+      return jsonResponse(result);
+    }
+
     // Candidates
     if (path === '/candidates') {
       if (method === 'GET') {
@@ -455,13 +609,20 @@ async function handleRequest(req: Request): Promise<Response> {
       }
     }
 
-    if (path.startsWith('/candidates/') && !path.includes('/work-experience') && method === 'GET') {
+    // Candidate with full details
+    if (path.match(/^\/candidates\/[^/]+\/full$/) && method === 'GET') {
+      const id = path.split('/')[2];
+      const result = await getCandidateFull(id);
+      return jsonResponse(result);
+    }
+
+    if (path.startsWith('/candidates/') && !path.includes('/work-experience') && !path.includes('/full') && method === 'GET') {
       const id = path.split('/')[2];
       const rows = await query("SELECT * FROM candidates WHERE id = $1", [id]);
       return jsonResponse(rows[0] || null);
     }
 
-    if (path.startsWith('/candidates/') && !path.includes('/work-experience') && method === 'PUT') {
+    if (path.startsWith('/candidates/') && !path.includes('/work-experience') && !path.includes('/full') && method === 'PUT') {
       const id = path.split('/')[2];
       const body = await req.json();
       
@@ -488,7 +649,7 @@ async function handleRequest(req: Request): Promise<Response> {
       return jsonResponse(result[0]);
     }
 
-    if (path.startsWith('/candidates/') && !path.includes('/work-experience') && method === 'DELETE') {
+    if (path.startsWith('/candidates/') && !path.includes('/work-experience') && !path.includes('/full') && method === 'DELETE') {
       const id = path.split('/')[2];
       await execute("DELETE FROM candidates WHERE id = $1", [id]);
       return jsonResponse({ success: true });
@@ -502,6 +663,7 @@ async function handleRequest(req: Request): Promise<Response> {
         
         let sql = `
           SELECT a.*, c.full_name as candidate_name, c.email as candidate_email, c.skills, c.years_of_experience,
+                 c.linkedin, c.current_occupation, c.overall_summary, c.strengths, c.weaknesses,
                  j.jo_number, j.title as job_title
           FROM candidate_job_applications a
           JOIN candidates c ON a.candidate_id = c.id
