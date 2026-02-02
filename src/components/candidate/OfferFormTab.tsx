@@ -12,14 +12,14 @@ import { useOffer, useUpsertOffer, OfferStatus as DBOfferStatus } from '@/hooks/
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'negotiating' | 'unresponsive' | '';
+export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'negotiating' | 'unresponsive';
 
 export interface OfferForm {
   offerDate: string;
   offerAmount: string;
   position: string;
   startDate: string;
-  status: OfferStatus;
+  status: OfferStatus | '';
   remarks: string;
   expiryDate: string;
   benefits: string;
@@ -27,7 +27,6 @@ export interface OfferForm {
 }
 
 const offerStatusLabels: Record<OfferStatus, string> = {
-  '': 'Not Set',
   'pending': 'Pending Response',
   'accepted': 'Accepted',
   'rejected': 'Rejected',
@@ -35,7 +34,7 @@ const offerStatusLabels: Record<OfferStatus, string> = {
   'unresponsive': 'Unresponsive'
 };
 
-const offerStatusColors: Record<OfferStatus, string> = {
+const offerStatusColors: Record<OfferStatus | '', string> = {
   '': 'bg-slate-100 text-slate-600 border-slate-300',
   'pending': 'bg-amber-100 text-amber-700 border-amber-300',
   'accepted': 'bg-emerald-100 text-emerald-700 border-emerald-300',
@@ -217,7 +216,7 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
           <div className="space-y-2">
             <Label className="text-sm">Offer Status</Label>
             <Select
-              value={formData.status}
+              value={formData.status || undefined}
               onValueChange={(value) => setFormData({ ...formData, status: value as OfferStatus })}
             >
               <SelectTrigger className={cn("border", formData.status && offerStatusColors[formData.status])}>
