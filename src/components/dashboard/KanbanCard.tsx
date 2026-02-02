@@ -1,7 +1,6 @@
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { motion } from 'framer-motion';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, Tag } from 'lucide-react';
 import { Candidate } from '@/data/mockData';
 import { cn } from '@/lib/utils';
 
@@ -57,11 +56,7 @@ export function KanbanCard({ candidate, isDragging, onClick }: KanbanCardProps) 
             </span>
           </div>
           
-          <p className="text-xs text-muted-foreground truncate mb-2">
-            {candidate.email}
-          </p>
-
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1 mb-2">
             {candidate.skills.slice(0, 3).map((skill) => (
               <span
                 key={skill}
@@ -75,6 +70,19 @@ export function KanbanCard({ candidate, isDragging, onClick }: KanbanCardProps) 
                 +{candidate.skills.length - 3}
               </span>
             )}
+          </div>
+
+          {/* Internal/External badge at bottom */}
+          <div className="flex items-center justify-end">
+            <span className={cn(
+              'px-2 py-0.5 rounded-full text-[10px] font-medium border flex items-center gap-1',
+              candidate.applicantType === 'internal' 
+                ? 'bg-blue-100 text-blue-700 border-blue-300' 
+                : 'bg-slate-100 text-slate-600 border-slate-300'
+            )}>
+              <Tag className="w-2.5 h-2.5" />
+              {candidate.applicantType === 'internal' ? 'Internal' : 'External'}
+            </span>
           </div>
         </div>
       </div>
