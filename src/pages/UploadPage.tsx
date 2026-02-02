@@ -236,31 +236,62 @@ export default function UploadPage() {
     // Update all files to processing status
     setFiles(prev => prev.map(f => ({ ...f, status: 'processing' as const })));
     
+    // Show loading toast for long operations
+    const loadingToastId = toast.loading('Processing CVs with AI... This may take a few minutes.', {
+      duration: Infinity
+    });
+    
     try {
-      const response = await fetch(N8N_WEBHOOK_URL, {
-        method: 'POST',
-        body: formData, // No Content-Type header - browser sets it with boundary
-      });
+      // Create AbortController for timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5-minute timeout
+      
+      let response: Response;
+      try {
+        response = await fetch(N8N_WEBHOOK_URL, {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        // Check if it was an abort (timeout)
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          throw new Error('Request timed out. The AI processing is taking longer than expected. Please try again.');
+        }
+        // For network errors, provide a helpful message
+        throw new Error('Network error connecting to AI service. Please check your connection and try again.');
+      }
       
       if (!response.ok) {
         throw new Error(`Webhook failed with status: ${response.status}`);
       }
       
-      // Try to parse response (may or may not be JSON)
+      // Parse response
       let result;
       try {
         result = await response.json();
         console.log('Webhook response:', result);
       } catch {
+        console.log('Webhook returned non-JSON response');
         result = null;
       }
+      
+      toast.dismiss(loadingToastId);
       
       // Process webhook response and store candidates in database
       if (result && Array.isArray(result)) {
         let successCount = 0;
+        let errorCount = 0;
+        
         for (let i = 0; i < result.length; i++) {
           const webhookOutput = result[i]?.output;
-          if (!webhookOutput) continue;
+          if (!webhookOutput) {
+            console.warn(`Skipping result ${i}: no output field`);
+            errorCount++;
+            continue;
+          }
           
           const fileMeta = metadata[i];
           try {
@@ -279,15 +310,32 @@ export default function UploadPage() {
               } : null
             });
             successCount++;
+            // Mark this file as complete
+            setFiles(prev => prev.map((f, idx) => 
+              idx === i ? { ...f, status: 'complete' as const } : f
+            ));
           } catch (err) {
             console.error(`Error storing candidate ${i}:`, err);
+            errorCount++;
+            // Mark this file as error
+            setFiles(prev => prev.map((f, idx) => 
+              idx === i ? { ...f, status: 'error' as const } : f
+            ));
           }
         }
-        toast.success(`${successCount} candidate(s) processed and stored`);
+        
+        if (successCount > 0) {
+          toast.success(`${successCount} candidate(s) processed and stored successfully`);
+        }
+        if (errorCount > 0) {
+          toast.warning(`${errorCount} candidate(s) failed to store`);
+        }
+      } else {
+        // Mark all as complete even if no structured response (webhook succeeded)
+        setFiles(prev => prev.map(f => ({ ...f, status: 'complete' as const })));
+        toast.success('CVs processed successfully');
       }
       
-      // Mark all as complete
-      setFiles(prev => prev.map(f => ({ ...f, status: 'complete' as const })));
       setIsVectorized(true);
       
       // Save uploader name to database
@@ -299,6 +347,7 @@ export default function UploadPage() {
       
       setTimeout(() => navigate('/dashboard'), 1500);
     } catch (error) {
+      toast.dismiss(loadingToastId);
       // Mark all as error
       setFiles(prev => prev.map(f => ({ ...f, status: 'error' as const })));
       const errorMessage = error instanceof Error ? error.message : 'Failed to process CVs';
