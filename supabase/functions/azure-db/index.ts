@@ -574,76 +574,181 @@ async function handleRequest(req: Request): Promise<Response> {
   try {
     // =====================================================
     // WEBHOOK CALLBACK ENDPOINT - n8n calls this when done
+    // Handles FLAT JSON object (not array with output wrapper)
     // =====================================================
     if (path === '/webhook-callback' && method === 'POST') {
       const body = await req.json();
-      console.log('Webhook callback received:', JSON.stringify(body).substring(0, 500));
+      console.log('=== WEBHOOK CALLBACK RECEIVED ===');
+      console.log('Raw payload (first 1000 chars):', JSON.stringify(body).substring(0, 1000));
       
-      // n8n sends array with one object containing 'output'
-      const payload = Array.isArray(body) ? body : [body];
+      // Handle both formats: flat object OR array with output wrapper
+      let dataItems: any[] = [];
       
-      for (const item of payload) {
-        const data = item.output || item;
+      if (Array.isArray(body)) {
+        // Array format: [{ output: {...} }] or [{...}]
+        dataItems = body.map(item => item.output || item);
+        console.log('Parsed as array, items:', dataItems.length);
+      } else if (body.output) {
+        // Single wrapped object: { output: {...} }
+        dataItems = [body.output];
+        console.log('Parsed as wrapped single object');
+      } else if (body.candidate_info) {
+        // FLAT object format (actual n8n response)
+        dataItems = [body];
+        console.log('Parsed as FLAT JSON object');
+      } else {
+        console.error('Unknown payload structure:', Object.keys(body));
+        return jsonResponse({ error: 'Invalid payload structure', keys: Object.keys(body) }, 400);
+      }
+      
+      for (const data of dataItems) {
+        console.log('Processing data item, keys:', Object.keys(data));
+        
+        // Validate required fields
+        if (!data.candidate_info) {
+          console.error('Missing candidate_info in data');
+          continue;
+        }
+        
         const metadata = data.metadata || {};
-        
-        if (!metadata.batch_id || metadata.index === undefined) {
-          console.error('Missing batch_id or index in webhook callback');
-          continue;
-        }
-        
-        // Find the processing candidate record
-        const candidates = await query(`
-          SELECT id FROM candidates 
-          WHERE processing_batch_id = $1 AND processing_index = $2 AND processing_status = 'processing'
-        `, [metadata.batch_id, metadata.index]);
-        
-        if (candidates.length === 0) {
-          console.error(`No processing candidate found for batch ${metadata.batch_id} index ${metadata.index}`);
-          continue;
-        }
-        
-        const candidateId = (candidates[0] as any).id;
         const candidateInfo = data.candidate_info || {};
         const workHistory = data.work_history || {};
-        const currentOcc = candidateInfo.current_occupation;
-        const currentOccupation = currentOcc 
-          ? `${currentOcc.title || ''} at ${currentOcc.company || ''}`.trim()
-          : null;
         
-        // Update candidate with AI-extracted data
-        await execute(`
-          UPDATE candidates SET
-            full_name = COALESCE($1, full_name),
-            email = $2,
-            phone = $3,
-            skills = $4,
-            linkedin = $5,
-            current_occupation = $6,
-            years_of_experience_text = $7,
-            target_role = $8,
-            target_role_source = $9,
-            overall_summary = $10,
-            strengths = $11,
-            weaknesses = $12,
-            processing_status = 'completed',
-            processing_completed_at = now(),
-            updated_at = now()
-          WHERE id = $13
-        `, [
-          candidateInfo.full_name || null,
-          candidateInfo.email || null,
-          candidateInfo.phone || null,
-          data.key_skills || workHistory.key_skills || [],
-          candidateInfo.linkedin || null,
-          currentOccupation,
-          candidateInfo.years_of_experience || workHistory.total_experience || null,
-          data.target_role?.position || null,
-          data.target_role?.source || null,
-          data.overall_summary || null,
-          data.strengths || [],
-          data.weaknesses || [],
-          candidateId
-        ]);
+        let candidateId: string | null = null;
+        
+        // Strategy 1: Find by batch_id and index (if metadata exists)
+        if (metadata.batch_id !== undefined && metadata.index !== undefined) {
+          console.log(`Looking up by batch_id: ${metadata.batch_id}, index: ${metadata.index}`);
+          const candidates = await query(`
+            SELECT id FROM candidates 
+            WHERE processing_batch_id = $1 AND processing_index = $2 AND processing_status = 'processing'
+          `, [metadata.batch_id, metadata.index]);
+          
+          if (candidates.length > 0) {
+            candidateId = (candidates[0] as any).id;
+            console.log('Found candidate by batch_id/index:', candidateId);
+          }
+        }
+        
+        // Strategy 2: Find by email
+        if (!candidateId && candidateInfo.email) {
+          console.log(`Looking up by email: ${candidateInfo.email}`);
+          const candidates = await query(`
+            SELECT id FROM candidates 
+            WHERE email = $1 AND processing_status = 'processing'
+            ORDER BY created_at DESC LIMIT 1
+          `, [candidateInfo.email]);
+          
+          if (candidates.length > 0) {
+            candidateId = (candidates[0] as any).id;
+            console.log('Found candidate by email:', candidateId);
+          }
+        }
+        
+        // Strategy 3: Find by cv_filename
+        if (!candidateId && metadata.filename) {
+          console.log(`Looking up by filename: ${metadata.filename}`);
+          const candidates = await query(`
+            SELECT id FROM candidates 
+            WHERE cv_filename = $1 AND processing_status = 'processing'
+            ORDER BY created_at DESC LIMIT 1
+          `, [metadata.filename]);
+          
+          if (candidates.length > 0) {
+            candidateId = (candidates[0] as any).id;
+            console.log('Found candidate by filename:', candidateId);
+          }
+        }
+        
+        // Strategy 4: Find most recent processing candidate
+        if (!candidateId) {
+          console.log('Fallback: looking for most recent processing candidate');
+          const candidates = await query(`
+            SELECT id, cv_filename FROM candidates 
+            WHERE processing_status = 'processing'
+            ORDER BY processing_started_at DESC LIMIT 1
+          `);
+          
+          if (candidates.length > 0) {
+            candidateId = (candidates[0] as any).id;
+            console.log('Found most recent processing candidate:', candidateId, (candidates[0] as any).cv_filename);
+          }
+        }
+        
+        if (!candidateId) {
+          console.error('No matching candidate found. Creating new record.');
+          // Create a new completed candidate record
+          const result = await query(`
+            INSERT INTO candidates (
+              full_name, email, phone, applicant_type, skills, 
+              linkedin, current_occupation, years_of_experience_text,
+              target_role, target_role_source, overall_summary, strengths, weaknesses,
+              processing_status, processing_completed_at
+            ) VALUES ($1, $2, $3, 'external', $4, $5, $6, $7, $8, $9, $10, $11, $12, 'completed', now())
+            RETURNING id
+          `, [
+            candidateInfo.full_name || 'Unknown',
+            candidateInfo.email || null,
+            candidateInfo.phone || null,
+            data.key_skills || workHistory.key_skills || [],
+            candidateInfo.linkedin || null,
+            candidateInfo.current_occupation ? `${candidateInfo.current_occupation.title || ''} at ${candidateInfo.current_occupation.company || ''}`.trim() : null,
+            candidateInfo.years_of_experience || workHistory.total_experience || null,
+            data.target_role?.position || null,
+            data.target_role?.source || null,
+            data.overall_summary || null,
+            data.strengths || [],
+            data.weaknesses || []
+          ]);
+          candidateId = (result[0] as any).id;
+          console.log('Created new candidate:', candidateId);
+        } else {
+          // Update existing candidate
+          const currentOcc = candidateInfo.current_occupation;
+          const currentOccupation = currentOcc 
+            ? `${currentOcc.title || ''} at ${currentOcc.company || ''}`.trim()
+            : null;
+          
+          await execute(`
+            UPDATE candidates SET
+              full_name = COALESCE($1, full_name),
+              email = COALESCE($2, email),
+              phone = COALESCE($3, phone),
+              skills = $4,
+              linkedin = $5,
+              current_occupation = $6,
+              years_of_experience_text = $7,
+              target_role = $8,
+              target_role_source = $9,
+              overall_summary = $10,
+              strengths = $11,
+              weaknesses = $12,
+              processing_status = 'completed',
+              processing_completed_at = now(),
+              updated_at = now()
+            WHERE id = $13
+          `, [
+            candidateInfo.full_name || null,
+            candidateInfo.email || null,
+            candidateInfo.phone || null,
+            data.key_skills || workHistory.key_skills || [],
+            candidateInfo.linkedin || null,
+            currentOccupation,
+            candidateInfo.years_of_experience || workHistory.total_experience || null,
+            data.target_role?.position || null,
+            data.target_role?.source || null,
+            data.overall_summary || null,
+            data.strengths || [],
+            data.weaknesses || [],
+            candidateId
+          ]);
+          console.log('Updated candidate:', candidateId);
+        }
+        
+        // Clear existing related data for idempotency
+        await execute('DELETE FROM candidate_education WHERE candidate_id = $1', [candidateId]);
+        await execute('DELETE FROM candidate_certifications WHERE candidate_id = $1', [candidateId]);
+        await execute('DELETE FROM candidate_work_experience WHERE candidate_id = $1', [candidateId]);
         
         // Insert education
         if (data.education && Array.isArray(data.education)) {
@@ -653,6 +758,7 @@ async function handleRequest(req: Request): Promise<Response> {
               VALUES ($1, $2, $3, $4)
             `, [candidateId, edu.degree || 'Unknown', edu.institution || 'Unknown', edu.year || null]);
           }
+          console.log('Inserted education records:', data.education.length);
         }
         
         // Insert certifications
@@ -663,6 +769,7 @@ async function handleRequest(req: Request): Promise<Response> {
               VALUES ($1, $2, $3, $4)
             `, [candidateId, cert.name || 'Unknown', cert.issuer || null, cert.year || null]);
           }
+          console.log('Inserted certification records:', data.certifications.length);
         }
         
         // Insert work experiences
@@ -683,9 +790,10 @@ async function handleRequest(req: Request): Promise<Response> {
               isCurrent
             ]);
           }
+          console.log('Inserted work experience records:', workHistory.work_experience.length);
         }
         
-        // If job_order_id was provided, create application
+        // If job_order_id was provided in metadata, create application
         const jobOrderId = metadata.job_order_id;
         if (jobOrderId) {
           try {
@@ -702,16 +810,17 @@ async function handleRequest(req: Request): Promise<Response> {
                 INSERT INTO candidate_timeline (application_id, candidate_id, to_status)
                 VALUES ($1, $2, 'new')
               `, [application.id, candidateId]);
+              console.log('Created application for job order:', jobOrderId);
             }
           } catch (err) {
             console.error("Error creating application from webhook callback:", err);
           }
         }
         
-        console.log(`Candidate ${candidateId} updated from webhook callback`);
+        console.log(`=== WEBHOOK CALLBACK COMPLETE: Candidate ${candidateId} ===`);
       }
       
-      return jsonResponse({ success: true, message: 'Webhook callback processed' });
+      return jsonResponse({ success: true, message: 'Webhook callback processed', timestamp: new Date().toISOString() });
     }
 
     // =====================================================
