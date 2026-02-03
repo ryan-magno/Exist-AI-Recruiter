@@ -35,13 +35,20 @@ export const azureDb = {
   
   // Candidates
   candidates: {
-    list: () => apiCall<any[]>('/candidates'),
+    list: (includeProcessing = false) => apiCall<any[]>(`/candidates${includeProcessing ? '?include_processing=true' : ''}`),
     get: (id: string) => apiCall<any>(`/candidates/${id}`),
     getFull: (id: string) => apiCall<any>(`/candidates/${id}/full`),
     create: (data: any) => apiCall<any>('/candidates', { method: 'POST', body: JSON.stringify(data) }),
     createFromWebhook: (data: any) => apiCall<any>('/candidates/from-webhook', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: any) => apiCall<any>(`/candidates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => apiCall<{ success: boolean }>(`/candidates/${id}`, { method: 'DELETE' }),
+    processingStatus: (params?: { batch_id?: string; since?: string }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.batch_id) searchParams.set('batch_id', params.batch_id);
+      if (params?.since) searchParams.set('since', params.since);
+      const query = searchParams.toString();
+      return apiCall<any>(`/candidates/processing-status${query ? `?${query}` : ''}`);
+    },
   },
   
   // Applications
