@@ -1,9 +1,11 @@
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, Loader2 } from 'lucide-react';
 import { Candidate } from '@/data/mockData';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import existLogo from '@/assets/exist-logo.png';
+
 interface KanbanCardProps {
   candidate: Candidate;
   isDragging?: boolean;
@@ -11,8 +13,12 @@ interface KanbanCardProps {
 }
 
 export function KanbanCard({ candidate, isDragging, onClick }: KanbanCardProps) {
+  const isProcessing = candidate.processingStatus === 'processing';
+  const isFailed = candidate.processingStatus === 'failed';
+  
   const { attributes, listeners, setNodeRef, transform, isDragging: isDraggingState } = useDraggable({
     id: candidate.id,
+    disabled: isProcessing, // Disable drag when processing
   });
 
   const style = {
@@ -26,6 +32,87 @@ export function KanbanCard({ candidate, isDragging, onClick }: KanbanCardProps) 
     return 'match-score-low';
   };
 
+  // Render processing state
+  if (isProcessing) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="kanban-card bg-card border border-dashed border-amber-300 rounded-lg p-3 cursor-not-allowed opacity-80"
+        title="AI analysis in progress (typically 30-45 seconds)"
+      >
+        <div className="flex items-start gap-2">
+          <div className="p-1 -ml-1">
+            <GripVertical className="w-4 h-4 text-muted-foreground/30" />
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />
+                <span className="text-xs font-medium text-amber-600">Processing...</span>
+              </div>
+              <span className="status-badge text-xs bg-amber-100 text-amber-700 border-amber-300 px-2 py-0.5 rounded-full">
+                AI Analysis
+              </span>
+            </div>
+            
+            <Skeleton className="h-4 w-3/4 mb-2" />
+            
+            <div className="flex flex-wrap gap-1 mb-2">
+              <Skeleton className="h-5 w-12 rounded" />
+              <Skeleton className="h-5 w-16 rounded" />
+              <Skeleton className="h-5 w-10 rounded" />
+            </div>
+
+            <p className="text-xs text-muted-foreground italic">
+              Extracting skills, experience, and match score...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render failed state
+  if (isFailed) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="kanban-card bg-card border border-dashed border-red-300 rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow"
+        onClick={onClick}
+      >
+        <div className="flex items-start gap-2">
+          <div
+            {...listeners}
+            {...attributes}
+            className="cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded touch-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="w-4 h-4 text-muted-foreground" />
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-1">
+              <p className="font-medium text-sm text-red-600 truncate">
+                Processing Failed
+              </p>
+              <span className="status-badge text-xs bg-red-100 text-red-700 border-red-300 px-2 py-0.5 rounded-full">
+                Error
+              </span>
+            </div>
+            
+            <p className="text-xs text-muted-foreground">
+              {candidate.name || 'Unable to process CV'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Normal candidate card
   return (
     <div
       ref={setNodeRef}

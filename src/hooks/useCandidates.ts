@@ -34,6 +34,8 @@ export interface CandidateWorkExperience {
   created_at: string;
 }
 
+export type ProcessingStatus = 'processing' | 'completed' | 'failed';
+
 export interface Candidate {
   id: string;
   full_name: string;
@@ -63,6 +65,12 @@ export interface Candidate {
   overall_summary: string | null;
   strengths: string[] | null;
   weaknesses: string[] | null;
+  // Processing status fields
+  processing_status: ProcessingStatus | null;
+  processing_batch_id: string | null;
+  processing_started_at: string | null;
+  processing_completed_at: string | null;
+  processing_index: number | null;
 }
 
 export interface CandidateFull extends Candidate {

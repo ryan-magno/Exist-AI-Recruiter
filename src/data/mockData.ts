@@ -85,6 +85,8 @@ export interface TechInterviewForm {
   verdictRationale: string;
 }
 
+export type ProcessingStatus = 'processing' | 'completed' | 'failed';
+
 export interface Candidate {
   id: string;
   name: string;
@@ -128,6 +130,10 @@ export interface Candidate {
   applicationHistory: ApplicationHistory[];
   hrInterviewForm?: HRInterviewForm;
   techInterviewForm?: TechInterviewForm;
+  
+  // Processing status for async CV analysis
+  processingStatus?: ProcessingStatus;
+  processingBatchId?: string;
 }
 
 export interface JobOrder {

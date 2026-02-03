@@ -24,9 +24,11 @@ const ALLOWED_CANDIDATE_COLUMNS = [
   'years_of_experience', 'educational_background', 'cv_url', 'cv_filename',
   'availability', 'preferred_work_setup', 'expected_salary', 'earliest_start_date',
   'uploaded_by', 'uploaded_by_user_id',
-  // New webhook fields
+  // Webhook fields
   'linkedin', 'current_occupation', 'years_of_experience_text', 'target_role',
-  'target_role_source', 'overall_summary', 'strengths', 'weaknesses'
+  'target_role_source', 'overall_summary', 'strengths', 'weaknesses',
+  // Processing status fields
+  'processing_status', 'processing_batch_id'
 ];
 
 const ALLOWED_APPLICATION_COLUMNS = [
@@ -132,6 +134,10 @@ async function initTables() {
     DO $$ BEGIN
       CREATE TYPE offer_status AS ENUM ('pending', 'accepted', 'rejected', 'negotiating', 'unresponsive');
     EXCEPTION WHEN duplicate_object THEN null; END $$;
+    
+    DO $$ BEGIN
+      CREATE TYPE processing_status_enum AS ENUM ('processing', 'completed', 'failed');
+    EXCEPTION WHEN duplicate_object THEN null; END $$;
 
     -- Departments table
     CREATE TABLE IF NOT EXISTS departments (
@@ -167,7 +173,7 @@ async function initTables() {
       updated_at TIMESTAMPTZ DEFAULT now()
     );
 
-    -- Candidates table
+    -- Candidates table with processing status
     CREATE TABLE IF NOT EXISTS candidates (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       full_name TEXT NOT NULL,
@@ -186,7 +192,7 @@ async function initTables() {
       earliest_start_date DATE,
       uploaded_by TEXT,
       uploaded_by_user_id UUID,
-      -- New webhook fields
+      -- Webhook fields
       linkedin TEXT,
       current_occupation TEXT,
       years_of_experience_text TEXT,
@@ -195,11 +201,17 @@ async function initTables() {
       overall_summary TEXT,
       strengths TEXT[],
       weaknesses TEXT[],
+      -- Processing status fields
+      processing_status TEXT DEFAULT 'completed',
+      processing_batch_id UUID,
+      processing_started_at TIMESTAMPTZ,
+      processing_completed_at TIMESTAMPTZ,
+      processing_index INTEGER,
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
     );
 
-    -- Candidate Education table (new)
+    -- Candidate Education table
     CREATE TABLE IF NOT EXISTS candidate_education (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
@@ -209,7 +221,7 @@ async function initTables() {
       created_at TIMESTAMPTZ DEFAULT now()
     );
 
-    -- Candidate Certifications table (new)
+    -- Candidate Certifications table
     CREATE TABLE IF NOT EXISTS candidate_certifications (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
@@ -353,6 +365,11 @@ async function initTables() {
       ALTER TABLE candidates ADD COLUMN IF NOT EXISTS overall_summary TEXT;
       ALTER TABLE candidates ADD COLUMN IF NOT EXISTS strengths TEXT[];
       ALTER TABLE candidates ADD COLUMN IF NOT EXISTS weaknesses TEXT[];
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS processing_status TEXT DEFAULT 'completed';
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS processing_batch_id UUID;
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ;
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS processing_completed_at TIMESTAMPTZ;
+      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS processing_index INTEGER;
     EXCEPTION WHEN duplicate_column THEN null; END $$;
 
     DO $$ BEGIN
@@ -420,8 +437,8 @@ async function createCandidateFromWebhook(body: any) {
       full_name, email, phone, applicant_type, skills, 
       linkedin, current_occupation, years_of_experience_text,
       target_role, target_role_source, overall_summary, strengths, weaknesses,
-      uploaded_by
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      uploaded_by, processing_status, processing_completed_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'completed', now())
     RETURNING *
   `, [
     candidateInfo.full_name || 'Unknown',
@@ -489,7 +506,7 @@ async function createCandidateFromWebhook(body: any) {
     try {
       const appResult = await query(`
         INSERT INTO candidate_job_applications (candidate_id, job_order_id, match_score, pipeline_status)
-        VALUES ($1, $2, $3, 'for_hr_interview')
+        VALUES ($1, $2, $3, 'new')
         RETURNING *
       `, [candidateId, job_order_id, output.qualification_score || null]);
       application = appResult[0];
@@ -497,7 +514,7 @@ async function createCandidateFromWebhook(body: any) {
       // Create initial timeline entry
       await execute(`
         INSERT INTO candidate_timeline (application_id, candidate_id, to_status)
-        VALUES ($1, $2, 'for_hr_interview')
+        VALUES ($1, $2, 'new')
       `, [(application as any).id, candidateId]);
     } catch (err) {
       console.error("Error creating application:", err);
@@ -555,12 +572,156 @@ async function handleRequest(req: Request): Promise<Response> {
   }
 
   try {
-    // Webhook proxy with background processing - returns immediately, processes in background
+    // =====================================================
+    // WEBHOOK CALLBACK ENDPOINT - n8n calls this when done
+    // =====================================================
+    if (path === '/webhook-callback' && method === 'POST') {
+      const body = await req.json();
+      console.log('Webhook callback received:', JSON.stringify(body).substring(0, 500));
+      
+      // n8n sends array with one object containing 'output'
+      const payload = Array.isArray(body) ? body : [body];
+      
+      for (const item of payload) {
+        const data = item.output || item;
+        const metadata = data.metadata || {};
+        
+        if (!metadata.batch_id || metadata.index === undefined) {
+          console.error('Missing batch_id or index in webhook callback');
+          continue;
+        }
+        
+        // Find the processing candidate record
+        const candidates = await query(`
+          SELECT id FROM candidates 
+          WHERE processing_batch_id = $1 AND processing_index = $2 AND processing_status = 'processing'
+        `, [metadata.batch_id, metadata.index]);
+        
+        if (candidates.length === 0) {
+          console.error(`No processing candidate found for batch ${metadata.batch_id} index ${metadata.index}`);
+          continue;
+        }
+        
+        const candidateId = (candidates[0] as any).id;
+        const candidateInfo = data.candidate_info || {};
+        const workHistory = data.work_history || {};
+        const currentOcc = candidateInfo.current_occupation;
+        const currentOccupation = currentOcc 
+          ? `${currentOcc.title || ''} at ${currentOcc.company || ''}`.trim()
+          : null;
+        
+        // Update candidate with AI-extracted data
+        await execute(`
+          UPDATE candidates SET
+            full_name = COALESCE($1, full_name),
+            email = $2,
+            phone = $3,
+            skills = $4,
+            linkedin = $5,
+            current_occupation = $6,
+            years_of_experience_text = $7,
+            target_role = $8,
+            target_role_source = $9,
+            overall_summary = $10,
+            strengths = $11,
+            weaknesses = $12,
+            processing_status = 'completed',
+            processing_completed_at = now(),
+            updated_at = now()
+          WHERE id = $13
+        `, [
+          candidateInfo.full_name || null,
+          candidateInfo.email || null,
+          candidateInfo.phone || null,
+          data.key_skills || workHistory.key_skills || [],
+          candidateInfo.linkedin || null,
+          currentOccupation,
+          candidateInfo.years_of_experience || workHistory.total_experience || null,
+          data.target_role?.position || null,
+          data.target_role?.source || null,
+          data.overall_summary || null,
+          data.strengths || [],
+          data.weaknesses || [],
+          candidateId
+        ]);
+        
+        // Insert education
+        if (data.education && Array.isArray(data.education)) {
+          for (const edu of data.education) {
+            await execute(`
+              INSERT INTO candidate_education (candidate_id, degree, institution, year)
+              VALUES ($1, $2, $3, $4)
+            `, [candidateId, edu.degree || 'Unknown', edu.institution || 'Unknown', edu.year || null]);
+          }
+        }
+        
+        // Insert certifications
+        if (data.certifications && Array.isArray(data.certifications)) {
+          for (const cert of data.certifications) {
+            await execute(`
+              INSERT INTO candidate_certifications (candidate_id, name, issuer, year)
+              VALUES ($1, $2, $3, $4)
+            `, [candidateId, cert.name || 'Unknown', cert.issuer || null, cert.year || null]);
+          }
+        }
+        
+        // Insert work experiences
+        if (workHistory.work_experience && Array.isArray(workHistory.work_experience)) {
+          for (const exp of workHistory.work_experience) {
+            const isCurrent = exp.duration?.toLowerCase().includes('present') || false;
+            await execute(`
+              INSERT INTO candidate_work_experience (
+                candidate_id, company_name, job_title, description, duration, key_projects, is_current
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `, [
+              candidateId, 
+              exp.company || 'Unknown', 
+              exp.job_title || 'Unknown', 
+              exp.summary || null,
+              exp.duration || null,
+              exp.key_projects || [],
+              isCurrent
+            ]);
+          }
+        }
+        
+        // If job_order_id was provided, create application
+        const jobOrderId = metadata.job_order_id;
+        if (jobOrderId) {
+          try {
+            const appResult = await query(`
+              INSERT INTO candidate_job_applications (candidate_id, job_order_id, match_score, pipeline_status)
+              VALUES ($1, $2, $3, 'new')
+              ON CONFLICT (candidate_id, job_order_id) DO UPDATE SET match_score = EXCLUDED.match_score
+              RETURNING *
+            `, [candidateId, jobOrderId, data.qualification_score || null]);
+            
+            if (appResult.length > 0) {
+              const application = appResult[0] as any;
+              await execute(`
+                INSERT INTO candidate_timeline (application_id, candidate_id, to_status)
+                VALUES ($1, $2, 'new')
+              `, [application.id, candidateId]);
+            }
+          } catch (err) {
+            console.error("Error creating application from webhook callback:", err);
+          }
+        }
+        
+        console.log(`Candidate ${candidateId} updated from webhook callback`);
+      }
+      
+      return jsonResponse({ success: true, message: 'Webhook callback processed' });
+    }
+
+    // =====================================================
+    // WEBHOOK PROXY - Upload to n8n with async processing
+    // =====================================================
     if (path === '/webhook-proxy' && method === 'POST') {
       const formData = await req.formData();
       const webhookUrl = 'https://workflow.exist.com.ph/webhook/vector-db-loader';
       
-      // Extract metadata from formData for later use
+      // Extract metadata
       const metadataStr = formData.get('metadata') as string;
       const uploaderName = formData.get('uploader_name') as string;
       let metadata: any[] = [];
@@ -570,11 +731,49 @@ async function handleRequest(req: Request): Promise<Response> {
         console.error('Failed to parse metadata:', e);
       }
       
-      // Generate a batch ID to track this upload
+      // Generate batch ID
       const batchId = crypto.randomUUID();
       console.log(`Starting webhook proxy, batch: ${batchId}, files: ${metadata.length}`);
       
-      // Background task to call webhook and store results
+      // Create placeholder "processing" records for each file immediately
+      const processingCandidates: string[] = [];
+      for (let i = 0; i < metadata.length; i++) {
+        const fileMeta = metadata[i];
+        try {
+          const result = await query(`
+            INSERT INTO candidates (
+              full_name, applicant_type, uploaded_by, cv_filename,
+              processing_status, processing_batch_id, processing_started_at, processing_index
+            ) VALUES ($1, $2, $3, $4, 'processing', $5, now(), $6)
+            RETURNING id
+          `, [
+            `Processing CV ${i + 1}...`,
+            fileMeta.applicant_type || 'external',
+            uploaderName || null,
+            fileMeta.filename || null,
+            batchId,
+            i
+          ]);
+          processingCandidates.push((result[0] as any).id);
+          console.log(`Created processing placeholder for file ${i}: ${fileMeta.filename}`);
+        } catch (err) {
+          console.error(`Error creating processing placeholder for file ${i}:`, err);
+        }
+      }
+      
+      // Inject batch_id and callback URL into metadata for n8n
+      const callbackUrl = `${Deno.env.get("SUPABASE_URL") || 'https://azzbrbfcaxphrnpfdgle.supabase.co'}/functions/v1/azure-db/webhook-callback`;
+      const enrichedMetadata = metadata.map((m, idx) => ({
+        ...m,
+        batch_id: batchId,
+        index: idx,
+        callback_url: callbackUrl
+      }));
+      
+      // Update formData with enriched metadata
+      formData.set('metadata', JSON.stringify(enrichedMetadata));
+      
+      // Background task to call webhook and update records
       const backgroundTask = async () => {
         try {
           console.log(`[${batchId}] Calling webhook: ${webhookUrl}`);
@@ -586,18 +785,44 @@ async function handleRequest(req: Request): Promise<Response> {
           
           if (!webhookResponse.ok) {
             console.error(`[${batchId}] Webhook failed with status: ${webhookResponse.status}`);
+            // Mark all as failed
+            for (const candidateId of processingCandidates) {
+              const bgClient = createPgClient();
+              await bgClient.connect();
+              await bgClient.queryObject(`
+                UPDATE candidates SET processing_status = 'failed', updated_at = now()
+                WHERE id = $1
+              `, [candidateId]);
+              await bgClient.end();
+            }
             return;
           }
           
           const result = await webhookResponse.json();
-          console.log(`[${batchId}] Webhook response received, candidates: ${Array.isArray(result) ? result.length : 'N/A'}`);
+          console.log(`[${batchId}] Webhook response received, items: ${Array.isArray(result) ? result.length : 'N/A'}`);
           
-          // Process each candidate and store in database
+          // Process each result and update the corresponding candidate
           if (result && Array.isArray(result)) {
             for (let i = 0; i < result.length; i++) {
               const webhookOutput = result[i]?.output;
               if (!webhookOutput) {
                 console.warn(`[${batchId}] Skipping result ${i}: no output field`);
+                // Mark as failed
+                if (processingCandidates[i]) {
+                  const bgClient = createPgClient();
+                  await bgClient.connect();
+                  await bgClient.queryObject(`
+                    UPDATE candidates SET processing_status = 'failed', updated_at = now()
+                    WHERE id = $1
+                  `, [processingCandidates[i]]);
+                  await bgClient.end();
+                }
+                continue;
+              }
+              
+              const candidateId = processingCandidates[i];
+              if (!candidateId) {
+                console.warn(`[${batchId}] No candidate ID for index ${i}`);
                 continue;
               }
               
@@ -607,7 +832,6 @@ async function handleRequest(req: Request): Promise<Response> {
                 : null;
               
               try {
-                // Create a new client for background task
                 const bgClient = createPgClient();
                 await bgClient.connect();
                 
@@ -618,19 +842,29 @@ async function handleRequest(req: Request): Promise<Response> {
                   ? `${currentOcc.title || ''} at ${currentOcc.company || ''}`.trim()
                   : null;
                 
-                // Insert candidate
-                const candidateResult = await bgClient.queryObject(`
-                  INSERT INTO candidates (
-                    full_name, email, phone, applicant_type, skills, linkedin,
-                    current_occupation, years_of_experience_text, target_role, target_role_source,
-                    overall_summary, strengths, weaknesses, uploaded_by
-                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-                  RETURNING *
+                // Update candidate with AI-extracted data
+                await bgClient.queryObject(`
+                  UPDATE candidates SET
+                    full_name = $1,
+                    email = $2,
+                    phone = $3,
+                    skills = $4,
+                    linkedin = $5,
+                    current_occupation = $6,
+                    years_of_experience_text = $7,
+                    target_role = $8,
+                    target_role_source = $9,
+                    overall_summary = $10,
+                    strengths = $11,
+                    weaknesses = $12,
+                    processing_status = 'completed',
+                    processing_completed_at = now(),
+                    updated_at = now()
+                  WHERE id = $13
                 `, [
                   candidateInfo.full_name || 'Unknown',
                   candidateInfo.email || null,
                   candidateInfo.phone || null,
-                  fileMeta.applicant_type || 'external',
                   webhookOutput.key_skills || workHistory.key_skills || [],
                   candidateInfo.linkedin || null,
                   currentOccupation,
@@ -640,12 +874,10 @@ async function handleRequest(req: Request): Promise<Response> {
                   webhookOutput.overall_summary || null,
                   webhookOutput.strengths || [],
                   webhookOutput.weaknesses || [],
-                  uploaderName || null
+                  candidateId
                 ]);
                 
-                const candidate = candidateResult.rows[0] as any;
-                const candidateId = candidate.id;
-                console.log(`[${batchId}] Created candidate: ${candidateId} - ${candidateInfo.full_name}`);
+                console.log(`[${batchId}] Updated candidate: ${candidateId} - ${candidateInfo.full_name}`);
                 
                 // Insert education
                 if (webhookOutput.education && Array.isArray(webhookOutput.education)) {
@@ -689,23 +921,41 @@ async function handleRequest(req: Request): Promise<Response> {
                 
                 // Create application if job_order_id provided
                 if (jobOrderId) {
-                  const appResult = await bgClient.queryObject(`
-                    INSERT INTO candidate_job_applications (candidate_id, job_order_id, match_score, pipeline_status)
-                    VALUES ($1, $2, $3, 'new')
-                    RETURNING *
-                  `, [candidateId, jobOrderId, webhookOutput.qualification_score || null]);
-                  const application = appResult.rows[0] as any;
-                  
-                  // Create timeline entry
-                  await bgClient.queryObject(`
-                    INSERT INTO candidate_timeline (application_id, candidate_id, to_status)
-                    VALUES ($1, $2, 'new')
-                  `, [application.id, candidateId]);
+                  try {
+                    const appResult = await bgClient.queryObject(`
+                      INSERT INTO candidate_job_applications (candidate_id, job_order_id, match_score, pipeline_status)
+                      VALUES ($1, $2, $3, 'new')
+                      ON CONFLICT (candidate_id, job_order_id) DO UPDATE SET match_score = EXCLUDED.match_score
+                      RETURNING *
+                    `, [candidateId, jobOrderId, webhookOutput.qualification_score || null]);
+                    
+                    if (appResult.rows.length > 0) {
+                      const application = appResult.rows[0] as any;
+                      await bgClient.queryObject(`
+                        INSERT INTO candidate_timeline (application_id, candidate_id, to_status)
+                        VALUES ($1, $2, 'new')
+                      `, [application.id, candidateId]);
+                    }
+                  } catch (appErr) {
+                    console.error(`[${batchId}] Error creating application for ${candidateId}:`, appErr);
+                  }
                 }
                 
                 await bgClient.end();
               } catch (dbError) {
-                console.error(`[${batchId}] Error storing candidate ${i}:`, dbError);
+                console.error(`[${batchId}] Error updating candidate ${candidateId}:`, dbError);
+                // Mark as failed
+                try {
+                  const errClient = createPgClient();
+                  await errClient.connect();
+                  await errClient.queryObject(`
+                    UPDATE candidates SET processing_status = 'failed', updated_at = now()
+                    WHERE id = $1
+                  `, [candidateId]);
+                  await errClient.end();
+                } catch (e) {
+                  console.error(`[${batchId}] Failed to mark candidate as failed:`, e);
+                }
               }
             }
           }
@@ -713,23 +963,83 @@ async function handleRequest(req: Request): Promise<Response> {
           console.log(`[${batchId}] Background processing complete`);
         } catch (error) {
           console.error(`[${batchId}] Background task error:`, error);
+          // Mark all as failed
+          for (const candidateId of processingCandidates) {
+            try {
+              const errClient = createPgClient();
+              await errClient.connect();
+              await errClient.queryObject(`
+                UPDATE candidates SET processing_status = 'failed', updated_at = now()
+                WHERE id = $1
+              `, [candidateId]);
+              await errClient.end();
+            } catch (e) {
+              console.error(`Failed to mark candidate ${candidateId} as failed:`, e);
+            }
+          }
         }
       };
       
       // Start background task without waiting
-      // @ts-ignore - EdgeRuntime is available in Supabase edge functions
       if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
         EdgeRuntime.waitUntil(backgroundTask());
       } else {
-        // Fallback: just fire and forget (not ideal but works)
         backgroundTask();
       }
       
-      // Return immediately with batch ID
+      // Return immediately with batch ID and candidate IDs
       return jsonResponse({ 
         status: 'processing',
         batch_id: batchId,
-        message: 'CVs are being processed. Candidates will appear shortly.'
+        candidate_ids: processingCandidates,
+        message: 'CVs are being processed. Poll /candidates/processing-status for updates.'
+      });
+    }
+
+    // =====================================================
+    // PROCESSING STATUS ENDPOINT - Frontend polls this
+    // =====================================================
+    if (path === '/candidates/processing-status' && method === 'GET') {
+      const batchId = url.searchParams.get('batch_id');
+      const since = url.searchParams.get('since'); // ISO timestamp
+      
+      let sql = `
+        SELECT id, full_name, processing_status, processing_batch_id, processing_started_at, 
+               processing_completed_at, cv_filename, applicant_type, created_at
+        FROM candidates
+        WHERE processing_status IN ('processing', 'completed', 'failed')
+      `;
+      const params: unknown[] = [];
+      
+      if (batchId) {
+        params.push(batchId);
+        sql += ` AND processing_batch_id = $${params.length}`;
+      }
+      
+      if (since) {
+        params.push(since);
+        sql += ` AND (processing_completed_at > $${params.length} OR processing_status = 'processing')`;
+      }
+      
+      sql += ' ORDER BY created_at DESC LIMIT 50';
+      
+      const rows = await query(sql, params);
+      
+      // Count by status
+      const statusCounts = await query(`
+        SELECT processing_status, COUNT(*) as count 
+        FROM candidates 
+        WHERE processing_status IS NOT NULL
+        ${batchId ? `AND processing_batch_id = $1` : ''}
+        GROUP BY processing_status
+      `, batchId ? [batchId] : []);
+      
+      return jsonResponse({
+        candidates: rows,
+        counts: statusCounts.reduce((acc: any, row: any) => {
+          acc[row.processing_status] = parseInt(row.count);
+          return acc;
+        }, {})
       });
     }
 
@@ -761,7 +1071,6 @@ async function handleRequest(req: Request): Promise<Response> {
       const id = path.split('/')[2];
       const body = await req.json();
       
-      // Validate columns against whitelist to prevent SQL injection
       const validatedBody = validateColumns(body, ALLOWED_JOB_ORDER_COLUMNS);
       
       if (Object.keys(validatedBody).length === 0) {
@@ -790,7 +1099,7 @@ async function handleRequest(req: Request): Promise<Response> {
       return jsonResponse({ success: true });
     }
 
-    // Candidates - NEW: from-webhook endpoint
+    // Candidates - from-webhook endpoint (legacy)
     if (path === '/candidates/from-webhook' && method === 'POST') {
       const body = await req.json();
       const result = await createCandidateFromWebhook(body);
@@ -800,14 +1109,21 @@ async function handleRequest(req: Request): Promise<Response> {
     // Candidates
     if (path === '/candidates') {
       if (method === 'GET') {
-        const rows = await query("SELECT * FROM candidates ORDER BY created_at DESC");
+        // Exclude processing candidates by default unless ?include_processing=true
+        const includeProcessing = url.searchParams.get('include_processing') === 'true';
+        let sql = "SELECT * FROM candidates";
+        if (!includeProcessing) {
+          sql += " WHERE processing_status = 'completed' OR processing_status IS NULL";
+        }
+        sql += " ORDER BY created_at DESC";
+        const rows = await query(sql);
         return jsonResponse(rows);
       }
       if (method === 'POST') {
         const body = await req.json();
         const result = await query(`
-          INSERT INTO candidates (full_name, email, phone, applicant_type, skills, years_of_experience, educational_background, availability, preferred_work_setup, expected_salary, cv_url, cv_filename, uploaded_by)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          INSERT INTO candidates (full_name, email, phone, applicant_type, skills, years_of_experience, educational_background, availability, preferred_work_setup, expected_salary, cv_url, cv_filename, uploaded_by, processing_status)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'completed')
           RETURNING *
         `, [body.full_name, body.email, body.phone, body.applicant_type || 'external', body.skills, body.years_of_experience, body.educational_background, body.availability, body.preferred_work_setup, body.expected_salary, body.cv_url, body.cv_filename, body.uploaded_by]);
         return jsonResponse(result[0]);
@@ -821,17 +1137,16 @@ async function handleRequest(req: Request): Promise<Response> {
       return jsonResponse(result);
     }
 
-    if (path.startsWith('/candidates/') && !path.includes('/work-experience') && !path.includes('/full') && method === 'GET') {
+    if (path.startsWith('/candidates/') && !path.includes('/work-experience') && !path.includes('/full') && !path.includes('/processing') && method === 'GET') {
       const id = path.split('/')[2];
       const rows = await query("SELECT * FROM candidates WHERE id = $1", [id]);
       return jsonResponse(rows[0] || null);
     }
 
-    if (path.startsWith('/candidates/') && !path.includes('/work-experience') && !path.includes('/full') && method === 'PUT') {
+    if (path.startsWith('/candidates/') && !path.includes('/work-experience') && !path.includes('/full') && !path.includes('/processing') && method === 'PUT') {
       const id = path.split('/')[2];
       const body = await req.json();
       
-      // Validate columns against whitelist to prevent SQL injection
       const validatedBody = validateColumns(body, ALLOWED_CANDIDATE_COLUMNS);
       
       if (Object.keys(validatedBody).length === 0) {
@@ -854,7 +1169,7 @@ async function handleRequest(req: Request): Promise<Response> {
       return jsonResponse(result[0]);
     }
 
-    if (path.startsWith('/candidates/') && !path.includes('/work-experience') && !path.includes('/full') && method === 'DELETE') {
+    if (path.startsWith('/candidates/') && !path.includes('/work-experience') && !path.includes('/full') && !path.includes('/processing') && method === 'DELETE') {
       const id = path.split('/')[2];
       await execute("DELETE FROM candidates WHERE id = $1", [id]);
       return jsonResponse({ success: true });
@@ -868,7 +1183,8 @@ async function handleRequest(req: Request): Promise<Response> {
         
         let sql = `
           SELECT a.*, c.full_name as candidate_name, c.email as candidate_email, c.skills, c.years_of_experience,
-                 c.linkedin, c.current_occupation, c.overall_summary, c.strengths, c.weaknesses,
+                 c.linkedin, c.current_occupation, c.overall_summary, c.strengths, c.weaknesses, c.applicant_type,
+                 c.processing_status,
                  j.jo_number, j.title as job_title
           FROM candidate_job_applications a
           JOIN candidates c ON a.candidate_id = c.id
@@ -914,7 +1230,6 @@ async function handleRequest(req: Request): Promise<Response> {
       const fromStatus = current.length > 0 ? (current[0] as any).pipeline_status : null;
       const candidateId = current.length > 0 ? (current[0] as any).candidate_id : null;
       
-      // Validate columns against whitelist to prevent SQL injection
       const validatedBody = validateColumns(body, ALLOWED_APPLICATION_COLUMNS);
       
       if (Object.keys(validatedBody).length === 0) {
