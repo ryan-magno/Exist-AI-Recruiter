@@ -1,7 +1,6 @@
 import { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { RefreshNotification } from '@/components/ui/RefreshNotification';
-import { ProcessingIndicator } from '@/components/ui/ProcessingIndicator';
 import { useRealtimeCandidates } from '@/hooks/useRealtimeCandidates';
 
 interface AppLayoutProps {
@@ -9,7 +8,7 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const { newCandidatesCount, showRefreshPrompt, processingCount, refreshData, dismissPrompt } = useRealtimeCandidates();
+  const { newCandidatesCount, showRefreshPrompt, refreshData, dismissPrompt } = useRealtimeCandidates();
 
   return (
     <div className="min-h-screen bg-background">
@@ -17,9 +16,6 @@ export function AppLayout({ children }: AppLayoutProps) {
       <main className="min-h-screen transition-all duration-300 ml-16">
         {children}
       </main>
-      
-      {/* Processing indicator - shows when CVs are being analyzed */}
-      <ProcessingIndicator count={processingCount} />
       
       {/* Refresh notification - shows when new candidates are ready */}
       <RefreshNotification
