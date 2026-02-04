@@ -67,6 +67,9 @@ export const azureDb = {
   // Departments
   departments: {
     list: () => apiCall<any[]>('/departments'),
+    create: (name: string) => apiCall<any>('/departments', { method: 'POST', body: JSON.stringify({ name }) }),
+    update: (id: string, name: string) => apiCall<any>(`/departments/${id}`, { method: 'PUT', body: JSON.stringify({ name }) }),
+    delete: (id: string) => apiCall<{ success: boolean }>(`/departments/${id}`, { method: 'DELETE' }),
   },
   
   // CV Uploaders
