@@ -1159,6 +1159,45 @@ async function handleRequest(req: Request): Promise<Response> {
       return jsonResponse({ success: true, message: 'Tables initialized and data seeded' });
     }
 
+    // Job Order Webhook URL
+    const JO_WEBHOOK_URL = 'https://workflow.exist.com.ph/webhook/job-order-webhook-path';
+    
+    // Helper function to send job order to webhook
+    async function sendJobOrderWebhook(jobOrder: any, action: 'create' | 'update' | 'delete') {
+      try {
+        const webhookPayload = {
+          action,
+          id: jobOrder.id,
+          jo_number: jobOrder.jo_number,
+          title: jobOrder.title,
+          description: jobOrder.description,
+          department_name: jobOrder.department_name,
+          level: jobOrder.level,
+          employment_type: jobOrder.employment_type,
+          status: jobOrder.status,
+          created_by: jobOrder.created_by,
+          created_at: jobOrder.created_at,
+          updated_at: jobOrder.updated_at
+        };
+        
+        console.log(`Sending job order webhook (${action}):`, webhookPayload);
+        
+        const response = await fetch(JO_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(webhookPayload)
+        });
+        
+        if (!response.ok) {
+          console.error(`Job order webhook failed (${action}):`, response.status, await response.text());
+        } else {
+          console.log(`Job order webhook success (${action}):`, response.status);
+        }
+      } catch (err) {
+        console.error(`Error sending job order webhook (${action}):`, err);
+      }
+    }
+
     // Job Orders
     if (path === '/job-orders') {
       if (method === 'GET') {
@@ -1172,11 +1211,21 @@ async function handleRequest(req: Request): Promise<Response> {
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING *
         `, [body.jo_number, body.title, body.description, body.department_name, body.level, body.quantity, body.employment_type, body.requestor_name, body.required_date, body.status || 'draft']);
-        return jsonResponse(result[0]);
+        
+        const createdJobOrder = result[0];
+        
+        // Send webhook asynchronously (fire and forget)
+        if (typeof EdgeRuntime !== 'undefined') {
+          EdgeRuntime.waitUntil(sendJobOrderWebhook(createdJobOrder, 'create'));
+        } else {
+          sendJobOrderWebhook(createdJobOrder, 'create').catch(console.error);
+        }
+        
+        return jsonResponse(createdJobOrder);
       }
     }
 
-    if (path.startsWith('/job-orders/') && method === 'PUT') {
+    if (path.startsWith('/job-orders/') && path.split('/')[2] !== 'count' && method === 'PUT') {
       const id = path.split('/')[2];
       const body = await req.json();
       
@@ -1199,12 +1248,36 @@ async function handleRequest(req: Request): Promise<Response> {
       values.push(id);
       
       const result = await query(`UPDATE job_orders SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`, values);
-      return jsonResponse(result[0]);
+      const updatedJobOrder = result[0];
+      
+      // Send webhook asynchronously (fire and forget)
+      if (typeof EdgeRuntime !== 'undefined') {
+        EdgeRuntime.waitUntil(sendJobOrderWebhook(updatedJobOrder, 'update'));
+      } else {
+        sendJobOrderWebhook(updatedJobOrder, 'update').catch(console.error);
+      }
+      
+      return jsonResponse(updatedJobOrder);
     }
 
-    if (path.startsWith('/job-orders/') && method === 'DELETE') {
+    if (path.startsWith('/job-orders/') && path.split('/')[2] !== 'count' && method === 'DELETE') {
       const id = path.split('/')[2];
+      
+      // Fetch job order before deleting for webhook
+      const existing = await query("SELECT * FROM job_orders WHERE id = $1", [id]);
+      const jobOrderToDelete = existing[0];
+      
       await execute("DELETE FROM job_orders WHERE id = $1", [id]);
+      
+      // Send webhook asynchronously (fire and forget)
+      if (jobOrderToDelete) {
+        if (typeof EdgeRuntime !== 'undefined') {
+          EdgeRuntime.waitUntil(sendJobOrderWebhook(jobOrderToDelete, 'delete'));
+        } else {
+          sendJobOrderWebhook(jobOrderToDelete, 'delete').catch(console.error);
+        }
+      }
+      
       return jsonResponse({ success: true });
     }
 
@@ -1374,10 +1447,52 @@ async function handleRequest(req: Request): Promise<Response> {
       return jsonResponse(result[0]);
     }
 
-    // Departments
+    // Departments - Full CRUD
     if (path === '/departments') {
-      const rows = await query("SELECT * FROM departments ORDER BY name");
-      return jsonResponse(rows);
+      if (method === 'GET') {
+        const rows = await query("SELECT * FROM departments ORDER BY name");
+        return jsonResponse(rows);
+      }
+      if (method === 'POST') {
+        const body = await req.json();
+        if (!body.name || typeof body.name !== 'string' || body.name.trim() === '') {
+          return jsonResponse({ error: 'Department name is required' }, 400);
+        }
+        const result = await query(`
+          INSERT INTO departments (name) VALUES ($1)
+          ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+          RETURNING *
+        `, [body.name.trim()]);
+        return jsonResponse(result[0]);
+      }
+    }
+
+    if (path.startsWith('/departments/') && method === 'PUT') {
+      const id = path.split('/')[2];
+      const body = await req.json();
+      if (!body.name || typeof body.name !== 'string' || body.name.trim() === '') {
+        return jsonResponse({ error: 'Department name is required' }, 400);
+      }
+      const result = await query(`
+        UPDATE departments SET name = $1 WHERE id = $2 RETURNING *
+      `, [body.name.trim(), id]);
+      if (!result[0]) {
+        return jsonResponse({ error: 'Department not found' }, 404);
+      }
+      return jsonResponse(result[0]);
+    }
+
+    if (path.startsWith('/departments/') && method === 'DELETE') {
+      const id = path.split('/')[2];
+      
+      // Check if department is in use by job orders
+      const inUse = await query("SELECT COUNT(*) as count FROM job_orders WHERE department_id = $1", [id]);
+      if (parseInt((inUse[0] as any).count) > 0) {
+        return jsonResponse({ error: 'Cannot delete department that is in use by job orders' }, 400);
+      }
+      
+      await execute("DELETE FROM departments WHERE id = $1", [id]);
+      return jsonResponse({ success: true });
     }
 
     // CV Uploaders

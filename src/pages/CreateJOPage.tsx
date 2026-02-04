@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { useDepartmentNames } from "@/hooks/useDepartments";
 import { useJobOrderCount, useCreateJobOrder, JobOrderInsert } from "@/hooks/useJobOrders";
+import { DepartmentManager } from "@/components/dashboard/DepartmentManager";
 
 const JOB_POSTING_SITES = [
   { id: "linkedin", name: "LinkedIn" },
@@ -157,10 +158,19 @@ export default function CreateJOPage() {
 
             {/* Department */}
             <div className="space-y-1.5">
-              <Label className="flex items-center gap-2 text-sm">
-                <Building className="w-4 h-4 text-muted-foreground" />
-                Requesting Department
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2 text-sm">
+                  <Building className="w-4 h-4 text-muted-foreground" />
+                  Requesting Department
+                </Label>
+                <DepartmentManager
+                  selectedDepartment={formData.department}
+                  onSelect={(dept) => {
+                    setFormData({ ...formData, department: dept });
+                    setErrors((prev) => ({ ...prev, department: false }));
+                  }}
+                />
+              </div>
               <Select
                 value={formData.department}
                 onValueChange={(value) => {
