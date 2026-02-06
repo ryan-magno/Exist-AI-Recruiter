@@ -101,6 +101,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const candidateMap = new Map<string, any>();
       candidatesData.forEach((c: any) => candidateMap.set(c.id, c));
 
+      // Fetch offers in parallel to get offer statuses for kanban display
+      const offerMap = new Map<string, string>();
+      try {
+        const offerResults = await Promise.allSettled(
+          applicationsData.map((app: any) => azureDb.offers.get(app.id))
+        );
+        offerResults.forEach((result, i) => {
+          if (result.status === 'fulfilled' && result.value?.status) {
+            offerMap.set(applicationsData[i].id, result.value.status);
+          }
+        });
+      } catch {
+        // Offers fetch failed, continue without
+      }
+
       // Convert applications to legacy Candidate format (each application = one candidate entry per JO)
       const legacyCandidates: LegacyCandidate[] = applicationsData.map((app: any) => {
         const candidate = candidateMap.get(app.candidate_id) || {};
@@ -113,7 +128,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         
         return {
           id: app.candidate_id,
-          applicationId: app.id, // Store application ID for timeline and forms
+          applicationId: app.id,
           name: app.candidate_name || candidate.full_name || 'Unknown',
           email: app.candidate_email || candidate.email || '',
           phone: candidate.phone || '',
@@ -150,7 +165,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           timeline: [],
           applicantType: candidate.applicant_type || 'external',
           workExperiences: [],
-          applicationHistory: []
+          applicationHistory: [],
+          offerStatus: (offerMap.get(app.id) as LegacyCandidate['offerStatus']) || undefined
         };
       });
 
@@ -255,13 +271,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const candidate = candidates.find(c => c.id === candidateId);
     if (!candidate || candidate.pipelineStatus === status) return;
 
+    const previousStatus = candidate.pipelineStatus;
+
     // Update local state immediately for responsiveness
     setCandidates(prev => 
       prev.map(c => c.id === candidateId ? { ...c, pipelineStatus: status, statusChangedDate: new Date().toISOString().split('T')[0] } : c)
     );
 
+    // Map legacy status to DB status
+    const legacyToDbStatus: Record<LegacyPipelineStatus, PipelineStatus> = {
+      'new-match': 'for_hr_interview',
+      'hr-interview': 'for_tech_interview',
+      'offer': 'offer',
+      'hired': 'hired',
+      'rejected': 'rejected'
+    };
+
+    // Persist to database (this also creates timeline entry in the edge function)
+    if (candidate.applicationId) {
+      try {
+        await updateApplicationStatusMutation.mutateAsync({
+          id: candidate.applicationId,
+          status: legacyToDbStatus[status],
+          previousStatus: legacyToDbStatus[previousStatus]
+        });
+      } catch (error) {
+        console.error('Error updating application status:', error);
+        // Revert local state on failure
+        setCandidates(prev => 
+          prev.map(c => c.id === candidateId ? { ...c, pipelineStatus: previousStatus } : c)
+        );
+        toast.error('Failed to update status');
+        return;
+      }
+    }
+
     // If moving to hired, handle the job order update
-    if (status === 'hired' && candidate.pipelineStatus !== 'hired' && candidate.assignedJoId) {
+    if (status === 'hired' && previousStatus !== 'hired' && candidate.assignedJoId) {
       handleHiredCandidate(candidate.assignedJoId, candidateId);
     }
   };
