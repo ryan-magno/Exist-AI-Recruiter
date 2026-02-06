@@ -1116,7 +1116,7 @@ async function handleRequest(req: Request): Promise<Response> {
         SELECT id, full_name, processing_status, processing_batch_id, processing_started_at, 
                processing_completed_at, cv_filename, applicant_type, created_at
         FROM candidates
-        WHERE processing_status IN ('processing', 'completed', 'failed')
+        WHERE processing_status IN ('processing', 'completed')
       `;
       const params: unknown[] = [];
       
@@ -1138,7 +1138,7 @@ async function handleRequest(req: Request): Promise<Response> {
       const statusCounts = await query(`
         SELECT processing_status, COUNT(*) as count 
         FROM candidates 
-        WHERE processing_status IS NOT NULL
+        WHERE processing_status IN ('processing', 'completed')
         ${batchId ? `AND processing_batch_id = $1` : ''}
         GROUP BY processing_status
       `, batchId ? [batchId] : []);
@@ -1150,6 +1150,24 @@ async function handleRequest(req: Request): Promise<Response> {
           return acc;
         }, {})
       });
+    }
+
+    // Cleanup failed/stale processing candidates
+    if (path === '/candidates/cleanup' && method === 'POST') {
+      // Mark stale "processing" candidates (older than 10 min) as failed
+      await execute(`
+        UPDATE candidates SET processing_status = 'failed' 
+        WHERE processing_status = 'processing' 
+        AND processing_started_at < now() - interval '10 minutes'
+      `);
+      // Delete all failed processing candidates (ghost records)
+      const deleted = await query(`
+        DELETE FROM candidates 
+        WHERE processing_status = 'failed' 
+        AND full_name LIKE 'Processing CV%'
+        RETURNING id
+      `);
+      return jsonResponse({ success: true, deleted: deleted.length });
     }
 
     // Initialize tables endpoint

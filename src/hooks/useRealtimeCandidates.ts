@@ -70,18 +70,24 @@ export function useRealtimeCandidates() {
 
       previousCompletedRef.current = currentCompleted;
       isFirstCheckRef.current = false;
+
+      // Stop polling if nothing is actively processing
+      if (processing === 0 && intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     } catch (error) {
       console.error('Error checking processing status:', error);
     }
   }, [queryClient]);
 
-  // Start polling on mount
+  // Start polling on mount, but stop when nothing is actively processing
   useEffect(() => {
     // Initial check
     checkProcessingStatus();
 
-    // Poll every 5 seconds for active processing
-    intervalRef.current = setInterval(checkProcessingStatus, 5000);
+    // Poll every 10 seconds (reduced from 5s to reduce load)
+    intervalRef.current = setInterval(checkProcessingStatus, 10000);
 
     return () => {
       if (intervalRef.current) {
