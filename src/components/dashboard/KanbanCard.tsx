@@ -159,17 +159,44 @@ export function KanbanCard({ candidate, isDragging, onClick }: KanbanCardProps) 
             )}
           </div>
 
-          {/* Internal badge only - no tag for external candidates */}
-          {candidate.applicantType === 'internal' && (
-            <div className="flex items-center justify-end">
+          {/* Status badges row */}
+          <div className="flex items-center justify-between gap-1">
+            <div className="flex items-center gap-1 flex-wrap">
+              {/* Tech Interview Result */}
+              {candidate.techInterviewResult && candidate.techInterviewResult !== 'pending' && (
+                <span className={cn(
+                  'text-[10px] font-medium px-1.5 py-0.5 rounded border',
+                  candidate.techInterviewResult === 'pass' 
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                    : 'bg-red-50 text-red-700 border-red-200'
+                )}>
+                  Tech: {candidate.techInterviewResult === 'pass' ? 'Pass' : 'Fail'}
+                </span>
+              )}
+              {/* Offer Status */}
+              {candidate.offerStatus && (
+                <span className={cn(
+                  'text-[10px] font-medium px-1.5 py-0.5 rounded border',
+                  candidate.offerStatus === 'accepted' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                  candidate.offerStatus === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                  candidate.offerStatus === 'negotiating' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                  'bg-muted text-muted-foreground border-border'
+                )}>
+                  Offer: {candidate.offerStatus.charAt(0).toUpperCase() + candidate.offerStatus.slice(1)}
+                </span>
+              )}
+            </div>
+
+            {/* Internal badge */}
+            {candidate.applicantType === 'internal' && (
               <img 
                 src={existLogo} 
                 alt="Internal" 
                 className="w-4 h-4 object-contain"
                 title="Internal Employee"
               />
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

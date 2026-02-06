@@ -118,6 +118,7 @@ export interface Candidate {
   earliestStartDate: string;
   currentOccupation: string;
   assignedJoId?: string;
+  applicationId?: string;
   educationalBackground: string;
   relevantWorkExperience: string;
   keySkills: string[];
@@ -134,6 +135,9 @@ export interface Candidate {
   // Processing status for async CV analysis
   processingStatus?: ProcessingStatus;
   processingBatchId?: string;
+  
+  // Offer status for kanban display
+  offerStatus?: 'pending' | 'accepted' | 'rejected' | 'negotiating' | 'unresponsive';
 }
 
 export interface JobOrder {

@@ -29,6 +29,8 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
   // Get the latest candidate data from context to reflect status changes
   const currentCandidate = candidates.find(c => c.id === candidate.id) || candidate;
 
+  // Tech form only available from tech stage onwards
+  const isTechStageOrBeyond = ['hr-interview', 'offer', 'hired'].includes(currentCandidate.pipelineStatus);
   const handleDownloadCV = () => {
     toast.success('CV Download Started', {
       description: `${currentCandidate?.name.replace(' ', '_')}_CV.pdf`
@@ -116,26 +118,50 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
           </div>
         </div>
 
-        {/* Main Tabs - Profile sections only */}
+        {/* Main Tabs - Two rows */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-4 flex-shrink-0 mx-4 mt-2" style={{width: 'calc(100% - 32px)'}}>
-            <TabsTrigger value="profile" className="gap-1.5 text-xs">
-              <User className="w-3.5 h-3.5" />
-              Profile
-            </TabsTrigger>
-            <TabsTrigger value="analysis" className="gap-1.5 text-xs">
-              <Sparkles className="w-3.5 h-3.5" />
-              Match
-            </TabsTrigger>
-            <TabsTrigger value="cv" className="gap-1.5 text-xs">
-              <FileText className="w-3.5 h-3.5" />
-              CV
-            </TabsTrigger>
-            <TabsTrigger value="history" className="gap-1.5 text-xs">
-              <History className="w-3.5 h-3.5" />
-              History
-            </TabsTrigger>
-          </TabsList>
+          <div className="px-4 pt-2 flex-shrink-0 space-y-1">
+            {/* Row 1: Profile tabs */}
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="profile" className="gap-1.5 text-xs">
+                <User className="w-3.5 h-3.5" />
+                Profile
+              </TabsTrigger>
+              <TabsTrigger value="analysis" className="gap-1.5 text-xs">
+                <Sparkles className="w-3.5 h-3.5" />
+                Match
+              </TabsTrigger>
+              <TabsTrigger value="cv" className="gap-1.5 text-xs">
+                <FileText className="w-3.5 h-3.5" />
+                CV
+              </TabsTrigger>
+              <TabsTrigger value="history" className="gap-1.5 text-xs">
+                <History className="w-3.5 h-3.5" />
+                History
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Row 2: Interview form tabs */}
+            <TabsList className={cn(
+              "grid w-full",
+              isTechStageOrBeyond ? "grid-cols-3" : "grid-cols-2"
+            )}>
+              <TabsTrigger value="hr-form" className="gap-1.5 text-xs">
+                <UserCheck className="w-3.5 h-3.5" />
+                HR Form
+              </TabsTrigger>
+              {isTechStageOrBeyond && (
+                <TabsTrigger value="tech-form" className="gap-1.5 text-xs">
+                  <Code className="w-3.5 h-3.5" />
+                  Tech Form
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="offer-form" className="gap-1.5 text-xs">
+                <FileCheck className="w-3.5 h-3.5" />
+                Offer Form
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <div className="flex-1 overflow-auto p-4 pb-8">
             <TabsContent value="profile" className="m-0 h-full">
@@ -163,49 +189,17 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
               <HRInterviewFormTab candidate={currentCandidate} />
             </TabsContent>
 
-            <TabsContent value="tech-form" className="m-0 h-full">
-              <TechInterviewFormTab candidate={currentCandidate} />
-            </TabsContent>
+            {isTechStageOrBeyond && (
+              <TabsContent value="tech-form" className="m-0 h-full">
+                <TechInterviewFormTab candidate={currentCandidate} />
+              </TabsContent>
+            )}
 
             <TabsContent value="offer-form" className="m-0 h-full">
               <OfferFormTab candidate={currentCandidate} />
             </TabsContent>
           </div>
         </Tabs>
-
-        {/* Interview Forms - Separate section below */}
-        <div className="border-t bg-muted/30 p-3 flex-shrink-0">
-          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Interview Forms</p>
-          <div className="flex gap-2">
-            <Button
-              variant={activeTab === 'hr-form' ? 'default' : 'outline'}
-              size="sm"
-              className="gap-1.5 text-xs"
-              onClick={() => setActiveTab('hr-form')}
-            >
-              <UserCheck className="w-3.5 h-3.5" />
-              HR Form
-            </Button>
-            <Button
-              variant={activeTab === 'tech-form' ? 'default' : 'outline'}
-              size="sm"
-              className="gap-1.5 text-xs"
-              onClick={() => setActiveTab('tech-form')}
-            >
-              <Code className="w-3.5 h-3.5" />
-              Tech Form
-            </Button>
-            <Button
-              variant={activeTab === 'offer-form' ? 'default' : 'outline'}
-              size="sm"
-              className="gap-1.5 text-xs"
-              onClick={() => setActiveTab('offer-form')}
-            >
-              <FileCheck className="w-3.5 h-3.5" />
-              Offer Form
-            </Button>
-          </div>
-        </div>
       </div>
 
       <EmailModal

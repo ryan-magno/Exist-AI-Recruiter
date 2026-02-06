@@ -42,8 +42,18 @@ export default function CandidatesPage() {
 
   // Sort by score (highest first) and filter
   const filteredCandidates = useMemo(() => {
+    // Get active JO IDs (not fulfilled/closed)
+    const activeJoIds = new Set(
+      jobOrders
+        .filter(jo => jo.status === 'draft' || jo.status === 'in-progress')
+        .map(jo => jo.id)
+    );
+
     return candidates
       .filter(candidate => {
+        // Only show candidates from active (open) job orders
+        if (!candidate.assignedJoId || !activeJoIds.has(candidate.assignedJoId)) return false;
+
         const searchLower = searchQuery.toLowerCase();
         const matchesSearch = !searchQuery || 
           candidate.name.toLowerCase().includes(searchLower) ||
