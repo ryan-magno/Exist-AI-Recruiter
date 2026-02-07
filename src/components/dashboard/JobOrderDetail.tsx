@@ -195,28 +195,29 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
           </div>
         </div>
 
-        {/* Description with See More - Rich Text */}
-        <div className="mt-3">
+        {/* Job Description Container */}
+        <div className="mt-3 bg-muted/30 rounded-lg border border-border p-3">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Job Description</p>
           {isLongDescription ? (
             <>
               {isExpanded ? (
                 <div className="max-h-64 overflow-y-auto pr-2">
                   <RichTextContent 
                     content={jobOrder.description} 
-                    className="text-sm text-muted-foreground leading-relaxed"
+                    className="text-sm text-foreground leading-relaxed"
                   />
                 </div>
               ) : (
                 <div className="overflow-hidden max-h-16">
                   <RichTextContent 
                     content={jobOrder.description} 
-                    className="text-sm text-muted-foreground leading-relaxed"
+                    className="text-sm text-foreground leading-relaxed"
                   />
                 </div>
               )}
               <button 
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="text-sm text-primary font-medium flex items-center gap-1 mt-1 hover:underline"
+                className="text-sm text-primary font-medium flex items-center gap-1 mt-2 hover:underline"
               >
                 {isExpanded ? (
                   <>Show less <ChevronUp className="w-3 h-3" /></>
@@ -228,7 +229,7 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
           ) : (
             <RichTextContent 
               content={jobOrder.description} 
-              className="text-sm text-muted-foreground leading-relaxed"
+              className="text-sm text-foreground leading-relaxed"
             />
           )}
         </div>

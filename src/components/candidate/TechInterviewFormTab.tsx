@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Code, Calendar, User, Phone, Video, MapPin, Save, Star, Check, Loader2 } from 'lucide-react';
+import { Code, User, Phone, Video, MapPin, Save, Star, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePickerField } from '@/components/ui/DatePickerField';
 import { Candidate, TechInterviewForm, TechVerdict, techVerdictLabels } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
@@ -111,14 +112,14 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
   return (
     <div className="space-y-6 pb-6">
       {/* Interview Metadata */}
-      <div className="bg-violet-50 rounded-xl p-4 border border-violet-200">
-        <h4 className="font-semibold text-violet-800 mb-3 flex items-center gap-2">
+      <div className="bg-muted/30 rounded-xl p-4 border border-border">
+        <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
           <Code className="w-4 h-4" />
           Tech Interview Metadata
         </h4>
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-violet-700">Tech Interviewer Name *</Label>
+            <Label className="text-xs text-muted-foreground">Tech Interviewer Name *</Label>
             <Input 
               placeholder="Enter interviewer name"
               value={form.interviewerName}
@@ -127,16 +128,16 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-violet-700">Interview Date</Label>
-            <Input 
-              type="date"
+            <Label className="text-xs text-muted-foreground">Interview Date</Label>
+            <DatePickerField
               value={form.interviewDate}
-              onChange={e => updateField('interviewDate', e.target.value)}
+              onChange={v => updateField('interviewDate', v)}
+              placeholder="Select date"
               className="h-9 text-sm"
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-violet-700">Interview Method</Label>
+            <Label className="text-xs text-muted-foreground">Interview Method</Label>
             <Select value={form.interviewMethod} onValueChange={v => updateField('interviewMethod', v as TechInterviewForm['interviewMethod'])}>
               <SelectTrigger className="h-9 text-sm">
                 <SelectValue />
@@ -152,9 +153,9 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
       </div>
 
       {/* Technical Assessment Scores */}
-      <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+      <div className="bg-muted/30 rounded-xl p-4 border border-border">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="font-semibold text-slate-700 flex items-center gap-2">
+          <h4 className="font-semibold text-foreground flex items-center gap-2">
             <Star className="w-4 h-4" />
             Technical Assessment (1-5)
           </h4>
@@ -187,11 +188,11 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
       </div>
 
       {/* Technical Areas */}
-      <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-        <h4 className="font-semibold text-blue-800 mb-3">Technical Assessment Details</h4>
+      <div className="bg-muted/30 rounded-xl p-4 border border-border">
+        <h4 className="font-semibold text-foreground mb-3">Technical Assessment Details</h4>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-blue-700">Strength Areas</Label>
+            <Label className="text-xs text-muted-foreground">Strength Areas</Label>
             <Textarea 
               placeholder="Technical areas where candidate excels..."
               value={form.strengthAreas}
@@ -201,7 +202,7 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-blue-700">Weakness Areas</Label>
+            <Label className="text-xs text-muted-foreground">Weakness Areas</Label>
             <Textarea 
               placeholder="Technical areas that need improvement..."
               value={form.weaknessAreas}
@@ -211,7 +212,7 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-blue-700">Technical Notes</Label>
+            <Label className="text-xs text-muted-foreground">Technical Notes</Label>
             <Textarea 
               placeholder="Detailed technical observations, coding quality, etc..."
               value={form.technicalNotes}
@@ -224,14 +225,14 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
       </div>
 
       {/* Final Tech Verdict */}
-      <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200">
-        <h4 className="font-semibold text-emerald-800 mb-3 flex items-center gap-2">
+      <div className="bg-muted/30 rounded-xl p-4 border border-border">
+        <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
           <Check className="w-4 h-4" />
           Final Tech Verdict
         </h4>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-emerald-700">Technical Recommendation</Label>
+            <Label className="text-xs text-muted-foreground">Technical Recommendation</Label>
             <Select value={form.verdict} onValueChange={v => updateField('verdict', v as TechVerdict)}>
               <SelectTrigger className={cn(
                 "h-9 text-sm",
@@ -249,7 +250,7 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-emerald-700">Rationale for Recommendation *</Label>
+            <Label className="text-xs text-muted-foreground">Rationale for Recommendation *</Label>
             <Textarea 
               placeholder="Provide reasoning for your recommendation..."
               value={form.verdictRationale}

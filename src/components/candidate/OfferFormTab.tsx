@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, FileCheck, AlertCircle, Calendar, DollarSign, Briefcase, Clock, MessageSquare, Loader2 } from 'lucide-react';
+import { Save, FileCheck, AlertCircle, DollarSign, Briefcase, Clock, MessageSquare, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,7 @@ import { useApp } from '@/context/AppContext';
 import { useOffer, useUpsertOffer, OfferStatus as DBOfferStatus } from '@/hooks/useOffers';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { DatePickerField } from '@/components/ui/DatePickerField';
 
 export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'negotiating' | 'unresponsive';
 
@@ -155,25 +156,23 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-sm">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
               Offer Date
             </Label>
-            <Input
-              type="date"
+            <DatePickerField
               value={formData.offerDate}
-              onChange={(e) => setFormData({ ...formData, offerDate: e.target.value })}
+              onChange={(v) => setFormData({ ...formData, offerDate: v })}
+              placeholder="Select offer date"
             />
           </div>
 
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-sm">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
               Expiry Date
             </Label>
-            <Input
-              type="date"
+            <DatePickerField
               value={formData.expiryDate}
-              onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+              onChange={(v) => setFormData({ ...formData, expiryDate: v })}
+              placeholder="Select expiry date"
             />
           </div>
 
@@ -206,10 +205,10 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
               <Clock className="w-4 h-4 text-muted-foreground" />
               Start Date
             </Label>
-            <Input
-              type="date"
+            <DatePickerField
               value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+              onChange={(v) => setFormData({ ...formData, startDate: v })}
+              placeholder="Select start date"
             />
           </div>
 

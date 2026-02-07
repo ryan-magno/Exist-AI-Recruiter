@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FilePlus, Calendar, Hash, Briefcase, Users, Building, User, Loader2, ExternalLink } from "lucide-react";
+import { FilePlus, Hash, Briefcase, Users, Building, User, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Level, EmploymentType, levelLabels, employmentTypeLabels } from "@/data/mockData";
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { DatePickerField } from "@/components/ui/DatePickerField";
 import { useDepartmentNames } from "@/hooks/useDepartments";
 import { useJobOrderCount, useCreateJobOrder, JobOrderInsert } from "@/hooks/useJobOrders";
 import { DepartmentManager } from "@/components/dashboard/DepartmentManager";
@@ -305,17 +306,16 @@ export default function CreateJOPage() {
             {/* Required Date */}
             <div className="space-y-1.5">
               <Label className="flex items-center gap-2 text-sm">
-                <Calendar className="w-4 h-4 text-muted-foreground" />
                 Required Date
               </Label>
-              <Input
-                type="date"
+              <DatePickerField
                 value={formData.requiredDate}
-                onChange={(e) => {
-                  setFormData({ ...formData, requiredDate: e.target.value });
-                  if (e.target.value) setErrors((prev) => ({ ...prev, requiredDate: false }));
+                onChange={(v) => {
+                  setFormData({ ...formData, requiredDate: v });
+                  if (v) setErrors((prev) => ({ ...prev, requiredDate: false }));
                 }}
-                className={cn(errors.requiredDate && "border-destructive focus-visible:ring-destructive")}
+                placeholder="Select required date"
+                error={errors.requiredDate}
               />
             </div>
           </div>
