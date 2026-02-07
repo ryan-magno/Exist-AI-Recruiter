@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { User, Calendar, Phone, Video, MapPin, DollarSign, Clock, Home, Briefcase, Globe, Save, Star, Check, Loader2 } from 'lucide-react';
+import { User, Phone, Video, MapPin, DollarSign, Clock, Home, Briefcase, Globe, Save, Star, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePickerField } from '@/components/ui/DatePickerField';
 import { Candidate, HRInterviewForm, HRVerdict, hrVerdictLabels } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { toast } from 'sonner';
@@ -113,14 +114,14 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
   return (
     <div className="space-y-6 pb-6">
       {/* 1. Interview Metadata */}
-      <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-        <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+      <div className="bg-muted/30 rounded-xl p-4 border border-border">
+        <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
           <User className="w-4 h-4" />
           Interview Metadata
         </h4>
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-blue-700">HR Interviewer Name *</Label>
+            <Label className="text-xs text-muted-foreground">HR Interviewer Name *</Label>
             <Input 
               placeholder="Enter interviewer name"
               value={form.interviewerName}
@@ -129,16 +130,16 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-blue-700">Interview Date</Label>
-            <Input 
-              type="date"
+            <Label className="text-xs text-muted-foreground">Interview Date</Label>
+            <DatePickerField
               value={form.interviewDate}
-              onChange={e => updateField('interviewDate', e.target.value)}
+              onChange={v => updateField('interviewDate', v)}
+              placeholder="Select date"
               className="h-9 text-sm"
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-blue-700">Interview Method</Label>
+            <Label className="text-xs text-muted-foreground">Interview Method</Label>
             <Select value={form.interviewMethod} onValueChange={v => updateField('interviewMethod', v as HRInterviewForm['interviewMethod'])}>
               <SelectTrigger className="h-9 text-sm">
                 <SelectValue />
@@ -154,14 +155,14 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
       </div>
 
       {/* 2. Logistics & Expectations */}
-      <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-        <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+      <div className="bg-muted/30 rounded-xl p-4 border border-border">
+        <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
           <Briefcase className="w-4 h-4" />
           Logistics & Expectations
         </h4>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-slate-600 flex items-center gap-1">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
               <Clock className="w-3 h-3" />
               Availability / Notice Period
             </Label>
@@ -179,7 +180,7 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-slate-600 flex items-center gap-1">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
               <DollarSign className="w-3 h-3" />
               Expected Salary / Rate
             </Label>
@@ -191,7 +192,7 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-slate-600 flex items-center gap-1">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
               <Home className="w-3 h-3" />
               Work Setup Preference
             </Label>
@@ -208,7 +209,7 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-slate-600">Employment Status Preference</Label>
+            <Label className="text-xs text-muted-foreground">Employment Status Preference</Label>
             <Select value={form.employmentStatusPreference} onValueChange={v => updateField('employmentStatusPreference', v as HRInterviewForm['employmentStatusPreference'])}>
               <SelectTrigger className="h-9 text-sm">
                 <SelectValue />
@@ -222,7 +223,7 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
             </Select>
           </div>
           <div className="space-y-1.5 col-span-2">
-            <Label className="text-xs text-slate-600 flex items-center gap-1">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
               <Globe className="w-3 h-3" />
               Relocation Willingness
             </Label>
@@ -242,11 +243,11 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
       </div>
 
       {/* 3. Behavioral & Qualitative Assessment */}
-      <div className="bg-violet-50 rounded-xl p-4 border border-violet-200">
-        <h4 className="font-semibold text-violet-800 mb-3">Behavioral & Qualitative Assessment</h4>
+      <div className="bg-muted/30 rounded-xl p-4 border border-border">
+        <h4 className="font-semibold text-foreground mb-3">Behavioral & Qualitative Assessment</h4>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-violet-700">Motivation: Why are you interested in this role and our company?</Label>
+            <Label className="text-xs text-muted-foreground">Motivation: Why are you interested in this role and our company?</Label>
             <Textarea 
               placeholder="Capture candidate's response..."
               value={form.motivationAnswer}
@@ -256,7 +257,7 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-violet-700">Conflict Resolution: Describe a challenging situation with a previous supervisor or teammate and how you resolved it.</Label>
+            <Label className="text-xs text-muted-foreground">Conflict Resolution: Describe a challenging situation with a previous supervisor or teammate and how you resolved it.</Label>
             <Textarea 
               placeholder="Capture candidate's response..."
               value={form.conflictResolutionAnswer}
@@ -266,7 +267,7 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-violet-700">Career Alignment: What are your long-term career goals, and how does this role fit into them?</Label>
+            <Label className="text-xs text-muted-foreground">Career Alignment: What are your long-term career goals, and how does this role fit into them?</Label>
             <Textarea 
               placeholder="Capture candidate's response..."
               value={form.careerAlignmentAnswer}
@@ -276,7 +277,7 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-violet-700">Administrative Notes / Red Flags / Concerns</Label>
+            <Label className="text-xs text-muted-foreground">Administrative Notes / Red Flags / Concerns</Label>
             <Textarea 
               placeholder="Any additional observations..."
               value={form.administrativeNotes}
@@ -289,8 +290,8 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
       </div>
 
       {/* 4. Competency & Culture Scoring */}
-      <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-        <h4 className="font-semibold text-amber-800 mb-3 flex items-center gap-2">
+      <div className="bg-muted/30 rounded-xl p-4 border border-border">
+        <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
           <Star className="w-4 h-4" />
           Competency & Culture Scoring (1-5)
         </h4>
@@ -312,7 +313,7 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs text-amber-700">Communication Notes</Label>
+          <Label className="text-xs text-muted-foreground">Communication Notes</Label>
           <Textarea 
             placeholder="Specific feedback on scores..."
             value={form.communicationNotes}
@@ -324,14 +325,14 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
       </div>
 
       {/* 5. Final HR Verdict */}
-      <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200">
-        <h4 className="font-semibold text-emerald-800 mb-3 flex items-center gap-2">
+      <div className="bg-muted/30 rounded-xl p-4 border border-border">
+        <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
           <Check className="w-4 h-4" />
           Final HR Verdict
         </h4>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-emerald-700">Overall HR Recommendation</Label>
+            <Label className="text-xs text-muted-foreground">Overall HR Recommendation</Label>
             <Select value={form.verdict} onValueChange={v => updateField('verdict', v as HRVerdict)}>
               <SelectTrigger className={cn(
                 "h-9 text-sm",
@@ -349,7 +350,7 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-emerald-700">Rationale for Recommendation *</Label>
+            <Label className="text-xs text-muted-foreground">Rationale for Recommendation *</Label>
             <Textarea 
               placeholder="Provide reasoning for your recommendation..."
               value={form.verdictRationale}
