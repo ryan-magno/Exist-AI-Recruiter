@@ -59,7 +59,6 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
-    { id: 'analysis', label: 'Match Analysis', icon: Target },
     { id: 'cv', label: 'CV', icon: FileText },
     { id: 'history', label: 'History', icon: History },
     { id: 'hr-form', label: 'HR Form', icon: UserCheck },
@@ -192,14 +191,6 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
         {/* ── SCROLLABLE BODY ── */}
         <div className="flex-1 overflow-y-auto p-6">
           {activeTab === 'profile' && <ProfileTab candidate={currentCandidate} fullData={fullData} />}
-          {activeTab === 'analysis' && (
-            <MatchAnalysis
-              candidate={currentCandidate}
-              isActive={activeTab === 'analysis'}
-              hasPlayed={hasPlayedAnimation}
-              onAnimationComplete={() => setHasPlayedAnimation(true)}
-            />
-          )}
           {activeTab === 'cv' && <CVPreview candidate={currentCandidate} />}
           {activeTab === 'history' && <ApplicationHistoryTab candidate={currentCandidate} />}
           {activeTab === 'hr-form' && <HRInterviewFormTab candidate={currentCandidate} />}
@@ -455,8 +446,24 @@ function ProfileTab({ candidate, fullData }: { candidate: Candidate; fullData: a
       }))
     : candidate.workExperiences || [];
 
+  // Overall summary from match analysis
+  const overallSummary = candidate.matchAnalysis?.summary || candidate.overallSummary;
+
   return (
     <div className="max-w-4xl">
+      {/* Overall Summary */}
+      {overallSummary && (
+        <section className="mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">Overall Summary</h3>
+          </div>
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+            <p className="text-sm text-foreground leading-relaxed">{overallSummary}</p>
+          </div>
+        </section>
+      )}
+
       {/* AI Insights 2-column */}
       <AIKeyInsights candidate={candidate} />
 
