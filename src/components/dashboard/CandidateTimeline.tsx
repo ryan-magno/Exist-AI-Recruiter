@@ -10,14 +10,11 @@ interface CandidateTimelineProps {
 // Map DB pipeline status to display labels
 const pipelineStatusLabels: Record<DBPipelineStatus | 'applied', string> = {
   'applied': 'Applied',
-  'new': 'New Match',
-  'screening': 'Screening',
-  'for_hr_interview': 'For HR Interview',
-  'for_tech_interview': 'For Tech Interview',
+  'hr_interview': 'For HR Interview',
+  'tech_interview': 'For Tech Interview',
   'offer': 'Offer',
   'hired': 'Hired',
-  'rejected': 'Rejected',
-  'withdrawn': 'Withdrawn'
+  'rejected': 'Rejected'
 };
 
 const getStatusLabel = (status: DBPipelineStatus | 'applied'): string => {
@@ -28,19 +25,15 @@ const getStatusColor = (status: DBPipelineStatus | 'applied'): string => {
   switch (status) {
     case 'applied':
       return 'bg-gray-400';
-    case 'new':
-    case 'screening':
+    case 'hr_interview':
       return 'bg-sky-500';
-    case 'for_hr_interview':
-      return 'bg-orange-500';
-    case 'for_tech_interview':
+    case 'tech_interview':
       return 'bg-violet-500';
     case 'offer':
       return 'bg-amber-500';
     case 'hired':
       return 'bg-emerald-500';
     case 'rejected':
-    case 'withdrawn':
       return 'bg-red-500';
     default:
       return 'bg-gray-400';

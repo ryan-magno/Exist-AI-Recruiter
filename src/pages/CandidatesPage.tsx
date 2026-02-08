@@ -45,7 +45,7 @@ export default function CandidatesPage() {
     // Get active JO IDs (not fulfilled/closed)
     const activeJoIds = new Set(
       jobOrders
-        .filter(jo => jo.status === 'draft' || jo.status === 'in-progress')
+        .filter(jo => jo.status === 'open' || jo.status === 'pooling' || jo.status === 'on_hold')
         .map(jo => jo.id)
     );
 

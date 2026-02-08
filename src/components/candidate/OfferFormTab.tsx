@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DatePickerField } from '@/components/ui/DatePickerField';
 
-export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'negotiating' | 'unresponsive';
+export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'expired';
 
 export interface OfferForm {
   offerDate: string;
@@ -31,8 +31,8 @@ const offerStatusLabels: Record<OfferStatus, string> = {
   'pending': 'Pending Response',
   'accepted': 'Accepted',
   'rejected': 'Rejected',
-  'negotiating': 'Negotiating',
-  'unresponsive': 'Unresponsive'
+  'withdrawn': 'Withdrawn',
+  'expired': 'Expired'
 };
 
 const offerStatusColors: Record<OfferStatus | '', string> = {
@@ -40,8 +40,8 @@ const offerStatusColors: Record<OfferStatus | '', string> = {
   'pending': 'bg-amber-100 text-amber-700 border-amber-300',
   'accepted': 'bg-emerald-100 text-emerald-700 border-emerald-300',
   'rejected': 'bg-red-100 text-red-700 border-red-300',
-  'negotiating': 'bg-blue-100 text-blue-700 border-blue-300',
-  'unresponsive': 'bg-slate-100 text-slate-600 border-slate-300'
+  'withdrawn': 'bg-blue-100 text-blue-700 border-blue-300',
+  'expired': 'bg-slate-100 text-slate-600 border-slate-300'
 };
 
 interface OfferFormTabProps {

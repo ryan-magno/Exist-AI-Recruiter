@@ -54,11 +54,11 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
       toast.success('Tech Interview form saved');
       
       // Auto-move based on verdict
-      if (form.verdict === 'proceed-to-offer' && candidate.pipelineStatus === 'hr-interview') {
+      if (form.verdict === 'pass' && candidate.pipelineStatus === 'tech_interview') {
         updateCandidatePipelineStatus(candidate.id, 'offer');
         updateCandidateTechInterviewResult(candidate.id, 'pass');
         toast.success('Candidate moved to Offer stage');
-      } else if (form.verdict === 'reject') {
+      } else if (form.verdict === 'fail') {
         updateCandidatePipelineStatus(candidate.id, 'rejected');
         updateCandidateTechInterviewResult(candidate.id, 'fail');
         toast.info('Candidate marked as rejected');
@@ -236,9 +236,9 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
             <Select value={form.verdict} onValueChange={v => updateField('verdict', v as TechVerdict)}>
               <SelectTrigger className={cn(
                 "h-9 text-sm",
-                form.verdict === 'proceed-to-offer' && 'border-emerald-500 bg-emerald-100',
-                form.verdict === 'hold' && 'border-amber-500 bg-amber-100',
-                form.verdict === 'reject' && 'border-red-500 bg-red-100'
+                form.verdict === 'pass' && 'border-emerald-500 bg-emerald-100',
+                form.verdict === 'conditional' && 'border-amber-500 bg-amber-100',
+                form.verdict === 'fail' && 'border-red-500 bg-red-100'
               )}>
                 <SelectValue placeholder="Select recommendation..." />
               </SelectTrigger>

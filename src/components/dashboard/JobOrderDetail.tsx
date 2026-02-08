@@ -92,9 +92,10 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
               </span>
               <span className={cn(
                 'px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide border',
-                jobOrder.status === 'in-progress' && 'bg-sky-100 text-sky-700 border-sky-300',
-                jobOrder.status === 'fulfilled' && 'bg-emerald-100 text-emerald-700 border-emerald-300',
-                jobOrder.status === 'draft' && 'bg-slate-100 text-slate-600 border-slate-300',
+                jobOrder.status === 'open' && 'bg-sky-100 text-sky-700 border-sky-300',
+                jobOrder.status === 'pooling' && 'bg-emerald-100 text-emerald-700 border-emerald-300',
+                jobOrder.status === 'on_hold' && 'bg-amber-100 text-amber-600 border-amber-300',
+                jobOrder.status === 'archived' && 'bg-slate-100 text-slate-600 border-slate-300',
                 jobOrder.status === 'closed' && 'bg-slate-100 text-slate-500 border-slate-300'
               )}>
                 {joStatusLabels[jobOrder.status]}
@@ -163,7 +164,7 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
                 </>
               )}
             </Button>
-            {jobOrder.hiredCount >= jobOrder.quantity && jobOrder.status !== 'fulfilled' && jobOrder.status !== 'closed' && (
+            {jobOrder.hiredCount >= jobOrder.quantity && jobOrder.status !== 'closed' && jobOrder.status !== 'archived' && (
               <Button 
                 variant="default" 
                 size="sm" 
