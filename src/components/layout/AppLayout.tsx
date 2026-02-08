@@ -11,13 +11,12 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { newCandidatesCount, showRefreshPrompt, refreshData, dismissPrompt } = useRealtimeCandidates();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex h-screen bg-background">
       <Sidebar />
-      <main className="min-h-screen transition-all duration-300 ml-16">
+      <main className="flex-1 overflow-hidden">
         {children}
       </main>
       
-      {/* Refresh notification - shows when new candidates are ready */}
       <RefreshNotification
         show={showRefreshPrompt}
         candidateCount={newCandidatesCount}
