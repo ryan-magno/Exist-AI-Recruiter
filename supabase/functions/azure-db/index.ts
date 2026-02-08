@@ -1529,11 +1529,21 @@ async function handleRequest(req: Request): Promise<Response> {
 
     // CV Uploaders
     if (path === '/cv-uploaders') {
-      if (method === 'GET') { return jsonResponse(await query("SELECT * FROM cv_uploaders ORDER BY name")); }
+      if (method === 'GET') { return jsonResponse(await query("SELECT DISTINCT ON (name) * FROM cv_uploaders ORDER BY name, created_at")); }
       if (method === 'POST') {
         const body = await req.json();
-        const result = await query(`INSERT INTO cv_uploaders (name) VALUES ($1) ON CONFLICT DO NOTHING RETURNING *`, [body.name]);
+        // Check if name already exists
+        const existing = await query("SELECT * FROM cv_uploaders WHERE LOWER(name) = LOWER($1) LIMIT 1", [body.name]);
+        if (existing.length > 0) {
+          return jsonResponse(existing[0]);
+        }
+        const result = await query(`INSERT INTO cv_uploaders (name) VALUES ($1) RETURNING *`, [body.name]);
         return jsonResponse(result[0]);
+      }
+      if (method === 'DELETE') {
+        // Cleanup duplicates endpoint
+        await query(`DELETE FROM cv_uploaders WHERE id NOT IN (SELECT MIN(id::text)::uuid FROM cv_uploaders GROUP BY name)`);
+        return jsonResponse({ success: true });
       }
     }
 

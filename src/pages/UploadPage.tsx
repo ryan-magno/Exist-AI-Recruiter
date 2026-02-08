@@ -15,6 +15,7 @@ import { useCVUploaderNames, useCreateCVUploader } from '@/hooks/useCVUploaders'
 import { useDepartmentNames } from '@/hooks/useDepartments';
 import { useJobOrders } from '@/hooks/useJobOrders';
 import { useCreateCandidateFromWebhook } from '@/hooks/useCandidates';
+import { DatePickerField } from '@/components/ui/DatePickerField';
 
 interface UploadedFile {
   id: string;
@@ -295,11 +296,14 @@ export default function UploadPage() {
           duration: 5000
         });
         
-        // Save uploader name to database
-        try {
-          await createUploader.mutateAsync(uploaderName.trim());
-        } catch (error) {
-          console.error('Error saving uploader:', error);
+        // Save uploader name to database (only if new)
+        const isExistingUploader = existingUploaders.some(n => n.toLowerCase() === uploaderName.trim().toLowerCase());
+        if (!isExistingUploader) {
+          try {
+            await createUploader.mutateAsync(uploaderName.trim());
+          } catch (error) {
+            console.error('Error saving uploader:', error);
+          }
         }
         
         setTimeout(() => navigate('/dashboard'), 2000);
@@ -361,11 +365,14 @@ export default function UploadPage() {
       
       setIsVectorized(true);
       
-      // Save uploader name to database
-      try {
-        await createUploader.mutateAsync(uploaderName.trim());
-      } catch (error) {
-        console.error('Error saving uploader:', error);
+      // Save uploader name to database (only if new)
+      const isExistingUploaderLegacy = existingUploaders.some(n => n.toLowerCase() === uploaderName.trim().toLowerCase());
+      if (!isExistingUploaderLegacy) {
+        try {
+          await createUploader.mutateAsync(uploaderName.trim());
+        } catch (error) {
+          console.error('Error saving uploader:', error);
+        }
       }
       
       setTimeout(() => navigate('/dashboard'), 1500);
@@ -745,11 +752,10 @@ function FileRow({ file, index, onUpdate, onRemove, departments, jobOrders, disa
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       <Label className="text-sm font-medium">From Date</Label>
                     </div>
-                    <Input
-                      type="date"
+                    <DatePickerField
                       value={file.fromDate || ''}
-                      onChange={(e) => onUpdate({ fromDate: e.target.value })}
-                      className="h-10"
+                      onChange={(v) => onUpdate({ fromDate: v })}
+                      placeholder="Select from date"
                       disabled={disabled}
                     />
                   </div>
@@ -758,11 +764,10 @@ function FileRow({ file, index, onUpdate, onRemove, departments, jobOrders, disa
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       <Label className="text-sm font-medium">To Date</Label>
                     </div>
-                    <Input
-                      type="date"
+                    <DatePickerField
                       value={file.toDate || ''}
-                      onChange={(e) => onUpdate({ toDate: e.target.value })}
-                      className="h-10"
+                      onChange={(v) => onUpdate({ toDate: v })}
+                      placeholder="Select to date"
                       disabled={disabled}
                     />
                   </div>
