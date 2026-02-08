@@ -18,7 +18,9 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
   const { selectedJoId, setSelectedJoId, getMatchesForJo } = useApp();
 
   const getAgingDays = (createdDate: string): number => {
+    if (!createdDate) return 0;
     const created = new Date(createdDate);
+    if (isNaN(created.getTime())) return 0;
     const now = new Date();
     return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
   };
@@ -31,7 +33,10 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
   };
 
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-US', { 
+    if (!dateString) return 'N/A';
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return 'N/A';
+    return d.toLocaleDateString('en-US', { 
       month: 'short', 
       day: 'numeric',
       year: 'numeric'

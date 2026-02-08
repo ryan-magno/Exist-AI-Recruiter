@@ -59,7 +59,9 @@ const columns: { id: PipelineStatus; title: string }[] = [
 
 // Stage aging utility functions
 function getStageAgingDays(statusChangedDate: string): number {
+  if (!statusChangedDate) return 0;
   const changed = new Date(statusChangedDate);
+  if (isNaN(changed.getTime())) return 0;
   const now = new Date();
   return Math.floor((now.getTime() - changed.getTime()) / (1000 * 60 * 60 * 24));
 }
@@ -77,7 +79,10 @@ function getStageAgingColor(days: number): string {
 }
 
 function formatStageDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-US', { 
+  if (!dateString) return 'N/A';
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return 'N/A';
+  return d.toLocaleDateString('en-US', { 
     month: 'short', 
     day: 'numeric'
   });

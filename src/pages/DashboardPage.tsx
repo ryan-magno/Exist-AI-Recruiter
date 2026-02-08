@@ -26,7 +26,9 @@ export default function DashboardPage() {
 
   // Get aging days for a job order
   const getAgingDays = (createdDate: string): number => {
+    if (!createdDate) return 0;
     const created = new Date(createdDate);
+    if (isNaN(created.getTime())) return 0;
     const now = new Date();
     return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
   };
