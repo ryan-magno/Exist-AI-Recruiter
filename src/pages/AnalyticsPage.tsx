@@ -39,18 +39,21 @@ export default function AnalyticsPage() {
   const kpis = useMemo(() => {
     const hiredThisMonth = candidates.filter(c => {
       const isHired = c.pipelineStatus === 'hired';
+      if (!isHired || !c.statusChangedDate) return false;
       const hiredDate = new Date(c.statusChangedDate);
+      if (isNaN(hiredDate.getTime())) return false;
       const now = new Date();
-      return isHired && hiredDate.getMonth() === now.getMonth() && hiredDate.getFullYear() === now.getFullYear();
+      return hiredDate.getMonth() === now.getMonth() && hiredDate.getFullYear() === now.getFullYear();
     }).length;
 
-    const avgTimeToHire = candidates
-      .filter(c => c.pipelineStatus === 'hired')
+    const hiredCandidates = candidates.filter(c => c.pipelineStatus === 'hired' && c.statusChangedDate && c.appliedDate);
+    const avgTimeToHire = hiredCandidates
       .reduce((acc, c) => {
         const applied = new Date(c.appliedDate);
         const hired = new Date(c.statusChangedDate);
+        if (isNaN(applied.getTime()) || isNaN(hired.getTime())) return acc;
         return acc + Math.floor((hired.getTime() - applied.getTime()) / (1000 * 60 * 60 * 24));
-      }, 0) / Math.max(candidates.filter(c => c.pipelineStatus === 'hired').length, 1);
+      }, 0) / Math.max(hiredCandidates.length, 1);
 
     const activeJobs = jobOrders.filter(jo => jo.status === 'open' || jo.status === 'pooling').length;
     const totalCandidates = candidates.length;

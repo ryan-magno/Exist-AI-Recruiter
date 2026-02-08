@@ -33,7 +33,9 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const getAgingDays = (createdDate: string): number => {
+    if (!createdDate) return 0;
     const created = new Date(createdDate);
+    if (isNaN(created.getTime())) return 0;
     const now = new Date();
     return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
   };
