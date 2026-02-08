@@ -83,7 +83,7 @@ export default function ArchivePage() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Calendar className="w-4 h-4" />
-                    <span>Created: {new Date(jo.createdDate).toLocaleDateString()}</span>
+                    <span>Created: {jo.createdDate && !isNaN(new Date(jo.createdDate).getTime()) ? new Date(jo.createdDate).toLocaleDateString() : 'N/A'}</span>
                   </div>
                 </div>
               </motion.div>
