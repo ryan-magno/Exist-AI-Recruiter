@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { azureDb } from '@/lib/azureDb';
 
-export type PipelineStatus = 'new' | 'screening' | 'for_hr_interview' | 'for_tech_interview' | 'offer' | 'hired' | 'rejected' | 'withdrawn';
-export type TechInterviewResult = 'pending' | 'passed' | 'failed';
+export type PipelineStatus = 'hr_interview' | 'tech_interview' | 'offer' | 'hired' | 'rejected';
+export type TechInterviewResult = 'pending' | 'pass' | 'fail' | 'conditional';
 
 export interface Application {
   id: string;
@@ -11,13 +11,13 @@ export interface Application {
   pipeline_status: PipelineStatus;
   match_score: number | null;
   tech_interview_result: TechInterviewResult | null;
+  employment_type: string | null;
   working_conditions: string | null;
   remarks: string | null;
   applied_date: string;
   status_changed_date: string;
   created_at: string;
   updated_at: string;
-  // Joined fields from API
   candidate_name?: string;
   candidate_email?: string;
   skills?: string[];
@@ -27,18 +27,8 @@ export interface Application {
 }
 
 export interface ApplicationWithDetails extends Application {
-  candidate?: {
-    id: string;
-    full_name: string;
-    email: string | null;
-    skills: string[] | null;
-    years_of_experience: number | null;
-  };
-  job_order?: {
-    id: string;
-    jo_number: string;
-    title: string;
-  };
+  candidate?: { id: string; full_name: string; email: string | null; skills: string[] | null; years_of_experience: number | null; };
+  job_order?: { id: string; jo_number: string; title: string; };
 }
 
 export interface ApplicationInsert {
@@ -52,6 +42,7 @@ export interface ApplicationInsert {
 export interface ApplicationUpdate {
   pipeline_status?: PipelineStatus;
   tech_interview_result?: TechInterviewResult;
+  employment_type?: string;
   working_conditions?: string;
   remarks?: string;
 }
@@ -69,21 +60,10 @@ export function useApplicationsForJobOrder(jobOrderId: string | null) {
     queryFn: async () => {
       if (!jobOrderId) return [];
       const apps = await azureDb.applications.list({ job_order_id: jobOrderId });
-      // Transform to match expected structure
       return apps.map((app: Application) => ({
         ...app,
-        candidate: {
-          id: app.candidate_id,
-          full_name: app.candidate_name || 'Unknown',
-          email: app.candidate_email || null,
-          skills: app.skills || null,
-          years_of_experience: app.years_of_experience || null
-        },
-        job_order: {
-          id: app.job_order_id,
-          jo_number: app.jo_number || '',
-          title: app.job_title || ''
-        }
+        candidate: { id: app.candidate_id, full_name: app.candidate_name || 'Unknown', email: app.candidate_email || null, skills: app.skills || null, years_of_experience: app.years_of_experience || null },
+        job_order: { id: app.job_order_id, jo_number: app.jo_number || '', title: app.job_title || '' }
       })) as ApplicationWithDetails[];
     },
     enabled: !!jobOrderId
@@ -96,14 +76,7 @@ export function useApplicationsForCandidate(candidateId: string | null) {
     queryFn: async () => {
       if (!candidateId) return [];
       const apps = await azureDb.applications.list({ candidate_id: candidateId });
-      return apps.map((app: Application) => ({
-        ...app,
-        job_order: {
-          id: app.job_order_id,
-          jo_number: app.jo_number || '',
-          title: app.job_title || ''
-        }
-      }));
+      return apps.map((app: Application) => ({ ...app, job_order: { id: app.job_order_id, jo_number: app.jo_number || '', title: app.job_title || '' } }));
     },
     enabled: !!candidateId
   });
@@ -117,21 +90,7 @@ export function useApplication(id: string | null) {
       const apps = await azureDb.applications.list();
       const app = apps.find((a: Application) => a.id === id);
       if (!app) return null;
-      return {
-        ...app,
-        candidate: {
-          id: app.candidate_id,
-          full_name: app.candidate_name || 'Unknown',
-          email: app.candidate_email || null,
-          skills: app.skills || null,
-          years_of_experience: app.years_of_experience || null
-        },
-        job_order: {
-          id: app.job_order_id,
-          jo_number: app.jo_number || '',
-          title: app.job_title || ''
-        }
-      } as ApplicationWithDetails;
+      return { ...app, candidate: { id: app.candidate_id, full_name: app.candidate_name || 'Unknown', email: app.candidate_email || null, skills: app.skills || null, years_of_experience: app.years_of_experience || null }, job_order: { id: app.job_order_id, jo_number: app.jo_number || '', title: app.job_title || '' } } as ApplicationWithDetails;
     },
     enabled: !!id
   });
@@ -141,36 +100,22 @@ export function useCreateApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (newApp: ApplicationInsert) => azureDb.applications.create(newApp),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
-    }
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['applications'] }); }
   });
 }
 
 export function useUpdateApplication() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: ApplicationUpdate }) => 
-      azureDb.applications.update(id, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
-    }
+    mutationFn: ({ id, updates }: { id: string; updates: ApplicationUpdate }) => azureDb.applications.update(id, updates),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['applications'] }); }
   });
 }
 
 export function useUpdateApplicationStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ 
-      id, 
-      status,
-      previousStatus 
-    }: { 
-      id: string; 
-      status: PipelineStatus;
-      previousStatus?: PipelineStatus;
-    }) => {
-      // The edge function handles timeline creation automatically
+    mutationFn: async ({ id, status, previousStatus }: { id: string; status: PipelineStatus; previousStatus?: PipelineStatus; }) => {
       return azureDb.applications.update(id, { pipeline_status: status });
     },
     onSuccess: () => {
@@ -183,12 +128,7 @@ export function useUpdateApplicationStatus() {
 export function useDeleteApplication() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      // Note: Azure PostgreSQL edge function would need DELETE endpoint for applications
-      throw new Error('Delete not implemented');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
-    }
+    mutationFn: async (id: string) => { throw new Error('Delete not implemented'); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['applications'] }); }
   });
 }

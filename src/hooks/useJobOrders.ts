@@ -11,10 +11,10 @@ export interface JobOrder {
   level: 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
   quantity: number;
   hired_count: number;
-  employment_type: 'consultant' | 'project-based' | 'regular';
+  employment_type: 'full_time' | 'part_time' | 'contract';
   requestor_name: string | null;
   required_date: string | null;
-  status: 'draft' | 'in-progress' | 'fulfilled' | 'closed';
+  status: 'open' | 'closed' | 'on_hold' | 'pooling' | 'archived';
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -27,10 +27,10 @@ export interface JobOrderInsert {
   department_name?: string | null;
   level: 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
   quantity?: number;
-  employment_type: 'consultant' | 'project-based' | 'regular';
+  employment_type: 'full_time' | 'part_time' | 'contract';
   requestor_name?: string | null;
   required_date?: string | null;
-  status?: 'draft' | 'in-progress' | 'fulfilled' | 'closed';
+  status?: 'open' | 'closed' | 'on_hold' | 'pooling' | 'archived';
 }
 
 export type JobOrderUpdate = Partial<JobOrder>;
@@ -58,17 +58,14 @@ export function useCreateJobOrder() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (newJO: JobOrderInsert) => azureDb.jobOrders.create(newJO),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['job-orders'] });
-    }
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['job-orders'] }); }
   });
 }
 
 export function useUpdateJobOrder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: JobOrderUpdate }) => 
-      azureDb.jobOrders.update(id, updates),
+    mutationFn: ({ id, updates }: { id: string; updates: JobOrderUpdate }) => azureDb.jobOrders.update(id, updates),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['job-orders'] });
       queryClient.invalidateQueries({ queryKey: ['job-orders', variables.id] });
@@ -80,9 +77,7 @@ export function useDeleteJobOrder() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => azureDb.jobOrders.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['job-orders'] });
-    }
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['job-orders'] }); }
   });
 }
 
