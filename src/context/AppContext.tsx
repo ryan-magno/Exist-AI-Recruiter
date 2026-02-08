@@ -117,14 +117,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           expectedSalary = `₱${expectedSalary}`;
         }
         
-        return {
+      return {
           id: app.candidate_id,
           applicationId: app.id,
           name: app.candidate_name || candidate.full_name || 'Unknown',
           email: app.candidate_email || candidate.email || '',
           phone: candidate.phone || '',
           linkedIn: candidate.linkedin || '',
-          matchScore: parseFloat(app.match_score) || 0,
+          matchScore: candidate.qualification_score || parseFloat(app.match_score) || 0,
           pipelineStatus: (app.pipeline_status as LegacyPipelineStatus) || 'hr_interview',
           statusChangedDate: app.status_changed_date?.split('T')[0] || new Date().toISOString().split('T')[0],
           techInterviewResult: dbTechResultToLegacy[app.tech_interview_result] || 'pending',
@@ -136,15 +136,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           },
           matchReasons: [],
           matchAnalysis: {
-            summary: app.overall_summary || candidate.overall_summary || '',
-            strengths: app.strengths || candidate.strengths || [],
-            weaknesses: app.weaknesses || candidate.weaknesses || []
+            summary: candidate.overall_summary || '',
+            strengths: candidate.strengths || [],
+            weaknesses: candidate.weaknesses || []
           },
           workingConditions: app.working_conditions || '',
           remarks: app.remarks || '',
           techNotes: '',
           employmentType: 'full_time' as const,
-          positionApplied: app.job_title || candidate.target_role || '',
+          positionApplied: app.job_title || (candidate.positions_fit_for?.[0]) || 'Not specified',
           expectedSalary: expectedSalary,
           earliestStartDate: candidate.earliest_start_date || '',
           currentPosition: candidate.current_position || '',
@@ -158,7 +158,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
           applicantType: candidate.applicant_type || 'external',
           workExperiences: [],
           applicationHistory: [],
-          offerStatus: (offerMap.get(app.id) as LegacyCandidate['offerStatus']) || undefined
+          offerStatus: (offerMap.get(app.id) as LegacyCandidate['offerStatus']) || undefined,
+          // New fields
+          qualificationScore: candidate.qualification_score || undefined,
+          overallSummary: candidate.overall_summary || undefined,
+          strengths: candidate.strengths || [],
+          weaknesses: candidate.weaknesses || [],
+          internalUploadReason: candidate.internal_upload_reason || undefined,
+          internalFromDate: candidate.internal_from_date || undefined,
+          internalToDate: candidate.internal_to_date || undefined,
+          googleDriveFileUrl: candidate.google_drive_file_url || undefined,
+          googleDriveFileId: candidate.google_drive_file_id || undefined,
+          preferredEmploymentType: candidate.preferred_employment_type || undefined,
+          batchId: candidate.batch_id || undefined,
+          batchCreatedAt: candidate.batch_created_at || undefined,
+          positionsFitFor: candidate.positions_fit_for || [],
         };
       });
 

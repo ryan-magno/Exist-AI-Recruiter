@@ -67,7 +67,7 @@ export default function CandidatesPage() {
         
         return matchesSearch && matchesPipeline && matchesDepartment;
       })
-      .sort((a, b) => b.matchScore - a.matchScore);
+      .sort((a, b) => (b.qualificationScore ?? b.matchScore) - (a.qualificationScore ?? a.matchScore));
   }, [candidates, searchQuery, pipelineFilter, departmentFilter, jobOrders]);
 
   const getScoreClass = (score: number): string => {
@@ -208,7 +208,7 @@ export default function CandidatesPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30">
-                  <TableHead className="w-[100px]">Score</TableHead>
+                  <TableHead className="w-[100px]">AI Score</TableHead>
                   <TableHead>Candidate</TableHead>
                   <TableHead>Applied For</TableHead>
                   <TableHead className="min-w-[180px]">Status</TableHead>
@@ -226,8 +226,8 @@ export default function CandidatesPage() {
                     onClick={() => handleOpenProfile(candidate)}
                   >
                     <TableCell>
-                      <span className={cn('status-badge font-semibold', getScoreClass(candidate.matchScore))}>
-                        {candidate.matchScore}%
+                      <span className={cn('status-badge font-semibold', getScoreClass(candidate.qualificationScore ?? candidate.matchScore))}>
+                        {candidate.qualificationScore != null ? `${candidate.qualificationScore}/100` : `${candidate.matchScore}%`}
                       </span>
                     </TableCell>
                     <TableCell>
