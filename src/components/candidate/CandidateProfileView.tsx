@@ -30,7 +30,7 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
   const currentCandidate = candidates.find(c => c.id === candidate.id) || candidate;
 
   // Tech form only available from tech stage onwards
-  const isTechStageOrBeyond = ['hr-interview', 'offer', 'hired'].includes(currentCandidate.pipelineStatus);
+  const isTechStageOrBeyond = ['tech_interview', 'offer', 'hired'].includes(currentCandidate.pipelineStatus);
   const handleDownloadCV = () => {
     toast.success('CV Download Started', {
       description: `${currentCandidate?.name.replace(' ', '_')}_CV.pdf`
@@ -215,7 +215,7 @@ function ProfileTab({ candidate }: { candidate: Candidate }) {
   // Get positions this candidate could fit based on their skills
   const getPositionsFitFor = () => {
     const matchingJobs = mockJobOrders
-      .filter(jo => jo.status === 'in-progress' || jo.status === 'draft')
+      .filter(jo => jo.status === 'open' || jo.status === 'pooling')
       .filter(jo => {
         const positionMatch = candidate.positionApplied?.toLowerCase().includes(jo.title.toLowerCase().split(' ')[0]);
         return positionMatch || jo.candidateIds.includes(candidate.id);
@@ -321,15 +321,26 @@ function ProfileTab({ candidate }: { candidate: Candidate }) {
         </p>
       </div>
 
-      {/* Current Occupation */}
-      <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-        <div className="flex items-center gap-2 text-slate-600 mb-1">
-          <Building className="w-4 h-4" />
-          <span className="text-xs font-medium">Current Occupation</span>
+      {/* Current Position & Company */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+          <div className="flex items-center gap-2 text-slate-600 mb-1">
+            <Building className="w-4 h-4" />
+            <span className="text-xs font-medium">Current Position</span>
+          </div>
+          <p className={cn("font-semibold", candidate.currentPosition ? "text-foreground" : "text-muted-foreground italic")}>
+            {displayValue(candidate.currentPosition)}
+          </p>
         </div>
-        <p className={cn("font-semibold", candidate.currentOccupation ? "text-foreground" : "text-muted-foreground italic")}>
-          {displayValue(candidate.currentOccupation)}
-        </p>
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+          <div className="flex items-center gap-2 text-slate-600 mb-1">
+            <Building className="w-4 h-4" />
+            <span className="text-xs font-medium">Current Company</span>
+          </div>
+          <p className={cn("font-semibold", candidate.currentCompany ? "text-foreground" : "text-muted-foreground italic")}>
+            {displayValue(candidate.currentCompany)}
+          </p>
+        </div>
       </div>
 
       {/* Work Experience - ALL EXPERIENCE */}
@@ -388,9 +399,11 @@ function WorkExperienceCard({ experience }: { experience: WorkExperience }) {
           <p className="font-semibold text-foreground">{experience.position}</p>
           <p className="text-sm text-violet-700">{experience.company}</p>
         </div>
-        <span className="text-xs text-muted-foreground whitespace-nowrap">
-          {formatDate(experience.startDate)} - {formatDate(experience.endDate)}
-        </span>
+        {experience.duration && (
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            {experience.duration}
+          </span>
+        )}
       </div>
       <p className="text-sm text-slate-700 mb-2">{experience.summary}</p>
       {experience.projects && experience.projects.length > 0 && (

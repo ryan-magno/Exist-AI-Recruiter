@@ -28,15 +28,15 @@ interface DashboardKanbanProps {
 }
 
 // Offer status types
-type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'negotiating' | 'unresponsive' | '';
+type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'expired' | '';
 
 const offerStatusLabels: Record<OfferStatus, string> = {
   '': 'Not Set',
   'pending': 'Pending',
   'accepted': 'Accepted',
   'rejected': 'Rejected',
-  'negotiating': 'Negotiating',
-  'unresponsive': 'Unresponsive'
+  'withdrawn': 'Withdrawn',
+  'expired': 'Expired'
 };
 
 const offerStatusColors: Record<OfferStatus, string> = {
@@ -44,14 +44,14 @@ const offerStatusColors: Record<OfferStatus, string> = {
   'pending': 'bg-amber-100 text-amber-700 border-amber-300',
   'accepted': 'bg-emerald-100 text-emerald-700 border-emerald-300',
   'rejected': 'bg-red-100 text-red-700 border-red-300',
-  'negotiating': 'bg-blue-100 text-blue-700 border-blue-300',
-  'unresponsive': 'bg-slate-100 text-slate-600 border-slate-300'
+  'withdrawn': 'bg-blue-100 text-blue-700 border-blue-300',
+  'expired': 'bg-slate-100 text-slate-600 border-slate-300'
 };
 
 // Define visible columns for dashboard (including rejected)
 const columns: { id: PipelineStatus; title: string }[] = [
-  { id: 'new-match', title: 'For HR Interview' },
-  { id: 'hr-interview', title: 'For Tech Interview' },
+  { id: 'hr_interview', title: 'For HR Interview' },
+  { id: 'tech_interview', title: 'For Tech Interview' },
   { id: 'offer', title: 'Offer' },
   { id: 'hired', title: 'Hired' },
   { id: 'rejected', title: 'Rejected' },
@@ -128,7 +128,7 @@ function KanbanCard({
   };
 
   const agingDays = getStageAgingDays(candidate.statusChangedDate);
-  const showTechInterview = candidate.pipelineStatus !== 'new-match';
+  const showTechInterview = candidate.pipelineStatus !== 'hr_interview';
   const isOfferStage = candidate.pipelineStatus === 'offer';
   const isHiredStage = candidate.pipelineStatus === 'hired';
   const isInternal = candidate.applicantType === 'internal';

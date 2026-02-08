@@ -44,8 +44,8 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
     const actions: SmartAction[] = [];
 
     // Count candidates in each stage
-    const forHrCount = matches.filter(c => c.pipelineStatus === 'new-match').length;
-    const forTechCount = matches.filter(c => c.pipelineStatus === 'hr-interview').length;
+    const forHrCount = matches.filter(c => c.pipelineStatus === 'hr_interview').length;
+    const forTechCount = matches.filter(c => c.pipelineStatus === 'tech_interview').length;
     const offerCount = matches.filter(c => c.pipelineStatus === 'offer').length;
     const totalActive = matches.filter(c => !['rejected', 'hired'].includes(c.pipelineStatus)).length;
 

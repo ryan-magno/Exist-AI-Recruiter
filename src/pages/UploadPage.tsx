@@ -402,7 +402,7 @@ export default function UploadPage() {
   );
 
   // Get active job orders for the dropdown
-  const activeJobOrders = jobOrders.filter(jo => jo.status === 'in-progress' || jo.status === 'draft');
+  const activeJobOrders = jobOrders.filter(jo => jo.status === 'open' || jo.status === 'pooling');
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">

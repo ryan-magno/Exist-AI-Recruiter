@@ -73,11 +73,9 @@ export default function CreateJOPage() {
         level: formData.level as JobOrderInsert['level'],
         quantity: formData.quantity,
         required_date: formData.requiredDate || null,
-        status: "draft",
+        status: "open",
         department_name: formData.department,
-        employment_type: (formData.employmentType === "full-time"
-          ? "regular"
-          : formData.employmentType) as JobOrderInsert['employment_type'],
+        employment_type: formData.employmentType as JobOrderInsert['employment_type'],
         requestor_name: formData.requestorName,
       });
 

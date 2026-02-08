@@ -9,7 +9,7 @@ export default function ArchivePage() {
   const { jobOrders, unarchiveJobOrder, deleteJobOrder } = useApp();
 
   const archivedOrders = jobOrders.filter(
-    jo => jo.status === 'closed' || jo.status === 'fulfilled'
+    jo => jo.status === 'closed' || jo.status === 'archived'
   );
 
   return (
@@ -55,9 +55,9 @@ export default function ArchivePage() {
                         <span className="text-sm font-medium text-muted-foreground">{jo.joNumber}</span>
                         <span className={cn(
                           "status-badge",
-                          jo.status === 'fulfilled' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                          jo.status === 'archived' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
                         )}>
-                          {jo.status === 'fulfilled' && <CheckCircle className="w-3 h-3 mr-1" />}
+                          {jo.status === 'archived' && <CheckCircle className="w-3 h-3 mr-1" />}
                           {joStatusLabels[jo.status]}
                         </span>
                       </div>

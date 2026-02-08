@@ -35,7 +35,7 @@ export default function DashboardPage() {
   const activeJobOrders = useMemo(() => {
     return jobOrders
       .filter(jo => {
-        if (jo.status === 'closed' || jo.status === 'fulfilled') return false;
+        if (jo.status === 'closed' || jo.status === 'archived') return false;
         
         // Department filter
         if (joDepartmentFilter !== 'all' && jo.department !== joDepartmentFilter) return false;

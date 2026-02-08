@@ -60,10 +60,10 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
       toast.success('HR Interview form saved');
       
       // Auto-move based on verdict
-      if (form.verdict === 'proceed-to-tech' && candidate.pipelineStatus === 'new-match') {
-        updateCandidatePipelineStatus(candidate.id, 'hr-interview');
+      if (form.verdict === 'pass' && candidate.pipelineStatus === 'hr_interview') {
+        updateCandidatePipelineStatus(candidate.id, 'tech_interview');
         toast.success('Candidate moved to Tech Interview stage');
-      } else if (form.verdict === 'reject') {
+      } else if (form.verdict === 'fail') {
         updateCandidatePipelineStatus(candidate.id, 'rejected');
         toast.info('Candidate marked as rejected');
       }
@@ -336,9 +336,9 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
             <Select value={form.verdict} onValueChange={v => updateField('verdict', v as HRVerdict)}>
               <SelectTrigger className={cn(
                 "h-9 text-sm",
-                form.verdict === 'proceed-to-tech' && 'border-emerald-500 bg-emerald-100',
-                form.verdict === 'hold' && 'border-amber-500 bg-amber-100',
-                form.verdict === 'reject' && 'border-red-500 bg-red-100'
+                form.verdict === 'pass' && 'border-emerald-500 bg-emerald-100',
+                form.verdict === 'conditional' && 'border-amber-500 bg-amber-100',
+                form.verdict === 'fail' && 'border-red-500 bg-red-100'
               )}>
                 <SelectValue placeholder="Select recommendation..." />
               </SelectTrigger>

@@ -15,23 +15,14 @@ import {
   TechInterviewForm 
 } from '@/data/mockData';
 
-// DB Pipeline status to legacy mapping
-const dbStatusToLegacy: Record<string, LegacyPipelineStatus> = {
-  'new': 'new-match',
-  'screening': 'new-match',
-  'for_hr_interview': 'new-match',
-  'for_tech_interview': 'hr-interview',
-  'offer': 'offer',
-  'hired': 'hired',
-  'rejected': 'rejected',
-  'withdrawn': 'rejected'
-};
-
 // DB Tech interview result to legacy mapping
 const dbTechResultToLegacy: Record<string, LegacyTechInterviewResult> = {
   'pending': 'pending',
   'passed': 'pass',
-  'failed': 'fail'
+  'failed': 'fail',
+  'pass': 'pass',
+  'fail': 'fail',
+  'conditional': 'conditional'
 };
 
 interface AppContextType {
@@ -134,7 +125,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           phone: candidate.phone || '',
           linkedIn: candidate.linkedin || '',
           matchScore: parseFloat(app.match_score) || 0,
-          pipelineStatus: dbStatusToLegacy[app.pipeline_status] || 'new-match',
+          pipelineStatus: (app.pipeline_status as LegacyPipelineStatus) || 'hr_interview',
           statusChangedDate: app.status_changed_date?.split('T')[0] || new Date().toISOString().split('T')[0],
           techInterviewResult: dbTechResultToLegacy[app.tech_interview_result] || 'pending',
           skills: app.skills || candidate.skills || [],
@@ -152,11 +143,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           workingConditions: app.working_conditions || '',
           remarks: app.remarks || '',
           techNotes: '',
-          employmentType: 'full-time',
+          employmentType: 'full_time' as const,
           positionApplied: app.job_title || candidate.target_role || '',
           expectedSalary: expectedSalary,
           earliestStartDate: candidate.earliest_start_date || '',
-          currentOccupation: app.current_occupation || candidate.current_occupation || '',
+          currentPosition: candidate.current_position || '',
+          currentCompany: candidate.current_company || '',
           assignedJoId: app.job_order_id,
           educationalBackground: candidate.educational_background || '',
           relevantWorkExperience: '',
@@ -222,7 +214,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         status: jo.status as LegacyJobOrder['status'],
         candidateIds: [],
         department: jo.department_name || '',
-        employmentType: (jo.employment_type === 'regular' ? 'full-time' : jo.employment_type) as LegacyJobOrder['employmentType'],
+        employmentType: jo.employment_type as LegacyJobOrder['employmentType'],
         requestorName: jo.requestor_name || ''
       }));
       setJobOrders(legacyJOs);
@@ -246,7 +238,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         id: joId,
         updates: { 
           hired_count: newHiredCount,
-          status: isFulfilled ? 'fulfilled' : jo.status
+          status: isFulfilled ? 'closed' : jo.status
         }
       });
       
@@ -278,22 +270,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       prev.map(c => c.id === candidateId ? { ...c, pipelineStatus: status, statusChangedDate: new Date().toISOString().split('T')[0] } : c)
     );
 
-    // Map legacy status to DB status
-    const legacyToDbStatus: Record<LegacyPipelineStatus, PipelineStatus> = {
-      'new-match': 'for_hr_interview',
-      'hr-interview': 'for_tech_interview',
-      'offer': 'offer',
-      'hired': 'hired',
-      'rejected': 'rejected'
-    };
+    // Frontend types now match DB types directly
+    const dbStatus = status as PipelineStatus;
+    const previousDbStatus = previousStatus as PipelineStatus;
 
     // Persist to database (this also creates timeline entry in the edge function)
     if (candidate.applicationId) {
       try {
         await updateApplicationStatusMutation.mutateAsync({
           id: candidate.applicationId,
-          status: legacyToDbStatus[status],
-          previousStatus: legacyToDbStatus[previousStatus]
+          status: dbStatus,
+          previousStatus: previousDbStatus
         });
       } catch (error) {
         console.error('Error updating application status:', error);
@@ -382,7 +369,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (updates.status) dbUpdates.status = updates.status as DBJobOrder['status'];
       if (updates.department) dbUpdates.department_name = updates.department;
       if (updates.employmentType) {
-        dbUpdates.employment_type = (updates.employmentType === 'full-time' ? 'regular' : updates.employmentType) as DBJobOrder['employment_type'];
+        dbUpdates.employment_type = updates.employmentType as DBJobOrder['employment_type'];
       }
       if (updates.requestorName) dbUpdates.requestor_name = updates.requestorName;
       
@@ -406,9 +393,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         level: jo.level as DBJobOrder['level'],
         quantity: jo.quantity,
         required_date: jo.requiredDate || null,
-        status: (jo.status || 'draft') as DBJobOrder['status'],
+        status: (jo.status || 'open') as DBJobOrder['status'],
         department_name: jo.department,
-        employment_type: (jo.employmentType === 'full-time' ? 'regular' : jo.employmentType) as DBJobOrder['employment_type'],
+        employment_type: jo.employmentType as DBJobOrder['employment_type'],
         requestor_name: jo.requestorName
       };
 
@@ -432,7 +419,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       await updateJobOrderMutation.mutateAsync({
         id: joId,
-        updates: { status: 'in-progress' }
+        updates: { status: 'open' }
       });
       toast.success('Job Order restored to active');
     } catch (error) {

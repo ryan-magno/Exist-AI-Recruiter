@@ -52,7 +52,7 @@ export default function AnalyticsPage() {
         return acc + Math.floor((hired.getTime() - applied.getTime()) / (1000 * 60 * 60 * 24));
       }, 0) / Math.max(candidates.filter(c => c.pipelineStatus === 'hired').length, 1);
 
-    const activeJobs = jobOrders.filter(jo => jo.status === 'in-progress' || jo.status === 'draft').length;
+    const activeJobs = jobOrders.filter(jo => jo.status === 'open' || jo.status === 'pooling').length;
     const totalCandidates = candidates.length;
     const internalCandidates = candidates.filter(c => c.applicantType === 'internal').length;
     const externalCandidates = candidates.filter(c => c.applicantType === 'external').length;
@@ -70,8 +70,8 @@ export default function AnalyticsPage() {
   // Pipeline distribution
   const pipelineData = useMemo(() => {
     const counts = {
-      'For HR Interview': candidates.filter(c => c.pipelineStatus === 'new-match').length,
-      'For Tech Interview': candidates.filter(c => c.pipelineStatus === 'hr-interview').length,
+      'For HR Interview': candidates.filter(c => c.pipelineStatus === 'hr_interview').length,
+      'For Tech Interview': candidates.filter(c => c.pipelineStatus === 'tech_interview').length,
       'Offer': candidates.filter(c => c.pipelineStatus === 'offer').length,
       'Hired': candidates.filter(c => c.pipelineStatus === 'hired').length,
       'Rejected': candidates.filter(c => c.pipelineStatus === 'rejected').length,
