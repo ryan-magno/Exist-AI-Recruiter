@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { azureDb } from '@/lib/azureDb';
 
-export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'negotiating' | 'unresponsive';
+export type OfferStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'expired';
 
 export interface Offer {
   id: string;
@@ -35,35 +35,12 @@ export interface OfferInsert {
 }
 
 export function useOffer(applicationId: string | null) {
-  return useQuery({
-    queryKey: ['offers', applicationId],
-    queryFn: async () => {
-      if (!applicationId) return null;
-      return azureDb.offers.get(applicationId) as Promise<Offer | null>;
-    },
-    enabled: !!applicationId
-  });
+  return useQuery({ queryKey: ['offers', applicationId], queryFn: async () => { if (!applicationId) return null; return azureDb.offers.get(applicationId) as Promise<Offer | null>; }, enabled: !!applicationId });
 }
-
 export function useOffersByCandidate(candidateId: string | null) {
-  return useQuery({
-    queryKey: ['offers', 'candidate', candidateId],
-    queryFn: async () => {
-      if (!candidateId) return [];
-      return azureDb.offers.listByCandidate(candidateId) as Promise<Offer[]>;
-    },
-    enabled: !!candidateId
-  });
+  return useQuery({ queryKey: ['offers', 'candidate', candidateId], queryFn: async () => { if (!candidateId) return []; return azureDb.offers.listByCandidate(candidateId) as Promise<Offer[]>; }, enabled: !!candidateId });
 }
-
 export function useUpsertOffer() {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (offer: OfferInsert) => azureDb.offers.upsert(offer),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['offers'] });
-      queryClient.invalidateQueries({ queryKey: ['offers', variables.application_id] });
-      queryClient.invalidateQueries({ queryKey: ['offers', 'candidate', variables.candidate_id] });
-    }
-  });
+  return useMutation({ mutationFn: (offer: OfferInsert) => azureDb.offers.upsert(offer), onSuccess: (_, variables) => { queryClient.invalidateQueries({ queryKey: ['offers'] }); queryClient.invalidateQueries({ queryKey: ['offers', variables.application_id] }); queryClient.invalidateQueries({ queryKey: ['offers', 'candidate', variables.candidate_id] }); } });
 }

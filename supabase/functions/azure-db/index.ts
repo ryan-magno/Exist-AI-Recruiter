@@ -24,16 +24,20 @@ const ALLOWED_CANDIDATE_COLUMNS = [
   'years_of_experience', 'educational_background', 'cv_url', 'cv_filename',
   'availability', 'preferred_work_setup', 'expected_salary', 'earliest_start_date',
   'uploaded_by', 'uploaded_by_user_id',
-  // Webhook fields
-  'linkedin', 'current_occupation', 'years_of_experience_text', 'target_role',
-  'target_role_source', 'overall_summary', 'strengths', 'weaknesses',
+  // New schema fields
+  'linkedin', 'current_position', 'current_company', 'years_of_experience_text',
+  'overall_summary', 'strengths', 'weaknesses',
+  'qualification_score', 'preferred_employment_type',
+  'internal_upload_reason', 'internal_from_date', 'internal_to_date',
+  'google_drive_file_id', 'google_drive_file_url',
+  'batch_id', 'batch_created_at',
   // Processing status fields
   'processing_status', 'processing_batch_id'
 ];
 
 const ALLOWED_APPLICATION_COLUMNS = [
-  'pipeline_status', 'match_score', 'tech_interview_result', 'working_conditions',
-  'remarks', 'applied_date'
+  'pipeline_status', 'match_score', 'tech_interview_result', 'employment_type',
+  'working_conditions', 'remarks', 'applied_date'
 ];
 
 // Validate column name against whitelist
@@ -95,48 +99,36 @@ async function execute(sql: string, params: unknown[] = []) {
   return { success: true };
 }
 
-// Initialize tables
+// Initialize tables with NEW schema
 async function initTables() {
   const createTablesSql = `
     -- Create enums if they don't exist
     DO $$ BEGIN
-      CREATE TYPE job_order_status AS ENUM ('draft', 'in-progress', 'fulfilled', 'closed');
+      CREATE TYPE pipeline_status_enum AS ENUM ('hr_interview', 'tech_interview', 'offer', 'hired', 'rejected');
     EXCEPTION WHEN duplicate_object THEN null; END $$;
     
     DO $$ BEGIN
-      CREATE TYPE job_level AS ENUM ('L1', 'L2', 'L3', 'L4', 'L5');
+      CREATE TYPE applicant_type_enum AS ENUM ('internal', 'external');
     EXCEPTION WHEN duplicate_object THEN null; END $$;
     
     DO $$ BEGIN
-      CREATE TYPE employment_type AS ENUM ('consultant', 'project-based', 'regular');
+      CREATE TYPE employment_type_enum AS ENUM ('full_time', 'part_time', 'contract');
     EXCEPTION WHEN duplicate_object THEN null; END $$;
     
     DO $$ BEGIN
-      CREATE TYPE applicant_type AS ENUM ('internal', 'external');
+      CREATE TYPE job_level_enum AS ENUM ('L1', 'L2', 'L3', 'L4', 'L5');
     EXCEPTION WHEN duplicate_object THEN null; END $$;
     
     DO $$ BEGIN
-      CREATE TYPE pipeline_status AS ENUM ('new', 'screening', 'for_hr_interview', 'for_tech_interview', 'offer', 'hired', 'rejected', 'withdrawn');
+      CREATE TYPE job_status_enum AS ENUM ('open', 'closed', 'on_hold', 'pooling', 'archived');
     EXCEPTION WHEN duplicate_object THEN null; END $$;
     
     DO $$ BEGIN
-      CREATE TYPE tech_interview_result AS ENUM ('pending', 'passed', 'failed');
+      CREATE TYPE interview_verdict_enum AS ENUM ('pass', 'fail', 'conditional', 'pending');
     EXCEPTION WHEN duplicate_object THEN null; END $$;
     
     DO $$ BEGIN
-      CREATE TYPE hr_verdict AS ENUM ('proceed_to_tech', 'hold', 'reject');
-    EXCEPTION WHEN duplicate_object THEN null; END $$;
-    
-    DO $$ BEGIN
-      CREATE TYPE tech_verdict AS ENUM ('recommend_hire', 'consider', 'do_not_hire');
-    EXCEPTION WHEN duplicate_object THEN null; END $$;
-    
-    DO $$ BEGIN
-      CREATE TYPE offer_status AS ENUM ('pending', 'accepted', 'rejected', 'negotiating', 'unresponsive');
-    EXCEPTION WHEN duplicate_object THEN null; END $$;
-    
-    DO $$ BEGIN
-      CREATE TYPE processing_status_enum AS ENUM ('processing', 'completed', 'failed');
+      CREATE TYPE offer_status_enum AS ENUM ('pending', 'accepted', 'rejected', 'withdrawn', 'expired');
     EXCEPTION WHEN duplicate_object THEN null; END $$;
 
     -- Departments table
@@ -149,7 +141,7 @@ async function initTables() {
     -- CV Uploaders table
     CREATE TABLE IF NOT EXISTS cv_uploaders (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      name TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
       created_at TIMESTAMPTZ DEFAULT now()
     );
 
@@ -160,53 +152,59 @@ async function initTables() {
       title TEXT NOT NULL,
       description TEXT,
       department_name TEXT,
-      department_id UUID REFERENCES departments(id),
-      level job_level NOT NULL,
+      department_id UUID REFERENCES departments(id) ON DELETE SET NULL,
+      level job_level_enum NOT NULL,
       quantity INTEGER DEFAULT 1,
       hired_count INTEGER DEFAULT 0,
-      employment_type employment_type NOT NULL,
+      employment_type employment_type_enum NOT NULL,
       requestor_name TEXT,
       required_date DATE,
-      status job_order_status DEFAULT 'draft',
+      status job_status_enum DEFAULT 'open',
       created_by UUID,
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
     );
 
-    -- Candidates table with processing status
+    -- Candidates table
     CREATE TABLE IF NOT EXISTS candidates (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       full_name TEXT NOT NULL,
       email TEXT,
       phone TEXT,
-      applicant_type applicant_type DEFAULT 'external',
+      applicant_type applicant_type_enum DEFAULT 'external',
       skills TEXT[],
       positions_fit_for TEXT[],
       years_of_experience INTEGER,
+      years_of_experience_text TEXT,
       educational_background TEXT,
+      current_position TEXT,
+      current_company TEXT,
       cv_url TEXT,
       cv_filename TEXT,
       availability TEXT,
       preferred_work_setup TEXT,
+      preferred_employment_type employment_type_enum,
       expected_salary TEXT,
       earliest_start_date DATE,
-      uploaded_by TEXT,
-      uploaded_by_user_id UUID,
-      -- Webhook fields
+      internal_upload_reason TEXT,
+      internal_from_date DATE,
+      internal_to_date DATE,
       linkedin TEXT,
-      current_occupation TEXT,
-      years_of_experience_text TEXT,
-      target_role TEXT,
-      target_role_source TEXT,
+      qualification_score INTEGER,
       overall_summary TEXT,
       strengths TEXT[],
       weaknesses TEXT[],
-      -- Processing status fields
+      batch_id UUID,
+      batch_created_at TIMESTAMPTZ,
       processing_status TEXT DEFAULT 'completed',
       processing_batch_id UUID,
       processing_started_at TIMESTAMPTZ,
       processing_completed_at TIMESTAMPTZ,
       processing_index INTEGER,
+      google_drive_file_id TEXT,
+      google_drive_file_url TEXT,
+      uploaded_by TEXT,
+      uploaded_by_user_id UUID,
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
     );
@@ -237,27 +235,25 @@ async function initTables() {
       candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
       company_name TEXT NOT NULL,
       job_title TEXT NOT NULL,
-      start_date DATE,
-      end_date DATE,
-      is_current BOOLEAN DEFAULT false,
-      description TEXT,
       duration TEXT,
-      key_projects TEXT[],
+      description TEXT,
+      key_projects JSONB,
       created_at TIMESTAMPTZ DEFAULT now()
     );
 
-    -- Candidate Job Applications (junction table)
+    -- Candidate Job Applications
     CREATE TABLE IF NOT EXISTS candidate_job_applications (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
       job_order_id UUID NOT NULL REFERENCES job_orders(id) ON DELETE CASCADE,
-      pipeline_status pipeline_status DEFAULT 'new',
+      pipeline_status pipeline_status_enum NOT NULL DEFAULT 'hr_interview',
       match_score NUMERIC,
-      tech_interview_result tech_interview_result DEFAULT 'pending',
+      employment_type employment_type_enum,
+      tech_interview_result interview_verdict_enum,
       working_conditions TEXT,
       remarks TEXT,
       applied_date TIMESTAMPTZ DEFAULT now(),
-      status_changed_date TIMESTAMPTZ DEFAULT now(),
+      status_changed_date TIMESTAMPTZ,
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now(),
       UNIQUE(candidate_id, job_order_id)
@@ -281,7 +277,7 @@ async function initTables() {
       professionalism_rating INTEGER CHECK (professionalism_rating >= 1 AND professionalism_rating <= 5),
       strengths TEXT,
       concerns TEXT,
-      verdict hr_verdict,
+      verdict interview_verdict_enum,
       verdict_rationale TEXT,
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
@@ -303,7 +299,7 @@ async function initTables() {
       coding_challenge_notes TEXT,
       technical_strengths TEXT,
       areas_for_improvement TEXT,
-      verdict tech_verdict,
+      verdict interview_verdict_enum,
       verdict_rationale TEXT,
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
@@ -314,8 +310,8 @@ async function initTables() {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       application_id UUID NOT NULL REFERENCES candidate_job_applications(id) ON DELETE CASCADE,
       candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
-      from_status pipeline_status,
-      to_status pipeline_status NOT NULL,
+      from_status pipeline_status_enum,
+      to_status pipeline_status_enum NOT NULL,
       changed_date TIMESTAMPTZ DEFAULT now(),
       changed_by UUID,
       duration_days INTEGER,
@@ -331,7 +327,7 @@ async function initTables() {
       jo_number TEXT,
       jo_title TEXT,
       applied_date DATE NOT NULL,
-      furthest_stage pipeline_status,
+      furthest_stage pipeline_status_enum,
       outcome TEXT,
       historical_notes TEXT,
       created_at TIMESTAMPTZ DEFAULT now()
@@ -347,7 +343,7 @@ async function initTables() {
       offer_amount TEXT,
       position TEXT,
       start_date DATE,
-      status offer_status DEFAULT 'pending',
+      status offer_status_enum DEFAULT 'pending',
       benefits TEXT,
       remarks TEXT,
       negotiation_notes TEXT,
@@ -355,27 +351,14 @@ async function initTables() {
       updated_at TIMESTAMPTZ DEFAULT now()
     );
 
-    -- Add new columns if they don't exist (for existing tables)
-    DO $$ BEGIN
-      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS linkedin TEXT;
-      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS current_occupation TEXT;
-      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS years_of_experience_text TEXT;
-      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS target_role TEXT;
-      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS target_role_source TEXT;
-      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS overall_summary TEXT;
-      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS strengths TEXT[];
-      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS weaknesses TEXT[];
-      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS processing_status TEXT DEFAULT 'completed';
-      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS processing_batch_id UUID;
-      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ;
-      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS processing_completed_at TIMESTAMPTZ;
-      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS processing_index INTEGER;
-    EXCEPTION WHEN duplicate_column THEN null; END $$;
-
-    DO $$ BEGIN
-      ALTER TABLE candidate_work_experience ADD COLUMN IF NOT EXISTS duration TEXT;
-      ALTER TABLE candidate_work_experience ADD COLUMN IF NOT EXISTS key_projects TEXT[];
-    EXCEPTION WHEN duplicate_column THEN null; END $$;
+    -- Create update_updated_at trigger function
+    CREATE OR REPLACE FUNCTION update_updated_at_column()
+    RETURNS TRIGGER AS $$
+    BEGIN
+      NEW.updated_at = NOW();
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
   `;
   
   await execute(createTablesSql);
@@ -399,19 +382,322 @@ async function seedData(forceReseed = false) {
     ON CONFLICT (name) DO NOTHING
   `);
 
-  // Seed job orders
+  // Seed job orders with new enum values
   await execute(`
     INSERT INTO job_orders (jo_number, title, description, department_name, level, quantity, employment_type, requestor_name, status)
     VALUES 
-    ('JO-2026-001', 'Senior Software Engineer', 'Build and maintain scalable web applications', 'Engineering', 'L3', 3, 'regular', 'John Smith', 'in-progress'),
-    ('JO-2026-002', 'Product Manager', 'Lead product strategy and roadmap', 'Product', 'L4', 1, 'regular', 'Sarah Johnson', 'in-progress'),
-    ('JO-2026-003', 'UX Designer', 'Create user-centered designs for web and mobile', 'Design', 'L2', 2, 'regular', 'Mike Chen', 'draft'),
-    ('JO-2026-004', 'DevOps Engineer', 'Manage cloud infrastructure and CI/CD pipelines', 'Engineering', 'L3', 1, 'consultant', 'John Smith', 'in-progress'),
-    ('JO-2026-005', 'Sales Representative', 'Drive revenue growth in enterprise segment', 'Sales', 'L2', 5, 'regular', 'Lisa Wang', 'in-progress')
+    ('JO-2026-001', 'Senior Software Engineer', 'Build and maintain scalable web applications', 'Engineering', 'L3', 3, 'full_time', 'John Smith', 'open'),
+    ('JO-2026-002', 'Product Manager', 'Lead product strategy and roadmap', 'Product', 'L4', 1, 'full_time', 'Sarah Johnson', 'open'),
+    ('JO-2026-003', 'UX Designer', 'Create user-centered designs for web and mobile', 'Design', 'L2', 2, 'full_time', 'Mike Chen', 'open'),
+    ('JO-2026-004', 'DevOps Engineer', 'Manage cloud infrastructure and CI/CD pipelines', 'Engineering', 'L3', 1, 'contract', 'John Smith', 'open'),
+    ('JO-2026-005', 'Sales Representative', 'Drive revenue growth in enterprise segment', 'Sales', 'L2', 5, 'full_time', 'Lisa Wang', 'open')
     ON CONFLICT (jo_number) DO NOTHING
   `);
 
   console.log("Synthetic data seeded successfully (job orders only - candidates from webhook)");
+}
+
+// Recreate database with full SQL script
+async function recreateDatabase() {
+  console.log("=== RECREATING DATABASE ===");
+  
+  const recreateSql = `
+    -- Drop existing tables (in correct order due to foreign key dependencies)
+    DROP TABLE IF EXISTS candidate_timeline CASCADE;
+    DROP TABLE IF EXISTS tech_interviews CASCADE;
+    DROP TABLE IF EXISTS hr_interviews CASCADE;
+    DROP TABLE IF EXISTS offers CASCADE;
+    DROP TABLE IF EXISTS application_history CASCADE;
+    DROP TABLE IF EXISTS candidate_job_applications CASCADE;
+    DROP TABLE IF EXISTS candidate_work_experience CASCADE;
+    DROP TABLE IF EXISTS candidate_certifications CASCADE;
+    DROP TABLE IF EXISTS candidate_education CASCADE;
+    DROP TABLE IF EXISTS candidates CASCADE;
+    DROP TABLE IF EXISTS job_orders CASCADE;
+    DROP TABLE IF EXISTS departments CASCADE;
+    DROP TABLE IF EXISTS cv_uploaders CASCADE;
+    
+    -- Drop existing enum types
+    DROP TYPE IF EXISTS pipeline_status_enum CASCADE;
+    DROP TYPE IF EXISTS applicant_type_enum CASCADE;
+    DROP TYPE IF EXISTS employment_type_enum CASCADE;
+    DROP TYPE IF EXISTS job_level_enum CASCADE;
+    DROP TYPE IF EXISTS job_status_enum CASCADE;
+    DROP TYPE IF EXISTS interview_verdict_enum CASCADE;
+    DROP TYPE IF EXISTS offer_status_enum CASCADE;
+    -- Also drop old enum types
+    DROP TYPE IF EXISTS pipeline_status CASCADE;
+    DROP TYPE IF EXISTS applicant_type CASCADE;
+    DROP TYPE IF EXISTS employment_type CASCADE;
+    DROP TYPE IF EXISTS job_level CASCADE;
+    DROP TYPE IF EXISTS job_order_status CASCADE;
+    DROP TYPE IF EXISTS hr_verdict CASCADE;
+    DROP TYPE IF EXISTS tech_verdict CASCADE;
+    DROP TYPE IF EXISTS offer_status CASCADE;
+    DROP TYPE IF EXISTS tech_interview_result CASCADE;
+    DROP TYPE IF EXISTS processing_status_enum CASCADE;
+    
+    -- Create new enum types
+    CREATE TYPE pipeline_status_enum AS ENUM ('hr_interview', 'tech_interview', 'offer', 'hired', 'rejected');
+    CREATE TYPE applicant_type_enum AS ENUM ('internal', 'external');
+    CREATE TYPE employment_type_enum AS ENUM ('full_time', 'part_time', 'contract');
+    CREATE TYPE job_level_enum AS ENUM ('L1', 'L2', 'L3', 'L4', 'L5');
+    CREATE TYPE job_status_enum AS ENUM ('open', 'closed', 'on_hold', 'pooling', 'archived');
+    CREATE TYPE interview_verdict_enum AS ENUM ('pass', 'fail', 'conditional', 'pending');
+    CREATE TYPE offer_status_enum AS ENUM ('pending', 'accepted', 'rejected', 'withdrawn', 'expired');
+    
+    -- Create tables
+    CREATE TABLE departments (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name TEXT NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    
+    CREATE TABLE cv_uploaders (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    
+    CREATE TABLE job_orders (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      jo_number TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      description TEXT,
+      department_name TEXT,
+      department_id UUID REFERENCES departments(id) ON DELETE SET NULL,
+      level job_level_enum NOT NULL,
+      quantity INTEGER,
+      hired_count INTEGER DEFAULT 0,
+      employment_type employment_type_enum NOT NULL,
+      requestor_name TEXT,
+      required_date DATE,
+      status job_status_enum DEFAULT 'open',
+      created_by UUID,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    
+    CREATE TABLE candidates (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      full_name TEXT NOT NULL,
+      email TEXT,
+      phone TEXT,
+      applicant_type applicant_type_enum,
+      skills TEXT[],
+      positions_fit_for TEXT[],
+      years_of_experience INTEGER,
+      years_of_experience_text TEXT,
+      educational_background TEXT,
+      current_position TEXT,
+      current_company TEXT,
+      cv_url TEXT,
+      cv_filename TEXT,
+      availability TEXT,
+      preferred_work_setup TEXT,
+      preferred_employment_type employment_type_enum,
+      expected_salary TEXT,
+      earliest_start_date DATE,
+      internal_upload_reason TEXT,
+      internal_from_date DATE,
+      internal_to_date DATE,
+      linkedin TEXT,
+      qualification_score INTEGER,
+      overall_summary TEXT,
+      strengths TEXT[],
+      weaknesses TEXT[],
+      batch_id UUID,
+      batch_created_at TIMESTAMPTZ,
+      processing_status TEXT,
+      processing_batch_id UUID,
+      processing_started_at TIMESTAMPTZ,
+      processing_completed_at TIMESTAMPTZ,
+      processing_index INTEGER,
+      google_drive_file_id TEXT,
+      google_drive_file_url TEXT,
+      uploaded_by TEXT,
+      uploaded_by_user_id UUID,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    
+    CREATE TABLE candidate_education (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+      degree TEXT NOT NULL,
+      institution TEXT NOT NULL,
+      year TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    
+    CREATE TABLE candidate_certifications (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      issuer TEXT,
+      year TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    
+    CREATE TABLE candidate_work_experience (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+      company_name TEXT NOT NULL,
+      job_title TEXT NOT NULL,
+      duration TEXT,
+      description TEXT,
+      key_projects JSONB,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    
+    CREATE TABLE candidate_job_applications (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+      job_order_id UUID NOT NULL REFERENCES job_orders(id) ON DELETE CASCADE,
+      pipeline_status pipeline_status_enum NOT NULL DEFAULT 'hr_interview',
+      match_score NUMERIC,
+      employment_type employment_type_enum,
+      tech_interview_result interview_verdict_enum,
+      working_conditions TEXT,
+      remarks TEXT,
+      applied_date TIMESTAMPTZ DEFAULT NOW(),
+      status_changed_date TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(candidate_id, job_order_id)
+    );
+    
+    CREATE TABLE candidate_timeline (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      application_id UUID NOT NULL REFERENCES candidate_job_applications(id) ON DELETE CASCADE,
+      candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+      from_status pipeline_status_enum,
+      to_status pipeline_status_enum NOT NULL,
+      changed_date TIMESTAMPTZ DEFAULT NOW(),
+      changed_by UUID,
+      duration_days INTEGER,
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    
+    CREATE TABLE application_history (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+      job_order_id UUID,
+      jo_number TEXT,
+      jo_title TEXT,
+      applied_date DATE NOT NULL,
+      furthest_stage pipeline_status_enum,
+      outcome TEXT,
+      historical_notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    
+    CREATE TABLE hr_interviews (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      application_id UUID NOT NULL REFERENCES candidate_job_applications(id) ON DELETE CASCADE,
+      candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+      interview_date DATE,
+      interviewer_name TEXT,
+      interview_mode TEXT,
+      availability TEXT,
+      expected_salary TEXT,
+      preferred_work_setup TEXT,
+      notice_period TEXT,
+      communication_rating INTEGER CHECK (communication_rating BETWEEN 1 AND 5),
+      motivation_rating INTEGER CHECK (motivation_rating BETWEEN 1 AND 5),
+      cultural_fit_rating INTEGER CHECK (cultural_fit_rating BETWEEN 1 AND 5),
+      professionalism_rating INTEGER CHECK (professionalism_rating BETWEEN 1 AND 5),
+      strengths TEXT,
+      concerns TEXT,
+      verdict interview_verdict_enum,
+      verdict_rationale TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    
+    CREATE TABLE tech_interviews (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      application_id UUID NOT NULL REFERENCES candidate_job_applications(id) ON DELETE CASCADE,
+      candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+      interview_date DATE,
+      interviewer_name TEXT,
+      interview_mode TEXT,
+      technical_knowledge_rating INTEGER CHECK (technical_knowledge_rating BETWEEN 1 AND 5),
+      problem_solving_rating INTEGER CHECK (problem_solving_rating BETWEEN 1 AND 5),
+      code_quality_rating INTEGER CHECK (code_quality_rating BETWEEN 1 AND 5),
+      system_design_rating INTEGER CHECK (system_design_rating BETWEEN 1 AND 5),
+      coding_challenge_score INTEGER,
+      coding_challenge_notes TEXT,
+      technical_strengths TEXT,
+      areas_for_improvement TEXT,
+      verdict interview_verdict_enum,
+      verdict_rationale TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    
+    CREATE TABLE offers (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      application_id UUID NOT NULL REFERENCES candidate_job_applications(id) ON DELETE CASCADE,
+      candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+      offer_date DATE,
+      expiry_date DATE,
+      offer_amount TEXT,
+      position TEXT,
+      start_date DATE,
+      status offer_status_enum DEFAULT 'pending',
+      benefits TEXT,
+      remarks TEXT,
+      negotiation_notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    
+    -- Create indexes
+    CREATE INDEX idx_candidates_email ON candidates(email);
+    CREATE INDEX idx_candidates_applicant_type ON candidates(applicant_type);
+    CREATE INDEX idx_candidates_batch_id ON candidates(batch_id);
+    CREATE INDEX idx_applications_candidate_id ON candidate_job_applications(candidate_id);
+    CREATE INDEX idx_applications_job_order_id ON candidate_job_applications(job_order_id);
+    CREATE INDEX idx_applications_pipeline_status ON candidate_job_applications(pipeline_status);
+    CREATE INDEX idx_timeline_application_id ON candidate_timeline(application_id);
+    CREATE INDEX idx_timeline_candidate_id ON candidate_timeline(candidate_id);
+    CREATE INDEX idx_work_exp_candidate_id ON candidate_work_experience(candidate_id);
+    CREATE INDEX idx_education_candidate_id ON candidate_education(candidate_id);
+    CREATE INDEX idx_certifications_candidate_id ON candidate_certifications(candidate_id);
+    CREATE INDEX idx_hr_interviews_application_id ON hr_interviews(application_id);
+    CREATE INDEX idx_tech_interviews_application_id ON tech_interviews(application_id);
+    CREATE INDEX idx_offers_application_id ON offers(application_id);
+    CREATE INDEX idx_offers_status ON offers(status);
+    CREATE INDEX idx_job_orders_status ON job_orders(status);
+    CREATE INDEX idx_job_orders_department_id ON job_orders(department_id);
+    
+    -- Create triggers
+    CREATE OR REPLACE FUNCTION update_updated_at_column()
+    RETURNS TRIGGER AS $$
+    BEGIN
+      NEW.updated_at = NOW();
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+    
+    CREATE TRIGGER update_candidates_updated_at BEFORE UPDATE ON candidates FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    CREATE TRIGGER update_job_orders_updated_at BEFORE UPDATE ON job_orders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    CREATE TRIGGER update_applications_updated_at BEFORE UPDATE ON candidate_job_applications FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    CREATE TRIGGER update_hr_interviews_updated_at BEFORE UPDATE ON hr_interviews FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    CREATE TRIGGER update_tech_interviews_updated_at BEFORE UPDATE ON tech_interviews FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    CREATE TRIGGER update_offers_updated_at BEFORE UPDATE ON offers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    
+    -- Seed departments
+    INSERT INTO departments (name) VALUES
+    ('Engineering'), ('Product'), ('Design'), ('Sales'), ('Marketing'),
+    ('Operations'), ('Finance'), ('Human Resources')
+    ON CONFLICT DO NOTHING;
+  `;
+  
+  await execute(recreateSql);
+  console.log("=== DATABASE RECREATED SUCCESSFULLY ===");
 }
 
 // Create candidate from webhook data
@@ -421,22 +707,16 @@ async function createCandidateFromWebhook(body: any) {
   
   console.log("Processing webhook candidate:", output.candidate_info?.full_name);
   
-  // Extract data from webhook output
   const candidateInfo = output.candidate_info || {};
   const workHistory = output.work_history || {};
   const currentOcc = candidateInfo.current_occupation || workHistory.current_occupation || {};
   
-  // Build current occupation string
-  const currentOccupation = currentOcc.title && currentOcc.company 
-    ? `${currentOcc.title} at ${currentOcc.company}` 
-    : null;
-  
-  // Insert candidate
+  // Insert candidate with split current_position / current_company
   const candidateResult = await query(`
     INSERT INTO candidates (
       full_name, email, phone, applicant_type, skills, 
-      linkedin, current_occupation, years_of_experience_text,
-      target_role, target_role_source, overall_summary, strengths, weaknesses,
+      linkedin, current_position, current_company, years_of_experience_text,
+      overall_summary, strengths, weaknesses, qualification_score,
       uploaded_by, processing_status, processing_completed_at
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'completed', now())
     RETURNING *
@@ -447,13 +727,13 @@ async function createCandidateFromWebhook(body: any) {
     applicant_type || 'external',
     output.key_skills || workHistory.key_skills || [],
     candidateInfo.linkedin || null,
-    currentOccupation,
+    currentOcc.title || null,
+    currentOcc.company || null,
     candidateInfo.years_of_experience || workHistory.total_experience || null,
-    output.target_role?.position || null,
-    output.target_role?.source || null,
     output.overall_summary || null,
     output.strengths || [],
     output.weaknesses || [],
+    output.qualification_score || null,
     uploader_name || null
   ]);
   
@@ -480,22 +760,20 @@ async function createCandidateFromWebhook(body: any) {
     }
   }
   
-  // Insert work experience records
+  // Insert work experience records (new schema: duration text, key_projects JSONB, no is_current)
   if (workHistory.work_experience && Array.isArray(workHistory.work_experience)) {
     for (const exp of workHistory.work_experience) {
-      const isCurrent = exp.duration?.toLowerCase().includes('present') || false;
       await execute(`
         INSERT INTO candidate_work_experience (
-          candidate_id, company_name, job_title, description, duration, key_projects, is_current
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          candidate_id, company_name, job_title, description, duration, key_projects
+        ) VALUES ($1, $2, $3, $4, $5, $6::jsonb)
       `, [
         candidateId, 
         exp.company || 'Unknown', 
         exp.job_title || 'Unknown', 
         exp.summary || null,
         exp.duration || null,
-        exp.key_projects || [],
-        isCurrent
+        JSON.stringify(exp.key_projects || [])
       ]);
     }
   }
@@ -506,7 +784,7 @@ async function createCandidateFromWebhook(body: any) {
     try {
       const appResult = await query(`
         INSERT INTO candidate_job_applications (candidate_id, job_order_id, match_score, pipeline_status)
-        VALUES ($1, $2, $3, 'new')
+        VALUES ($1, $2, $3, 'hr_interview')
         RETURNING *
       `, [candidateId, job_order_id, output.qualification_score || null]);
       application = appResult[0];
@@ -514,7 +792,7 @@ async function createCandidateFromWebhook(body: any) {
       // Create initial timeline entry
       await execute(`
         INSERT INTO candidate_timeline (application_id, candidate_id, to_status)
-        VALUES ($1, $2, 'new')
+        VALUES ($1, $2, 'hr_interview')
       `, [(application as any).id, candidateId]);
     } catch (err) {
       console.error("Error creating application:", err);
@@ -524,29 +802,25 @@ async function createCandidateFromWebhook(body: any) {
   return { candidate, application };
 }
 
-// Get candidate with full details (education, certifications, work experience)
+// Get candidate with full details
 async function getCandidateFull(id: string) {
-  // Get candidate
   const candidates = await query("SELECT * FROM candidates WHERE id = $1", [id]);
   if (candidates.length === 0) return null;
   
   const candidate = candidates[0] as any;
   
-  // Get education
   const education = await query(
     "SELECT * FROM candidate_education WHERE candidate_id = $1 ORDER BY year DESC NULLS LAST",
     [id]
   );
   
-  // Get certifications
   const certifications = await query(
     "SELECT * FROM candidate_certifications WHERE candidate_id = $1 ORDER BY year DESC NULLS LAST",
     [id]
   );
   
-  // Get work experiences
   const workExperiences = await query(
-    "SELECT * FROM candidate_work_experience WHERE candidate_id = $1 ORDER BY is_current DESC, created_at DESC",
+    "SELECT * FROM candidate_work_experience WHERE candidate_id = $1 ORDER BY created_at DESC",
     [id]
   );
   
@@ -566,49 +840,42 @@ async function handleRequest(req: Request): Promise<Response> {
 
   console.log(`${method} ${path}`);
 
-  // Handle CORS preflight
   if (method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
     // =====================================================
-    // WEBHOOK CALLBACK ENDPOINT - n8n calls this when done
-    // Handles FLAT JSON object (not array with output wrapper)
+    // RECREATE DATABASE ENDPOINT
+    // =====================================================
+    if (path === '/recreate-db' && method === 'POST') {
+      console.log('=== RECREATE DATABASE REQUEST ===');
+      await recreateDatabase();
+      return jsonResponse({ success: true, message: 'Database recreated successfully. All tables dropped and recreated with new schema.' });
+    }
+
+    // =====================================================
+    // WEBHOOK CALLBACK ENDPOINT
     // =====================================================
     if (path === '/webhook-callback' && method === 'POST') {
       const body = await req.json();
       console.log('=== WEBHOOK CALLBACK RECEIVED ===');
       console.log('Raw payload (first 1000 chars):', JSON.stringify(body).substring(0, 1000));
       
-      // Handle both formats: flat object OR array with output wrapper
       let dataItems: any[] = [];
       
       if (Array.isArray(body)) {
-        // Array format: [{ output: {...} }] or [{...}]
         dataItems = body.map(item => item.output || item);
-        console.log('Parsed as array, items:', dataItems.length);
       } else if (body.output) {
-        // Single wrapped object: { output: {...} }
         dataItems = [body.output];
-        console.log('Parsed as wrapped single object');
       } else if (body.candidate_info) {
-        // FLAT object format (actual n8n response)
         dataItems = [body];
-        console.log('Parsed as FLAT JSON object');
       } else {
-        console.error('Unknown payload structure:', Object.keys(body));
         return jsonResponse({ error: 'Invalid payload structure', keys: Object.keys(body) }, 400);
       }
       
       for (const data of dataItems) {
-        console.log('Processing data item, keys:', Object.keys(data));
-        
-        // Validate required fields
-        if (!data.candidate_info) {
-          console.error('Missing candidate_info in data');
-          continue;
-        }
+        if (!data.candidate_info) continue;
         
         const metadata = data.metadata || {};
         const candidateInfo = data.candidate_info || {};
@@ -616,73 +883,54 @@ async function handleRequest(req: Request): Promise<Response> {
         
         let candidateId: string | null = null;
         
-        // Strategy 1: Find by batch_id and index (if metadata exists)
+        // Strategy 1: Find by batch_id and index
         if (metadata.batch_id !== undefined && metadata.index !== undefined) {
-          console.log(`Looking up by batch_id: ${metadata.batch_id}, index: ${metadata.index}`);
           const candidates = await query(`
             SELECT id FROM candidates 
             WHERE processing_batch_id = $1 AND processing_index = $2 AND processing_status = 'processing'
           `, [metadata.batch_id, metadata.index]);
-          
-          if (candidates.length > 0) {
-            candidateId = (candidates[0] as any).id;
-            console.log('Found candidate by batch_id/index:', candidateId);
-          }
+          if (candidates.length > 0) candidateId = (candidates[0] as any).id;
         }
         
         // Strategy 2: Find by email
         if (!candidateId && candidateInfo.email) {
-          console.log(`Looking up by email: ${candidateInfo.email}`);
           const candidates = await query(`
             SELECT id FROM candidates 
             WHERE email = $1 AND processing_status = 'processing'
             ORDER BY created_at DESC LIMIT 1
           `, [candidateInfo.email]);
-          
-          if (candidates.length > 0) {
-            candidateId = (candidates[0] as any).id;
-            console.log('Found candidate by email:', candidateId);
-          }
+          if (candidates.length > 0) candidateId = (candidates[0] as any).id;
         }
         
         // Strategy 3: Find by cv_filename
         if (!candidateId && metadata.filename) {
-          console.log(`Looking up by filename: ${metadata.filename}`);
           const candidates = await query(`
             SELECT id FROM candidates 
             WHERE cv_filename = $1 AND processing_status = 'processing'
             ORDER BY created_at DESC LIMIT 1
           `, [metadata.filename]);
-          
-          if (candidates.length > 0) {
-            candidateId = (candidates[0] as any).id;
-            console.log('Found candidate by filename:', candidateId);
-          }
+          if (candidates.length > 0) candidateId = (candidates[0] as any).id;
         }
         
         // Strategy 4: Find most recent processing candidate
         if (!candidateId) {
-          console.log('Fallback: looking for most recent processing candidate');
           const candidates = await query(`
-            SELECT id, cv_filename FROM candidates 
+            SELECT id FROM candidates 
             WHERE processing_status = 'processing'
             ORDER BY processing_started_at DESC LIMIT 1
           `);
-          
-          if (candidates.length > 0) {
-            candidateId = (candidates[0] as any).id;
-            console.log('Found most recent processing candidate:', candidateId, (candidates[0] as any).cv_filename);
-          }
+          if (candidates.length > 0) candidateId = (candidates[0] as any).id;
         }
         
+        const currentOcc = candidateInfo.current_occupation;
+        
         if (!candidateId) {
-          console.error('No matching candidate found. Creating new record.');
-          // Create a new completed candidate record
+          // Create new candidate record
           const result = await query(`
             INSERT INTO candidates (
               full_name, email, phone, applicant_type, skills, 
-              linkedin, current_occupation, years_of_experience_text,
-              target_role, target_role_source, overall_summary, strengths, weaknesses,
+              linkedin, current_position, current_company, years_of_experience_text,
+              overall_summary, strengths, weaknesses, qualification_score,
               processing_status, processing_completed_at
             ) VALUES ($1, $2, $3, 'external', $4, $5, $6, $7, $8, $9, $10, $11, $12, 'completed', now())
             RETURNING id
@@ -692,23 +940,17 @@ async function handleRequest(req: Request): Promise<Response> {
             candidateInfo.phone || null,
             data.key_skills || workHistory.key_skills || [],
             candidateInfo.linkedin || null,
-            candidateInfo.current_occupation ? `${candidateInfo.current_occupation.title || ''} at ${candidateInfo.current_occupation.company || ''}`.trim() : null,
+            currentOcc?.title || null,
+            currentOcc?.company || null,
             candidateInfo.years_of_experience || workHistory.total_experience || null,
-            data.target_role?.position || null,
-            data.target_role?.source || null,
             data.overall_summary || null,
             data.strengths || [],
-            data.weaknesses || []
+            data.weaknesses || [],
+            data.qualification_score || null
           ]);
           candidateId = (result[0] as any).id;
-          console.log('Created new candidate:', candidateId);
         } else {
           // Update existing candidate
-          const currentOcc = candidateInfo.current_occupation;
-          const currentOccupation = currentOcc 
-            ? `${currentOcc.title || ''} at ${currentOcc.company || ''}`.trim()
-            : null;
-          
           await execute(`
             UPDATE candidates SET
               full_name = COALESCE($1, full_name),
@@ -716,13 +958,13 @@ async function handleRequest(req: Request): Promise<Response> {
               phone = COALESCE($3, phone),
               skills = $4,
               linkedin = $5,
-              current_occupation = $6,
-              years_of_experience_text = $7,
-              target_role = $8,
-              target_role_source = $9,
-              overall_summary = $10,
-              strengths = $11,
-              weaknesses = $12,
+              current_position = $6,
+              current_company = $7,
+              years_of_experience_text = $8,
+              overall_summary = $9,
+              strengths = $10,
+              weaknesses = $11,
+              qualification_score = $12,
               processing_status = 'completed',
               processing_completed_at = now(),
               updated_at = now()
@@ -733,16 +975,15 @@ async function handleRequest(req: Request): Promise<Response> {
             candidateInfo.phone || null,
             data.key_skills || workHistory.key_skills || [],
             candidateInfo.linkedin || null,
-            currentOccupation,
+            currentOcc?.title || null,
+            currentOcc?.company || null,
             candidateInfo.years_of_experience || workHistory.total_experience || null,
-            data.target_role?.position || null,
-            data.target_role?.source || null,
             data.overall_summary || null,
             data.strengths || [],
             data.weaknesses || [],
+            data.qualification_score || null,
             candidateId
           ]);
-          console.log('Updated candidate:', candidateId);
         }
         
         // Clear existing related data for idempotency
@@ -758,7 +999,6 @@ async function handleRequest(req: Request): Promise<Response> {
               VALUES ($1, $2, $3, $4)
             `, [candidateId, edu.degree || 'Unknown', edu.institution || 'Unknown', edu.year || null]);
           }
-          console.log('Inserted education records:', data.education.length);
         }
         
         // Insert certifications
@@ -769,37 +1009,33 @@ async function handleRequest(req: Request): Promise<Response> {
               VALUES ($1, $2, $3, $4)
             `, [candidateId, cert.name || 'Unknown', cert.issuer || null, cert.year || null]);
           }
-          console.log('Inserted certification records:', data.certifications.length);
         }
         
-        // Insert work experiences
+        // Insert work experiences (new schema)
         if (workHistory.work_experience && Array.isArray(workHistory.work_experience)) {
           for (const exp of workHistory.work_experience) {
-            const isCurrent = exp.duration?.toLowerCase().includes('present') || false;
             await execute(`
               INSERT INTO candidate_work_experience (
-                candidate_id, company_name, job_title, description, duration, key_projects, is_current
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                candidate_id, company_name, job_title, description, duration, key_projects
+              ) VALUES ($1, $2, $3, $4, $5, $6::jsonb)
             `, [
               candidateId, 
               exp.company || 'Unknown', 
               exp.job_title || 'Unknown', 
               exp.summary || null,
               exp.duration || null,
-              exp.key_projects || [],
-              isCurrent
+              JSON.stringify(exp.key_projects || [])
             ]);
           }
-          console.log('Inserted work experience records:', workHistory.work_experience.length);
         }
         
-        // If job_order_id was provided in metadata, create application
+        // Create application if job_order_id in metadata
         const jobOrderId = metadata.job_order_id;
         if (jobOrderId) {
           try {
             const appResult = await query(`
               INSERT INTO candidate_job_applications (candidate_id, job_order_id, match_score, pipeline_status)
-              VALUES ($1, $2, $3, 'new')
+              VALUES ($1, $2, $3, 'hr_interview')
               ON CONFLICT (candidate_id, job_order_id) DO UPDATE SET match_score = EXCLUDED.match_score
               RETURNING *
             `, [candidateId, jobOrderId, data.qualification_score || null]);
@@ -808,43 +1044,33 @@ async function handleRequest(req: Request): Promise<Response> {
               const application = appResult[0] as any;
               await execute(`
                 INSERT INTO candidate_timeline (application_id, candidate_id, to_status)
-                VALUES ($1, $2, 'new')
+                VALUES ($1, $2, 'hr_interview')
               `, [application.id, candidateId]);
-              console.log('Created application for job order:', jobOrderId);
             }
           } catch (err) {
             console.error("Error creating application from webhook callback:", err);
           }
         }
-        
-        console.log(`=== WEBHOOK CALLBACK COMPLETE: Candidate ${candidateId} ===`);
       }
       
-      return jsonResponse({ success: true, message: 'Webhook callback processed', timestamp: new Date().toISOString() });
+      return jsonResponse({ success: true, message: 'Webhook callback processed' });
     }
 
     // =====================================================
-    // WEBHOOK PROXY - Upload to n8n with async processing
+    // WEBHOOK PROXY
     // =====================================================
     if (path === '/webhook-proxy' && method === 'POST') {
       const formData = await req.formData();
       const webhookUrl = 'https://workflow.exist.com.ph/webhook/vector-db-loader';
       
-      // Extract metadata
       const metadataStr = formData.get('metadata') as string;
       const uploaderName = formData.get('uploader_name') as string;
       let metadata: any[] = [];
-      try {
-        metadata = JSON.parse(metadataStr || '[]');
-      } catch (e) {
-        console.error('Failed to parse metadata:', e);
-      }
+      try { metadata = JSON.parse(metadataStr || '[]'); } catch (e) { console.error('Failed to parse metadata:', e); }
       
-      // Generate batch ID
       const batchId = crypto.randomUUID();
       console.log(`Starting webhook proxy, batch: ${batchId}, files: ${metadata.length}`);
       
-      // Create placeholder "processing" records for each file immediately
       const processingCandidates: string[] = [];
       for (let i = 0; i < metadata.length; i++) {
         const fileMeta = metadata[i];
@@ -864,13 +1090,11 @@ async function handleRequest(req: Request): Promise<Response> {
             i
           ]);
           processingCandidates.push((result[0] as any).id);
-          console.log(`Created processing placeholder for file ${i}: ${fileMeta.filename}`);
         } catch (err) {
           console.error(`Error creating processing placeholder for file ${i}:`, err);
         }
       }
       
-      // Inject batch_id and callback URL into metadata for n8n
       const callbackUrl = `${Deno.env.get("SUPABASE_URL") || 'https://azzbrbfcaxphrnpfdgle.supabase.co'}/functions/v1/azure-db/webhook-callback`;
       const enrichedMetadata = metadata.map((m, idx) => ({
         ...m,
@@ -879,66 +1103,38 @@ async function handleRequest(req: Request): Promise<Response> {
         callback_url: callbackUrl
       }));
       
-      // Update formData with enriched metadata
       formData.set('metadata', JSON.stringify(enrichedMetadata));
       
-      // Background task to call webhook and update records
       const backgroundTask = async () => {
         try {
           console.log(`[${batchId}] Calling webhook: ${webhookUrl}`);
+          const response = await fetch(webhookUrl, { method: 'POST', body: formData });
           
-          const webhookResponse = await fetch(webhookUrl, {
-            method: 'POST',
-            body: formData,
-          });
-          
-          if (!webhookResponse.ok) {
-            console.error(`[${batchId}] Webhook failed with status: ${webhookResponse.status}`);
-            // Mark all as failed
+          if (!response.ok) {
+            console.error(`[${batchId}] Webhook error: ${response.status}`);
             for (const candidateId of processingCandidates) {
-              const bgClient = createPgClient();
-              await bgClient.connect();
-              await bgClient.queryObject(`
-                UPDATE candidates SET processing_status = 'failed', updated_at = now()
-                WHERE id = $1
-              `, [candidateId]);
-              await bgClient.end();
+              try {
+                const errClient = createPgClient();
+                await errClient.connect();
+                await errClient.queryObject(`UPDATE candidates SET processing_status = 'failed', updated_at = now() WHERE id = $1`, [candidateId]);
+                await errClient.end();
+              } catch (e) { console.error(`Failed to mark ${candidateId} as failed:`, e); }
             }
             return;
           }
           
-          const result = await webhookResponse.json();
-          console.log(`[${batchId}] Webhook response received, items: ${Array.isArray(result) ? result.length : 'N/A'}`);
+          let responseData;
+          try { responseData = await response.json(); } catch { responseData = null; }
           
-          // Process each result and update the corresponding candidate
-          if (result && Array.isArray(result)) {
-            for (let i = 0; i < result.length; i++) {
-              const webhookOutput = result[i]?.output;
-              if (!webhookOutput) {
-                console.warn(`[${batchId}] Skipping result ${i}: no output field`);
-                // Mark as failed
-                if (processingCandidates[i]) {
-                  const bgClient = createPgClient();
-                  await bgClient.connect();
-                  await bgClient.queryObject(`
-                    UPDATE candidates SET processing_status = 'failed', updated_at = now()
-                    WHERE id = $1
-                  `, [processingCandidates[i]]);
-                  await bgClient.end();
-                }
-                continue;
-              }
-              
+          if (responseData) {
+            const items = Array.isArray(responseData) ? responseData : [responseData];
+            
+            for (let i = 0; i < items.length && i < processingCandidates.length; i++) {
               const candidateId = processingCandidates[i];
-              if (!candidateId) {
-                console.warn(`[${batchId}] No candidate ID for index ${i}`);
-                continue;
-              }
+              const item = items[i];
+              const webhookOutput = item.output || item;
               
-              const fileMeta = metadata[i] || {};
-              const jobOrderId = typeof fileMeta.applying_for === 'object' 
-                ? fileMeta.applying_for?.job_order_id 
-                : null;
+              if (!webhookOutput.candidate_info) continue;
               
               try {
                 const bgClient = createPgClient();
@@ -946,29 +1142,16 @@ async function handleRequest(req: Request): Promise<Response> {
                 
                 const candidateInfo = webhookOutput.candidate_info || {};
                 const workHistory = webhookOutput.work_history || {};
+                const jobOrderId = metadata[i]?.job_order_id;
                 const currentOcc = candidateInfo.current_occupation;
-                const currentOccupation = currentOcc 
-                  ? `${currentOcc.title || ''} at ${currentOcc.company || ''}`.trim()
-                  : null;
                 
-                // Update candidate with AI-extracted data
                 await bgClient.queryObject(`
                   UPDATE candidates SET
-                    full_name = $1,
-                    email = $2,
-                    phone = $3,
-                    skills = $4,
-                    linkedin = $5,
-                    current_occupation = $6,
-                    years_of_experience_text = $7,
-                    target_role = $8,
-                    target_role_source = $9,
-                    overall_summary = $10,
-                    strengths = $11,
-                    weaknesses = $12,
-                    processing_status = 'completed',
-                    processing_completed_at = now(),
-                    updated_at = now()
+                    full_name = $1, email = $2, phone = $3, skills = $4,
+                    linkedin = $5, current_position = $6, current_company = $7,
+                    years_of_experience_text = $8, overall_summary = $9,
+                    strengths = $10, weaknesses = $11, qualification_score = $12,
+                    processing_status = 'completed', processing_completed_at = now(), updated_at = now()
                   WHERE id = $13
                 `, [
                   candidateInfo.full_name || 'Unknown',
@@ -976,17 +1159,15 @@ async function handleRequest(req: Request): Promise<Response> {
                   candidateInfo.phone || null,
                   webhookOutput.key_skills || workHistory.key_skills || [],
                   candidateInfo.linkedin || null,
-                  currentOccupation,
+                  currentOcc?.title || null,
+                  currentOcc?.company || null,
                   candidateInfo.years_of_experience || workHistory.total_experience || null,
-                  webhookOutput.target_role?.position || null,
-                  webhookOutput.target_role?.source || null,
                   webhookOutput.overall_summary || null,
                   webhookOutput.strengths || [],
                   webhookOutput.weaknesses || [],
+                  webhookOutput.qualification_score || null,
                   candidateId
                 ]);
-                
-                console.log(`[${batchId}] Updated candidate: ${candidateId} - ${candidateInfo.full_name}`);
                 
                 // Insert education
                 if (webhookOutput.education && Array.isArray(webhookOutput.education)) {
@@ -1008,32 +1189,27 @@ async function handleRequest(req: Request): Promise<Response> {
                   }
                 }
                 
-                // Insert work experiences
+                // Insert work experiences (new schema)
                 if (workHistory.work_experience && Array.isArray(workHistory.work_experience)) {
                   for (const exp of workHistory.work_experience) {
-                    const isCurrent = exp.duration?.toLowerCase().includes('present') || false;
                     await bgClient.queryObject(`
                       INSERT INTO candidate_work_experience (
-                        candidate_id, company_name, job_title, description, duration, key_projects, is_current
-                      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                        candidate_id, company_name, job_title, description, duration, key_projects
+                      ) VALUES ($1, $2, $3, $4, $5, $6::jsonb)
                     `, [
-                      candidateId, 
-                      exp.company || 'Unknown', 
-                      exp.job_title || 'Unknown', 
-                      exp.summary || null,
-                      exp.duration || null,
-                      exp.key_projects || [],
-                      isCurrent
+                      candidateId, exp.company || 'Unknown', exp.job_title || 'Unknown',
+                      exp.summary || null, exp.duration || null,
+                      JSON.stringify(exp.key_projects || [])
                     ]);
                   }
                 }
                 
-                // Create application if job_order_id provided
+                // Create application
                 if (jobOrderId) {
                   try {
                     const appResult = await bgClient.queryObject(`
                       INSERT INTO candidate_job_applications (candidate_id, job_order_id, match_score, pipeline_status)
-                      VALUES ($1, $2, $3, 'new')
+                      VALUES ($1, $2, $3, 'hr_interview')
                       ON CONFLICT (candidate_id, job_order_id) DO UPDATE SET match_score = EXCLUDED.match_score
                       RETURNING *
                     `, [candidateId, jobOrderId, webhookOutput.qualification_score || null]);
@@ -1042,102 +1218,70 @@ async function handleRequest(req: Request): Promise<Response> {
                       const application = appResult.rows[0] as any;
                       await bgClient.queryObject(`
                         INSERT INTO candidate_timeline (application_id, candidate_id, to_status)
-                        VALUES ($1, $2, 'new')
+                        VALUES ($1, $2, 'hr_interview')
                       `, [application.id, candidateId]);
                     }
                   } catch (appErr) {
-                    console.error(`[${batchId}] Error creating application for ${candidateId}:`, appErr);
+                    console.error(`[${batchId}] Error creating application:`, appErr);
                   }
                 }
                 
                 await bgClient.end();
               } catch (dbError) {
                 console.error(`[${batchId}] Error updating candidate ${candidateId}:`, dbError);
-                // Mark as failed
                 try {
                   const errClient = createPgClient();
                   await errClient.connect();
-                  await errClient.queryObject(`
-                    UPDATE candidates SET processing_status = 'failed', updated_at = now()
-                    WHERE id = $1
-                  `, [candidateId]);
+                  await errClient.queryObject(`UPDATE candidates SET processing_status = 'failed', updated_at = now() WHERE id = $1`, [candidateId]);
                   await errClient.end();
-                } catch (e) {
-                  console.error(`[${batchId}] Failed to mark candidate as failed:`, e);
-                }
+                } catch (e) { console.error(`Failed to mark as failed:`, e); }
               }
             }
           }
-          
-          console.log(`[${batchId}] Background processing complete`);
         } catch (error) {
           console.error(`[${batchId}] Background task error:`, error);
-          // Mark all as failed
           for (const candidateId of processingCandidates) {
             try {
               const errClient = createPgClient();
               await errClient.connect();
-              await errClient.queryObject(`
-                UPDATE candidates SET processing_status = 'failed', updated_at = now()
-                WHERE id = $1
-              `, [candidateId]);
+              await errClient.queryObject(`UPDATE candidates SET processing_status = 'failed', updated_at = now() WHERE id = $1`, [candidateId]);
               await errClient.end();
-            } catch (e) {
-              console.error(`Failed to mark candidate ${candidateId} as failed:`, e);
-            }
+            } catch (e) { console.error(`Failed to mark ${candidateId} as failed:`, e); }
           }
         }
       };
       
-      // Start background task without waiting
       if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
         EdgeRuntime.waitUntil(backgroundTask());
       } else {
         backgroundTask();
       }
       
-      // Return immediately with batch ID and candidate IDs
       return jsonResponse({ 
         status: 'processing',
         batch_id: batchId,
         candidate_ids: processingCandidates,
-        message: 'CVs are being processed. Poll /candidates/processing-status for updates.'
+        message: 'CVs are being processed.'
       });
     }
 
-    // =====================================================
-    // PROCESSING STATUS ENDPOINT - Frontend polls this
-    // =====================================================
+    // Processing status
     if (path === '/candidates/processing-status' && method === 'GET') {
       const batchId = url.searchParams.get('batch_id');
-      const since = url.searchParams.get('since'); // ISO timestamp
+      const since = url.searchParams.get('since');
       
-      let sql = `
-        SELECT id, full_name, processing_status, processing_batch_id, processing_started_at, 
-               processing_completed_at, cv_filename, applicant_type, created_at
-        FROM candidates
-        WHERE processing_status IN ('processing', 'completed')
-      `;
+      let sql = `SELECT id, full_name, processing_status, processing_batch_id, processing_started_at, 
+             processing_completed_at, cv_filename, applicant_type, created_at FROM candidates
+             WHERE processing_status IN ('processing', 'completed')`;
       const params: unknown[] = [];
       
-      if (batchId) {
-        params.push(batchId);
-        sql += ` AND processing_batch_id = $${params.length}`;
-      }
-      
-      if (since) {
-        params.push(since);
-        sql += ` AND (processing_completed_at > $${params.length} OR processing_status = 'processing')`;
-      }
-      
+      if (batchId) { params.push(batchId); sql += ` AND processing_batch_id = $${params.length}`; }
+      if (since) { params.push(since); sql += ` AND (processing_completed_at > $${params.length} OR processing_status = 'processing')`; }
       sql += ' ORDER BY created_at DESC LIMIT 50';
       
       const rows = await query(sql, params);
-      
-      // Count by status
       const statusCounts = await query(`
-        SELECT processing_status, COUNT(*) as count 
-        FROM candidates 
+        SELECT processing_status, COUNT(*) as count FROM candidates 
         WHERE processing_status IN ('processing', 'completed')
         ${batchId ? `AND processing_batch_id = $1` : ''}
         GROUP BY processing_status
@@ -1145,72 +1289,35 @@ async function handleRequest(req: Request): Promise<Response> {
       
       return jsonResponse({
         candidates: rows,
-        counts: statusCounts.reduce((acc: any, row: any) => {
-          acc[row.processing_status] = parseInt(row.count);
-          return acc;
-        }, {})
+        counts: statusCounts.reduce((acc: any, row: any) => { acc[row.processing_status] = parseInt(row.count); return acc; }, {})
       });
     }
 
-    // Cleanup failed/stale processing candidates
+    // Cleanup
     if (path === '/candidates/cleanup' && method === 'POST') {
-      // Mark stale "processing" candidates (older than 10 min) as failed
-      await execute(`
-        UPDATE candidates SET processing_status = 'failed' 
-        WHERE processing_status = 'processing' 
-        AND processing_started_at < now() - interval '10 minutes'
-      `);
-      // Delete all failed processing candidates (ghost records)
-      const deleted = await query(`
-        DELETE FROM candidates 
-        WHERE processing_status = 'failed' 
-        AND full_name LIKE 'Processing CV%'
-        RETURNING id
-      `);
+      await execute(`UPDATE candidates SET processing_status = 'failed' WHERE processing_status = 'processing' AND processing_started_at < now() - interval '10 minutes'`);
+      const deleted = await query(`DELETE FROM candidates WHERE processing_status = 'failed' AND full_name LIKE 'Processing CV%' RETURNING id`);
       return jsonResponse({ success: true, deleted: deleted.length });
     }
 
-    // Initialize tables endpoint
+    // Init
     if (path === '/init' && method === 'POST') {
       await initTables();
       await seedData();
       return jsonResponse({ success: true, message: 'Tables initialized and data seeded' });
     }
 
-    // Job Order Webhook URL
+    // Job Order Webhook
     const JO_WEBHOOK_URL = 'https://workflow.exist.com.ph/webhook/job-order-webhook-path';
     
-    // Helper function to send job order to webhook
     async function sendJobOrderWebhook(jobOrder: any, action: 'create' | 'update' | 'delete') {
       try {
-        const webhookPayload = {
-          action,
-          id: jobOrder.id,
-          jo_number: jobOrder.jo_number,
-          title: jobOrder.title,
-          description: jobOrder.description,
-          department_name: jobOrder.department_name,
-          level: jobOrder.level,
-          employment_type: jobOrder.employment_type,
-          status: jobOrder.status,
-          created_by: jobOrder.created_by,
-          created_at: jobOrder.created_at,
-          updated_at: jobOrder.updated_at
-        };
-        
-        console.log(`Sending job order webhook (${action}):`, webhookPayload);
-        
         const response = await fetch(JO_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(webhookPayload)
+          body: JSON.stringify({ action, ...jobOrder })
         });
-        
-        if (!response.ok) {
-          console.error(`Job order webhook failed (${action}):`, response.status, await response.text());
-        } else {
-          console.log(`Job order webhook success (${action}):`, response.status);
-        }
+        console.log(`Job order webhook (${action}):`, response.status);
       } catch (err) {
         console.error(`Error sending job order webhook (${action}):`, err);
       }
@@ -1228,78 +1335,47 @@ async function handleRequest(req: Request): Promise<Response> {
           INSERT INTO job_orders (jo_number, title, description, department_name, level, quantity, employment_type, requestor_name, required_date, status)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING *
-        `, [body.jo_number, body.title, body.description, body.department_name, body.level, body.quantity, body.employment_type, body.requestor_name, body.required_date, body.status || 'draft']);
+        `, [body.jo_number, body.title, body.description, body.department_name, body.level, body.quantity, body.employment_type, body.requestor_name, body.required_date, body.status || 'open']);
         
-        const createdJobOrder = result[0];
-        
-        // Send webhook asynchronously (fire and forget)
-        if (typeof EdgeRuntime !== 'undefined') {
-          EdgeRuntime.waitUntil(sendJobOrderWebhook(createdJobOrder, 'create'));
-        } else {
-          sendJobOrderWebhook(createdJobOrder, 'create').catch(console.error);
-        }
-        
-        return jsonResponse(createdJobOrder);
+        const created = result[0];
+        if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(sendJobOrderWebhook(created, 'create'));
+        else sendJobOrderWebhook(created, 'create').catch(console.error);
+        return jsonResponse(created);
       }
     }
 
     if (path.startsWith('/job-orders/') && path.split('/')[2] !== 'count' && method === 'PUT') {
       const id = path.split('/')[2];
       const body = await req.json();
-      
       const validatedBody = validateColumns(body, ALLOWED_JOB_ORDER_COLUMNS);
-      
-      if (Object.keys(validatedBody).length === 0) {
-        return jsonResponse({ error: 'No valid columns to update' }, 400);
-      }
+      if (Object.keys(validatedBody).length === 0) return jsonResponse({ error: 'No valid columns to update' }, 400);
       
       const updates: string[] = [];
       const values: unknown[] = [];
       let idx = 1;
-      
-      for (const [key, value] of Object.entries(validatedBody)) {
-        updates.push(`${key} = $${idx}`);
-        values.push(value);
-        idx++;
-      }
+      for (const [key, value] of Object.entries(validatedBody)) { updates.push(`${key} = $${idx}`); values.push(value); idx++; }
       updates.push(`updated_at = now()`);
       values.push(id);
       
       const result = await query(`UPDATE job_orders SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`, values);
-      const updatedJobOrder = result[0];
-      
-      // Send webhook asynchronously (fire and forget)
-      if (typeof EdgeRuntime !== 'undefined') {
-        EdgeRuntime.waitUntil(sendJobOrderWebhook(updatedJobOrder, 'update'));
-      } else {
-        sendJobOrderWebhook(updatedJobOrder, 'update').catch(console.error);
-      }
-      
-      return jsonResponse(updatedJobOrder);
+      const updated = result[0];
+      if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(sendJobOrderWebhook(updated, 'update'));
+      else sendJobOrderWebhook(updated, 'update').catch(console.error);
+      return jsonResponse(updated);
     }
 
     if (path.startsWith('/job-orders/') && path.split('/')[2] !== 'count' && method === 'DELETE') {
       const id = path.split('/')[2];
-      
-      // Fetch job order before deleting for webhook
       const existing = await query("SELECT * FROM job_orders WHERE id = $1", [id]);
-      const jobOrderToDelete = existing[0];
-      
       await execute("DELETE FROM job_orders WHERE id = $1", [id]);
-      
-      // Send webhook asynchronously (fire and forget)
-      if (jobOrderToDelete) {
-        if (typeof EdgeRuntime !== 'undefined') {
-          EdgeRuntime.waitUntil(sendJobOrderWebhook(jobOrderToDelete, 'delete'));
-        } else {
-          sendJobOrderWebhook(jobOrderToDelete, 'delete').catch(console.error);
-        }
+      if (existing[0]) {
+        if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(sendJobOrderWebhook(existing[0], 'delete'));
+        else sendJobOrderWebhook(existing[0], 'delete').catch(console.error);
       }
-      
       return jsonResponse({ success: true });
     }
 
-    // Candidates - from-webhook endpoint (legacy)
+    // Candidates - from-webhook
     if (path === '/candidates/from-webhook' && method === 'POST') {
       const body = await req.json();
       const result = await createCandidateFromWebhook(body);
@@ -1309,12 +1385,9 @@ async function handleRequest(req: Request): Promise<Response> {
     // Candidates
     if (path === '/candidates') {
       if (method === 'GET') {
-        // Exclude processing candidates by default unless ?include_processing=true
         const includeProcessing = url.searchParams.get('include_processing') === 'true';
         let sql = "SELECT * FROM candidates";
-        if (!includeProcessing) {
-          sql += " WHERE processing_status = 'completed' OR processing_status IS NULL";
-        }
+        if (!includeProcessing) sql += " WHERE processing_status = 'completed' OR processing_status IS NULL";
         sql += " ORDER BY created_at DESC";
         const rows = await query(sql);
         return jsonResponse(rows);
@@ -1330,7 +1403,7 @@ async function handleRequest(req: Request): Promise<Response> {
       }
     }
 
-    // Candidate with full details
+    // Candidate full
     if (path.match(/^\/candidates\/[^/]+\/full$/) && method === 'GET') {
       const id = path.split('/')[2];
       const result = await getCandidateFull(id);
@@ -1346,22 +1419,13 @@ async function handleRequest(req: Request): Promise<Response> {
     if (path.startsWith('/candidates/') && !path.includes('/work-experience') && !path.includes('/full') && !path.includes('/processing') && method === 'PUT') {
       const id = path.split('/')[2];
       const body = await req.json();
-      
       const validatedBody = validateColumns(body, ALLOWED_CANDIDATE_COLUMNS);
-      
-      if (Object.keys(validatedBody).length === 0) {
-        return jsonResponse({ error: 'No valid columns to update' }, 400);
-      }
+      if (Object.keys(validatedBody).length === 0) return jsonResponse({ error: 'No valid columns to update' }, 400);
       
       const updates: string[] = [];
       const values: unknown[] = [];
       let idx = 1;
-      
-      for (const [key, value] of Object.entries(validatedBody)) {
-        updates.push(`${key} = $${idx}`);
-        values.push(value);
-        idx++;
-      }
+      for (const [key, value] of Object.entries(validatedBody)) { updates.push(`${key} = $${idx}`); values.push(value); idx++; }
       updates.push(`updated_at = now()`);
       values.push(id);
       
@@ -1383,8 +1447,8 @@ async function handleRequest(req: Request): Promise<Response> {
         
         let sql = `
           SELECT a.*, c.full_name as candidate_name, c.email as candidate_email, c.skills, c.years_of_experience,
-                 c.linkedin, c.current_occupation, c.overall_summary, c.strengths, c.weaknesses, c.applicant_type,
-                 c.processing_status,
+                 c.linkedin, c.current_position, c.current_company, c.overall_summary, c.strengths, c.weaknesses, c.applicant_type,
+                 c.processing_status, c.qualification_score,
                  j.jo_number, j.title as job_title
           FROM candidate_job_applications a
           JOIN candidates c ON a.candidate_id = c.id
@@ -1393,18 +1457,10 @@ async function handleRequest(req: Request): Promise<Response> {
         const conditions: string[] = [];
         const params: unknown[] = [];
         
-        if (jobOrderId) {
-          conditions.push(`a.job_order_id = $${params.length + 1}`);
-          params.push(jobOrderId);
-        }
-        if (candidateId) {
-          conditions.push(`a.candidate_id = $${params.length + 1}`);
-          params.push(candidateId);
-        }
+        if (jobOrderId) { conditions.push(`a.job_order_id = $${params.length + 1}`); params.push(jobOrderId); }
+        if (candidateId) { conditions.push(`a.candidate_id = $${params.length + 1}`); params.push(candidateId); }
         
-        if (conditions.length > 0) {
-          sql += ` WHERE ${conditions.join(' AND ')}`;
-        }
+        if (conditions.length > 0) sql += ` WHERE ${conditions.join(' AND ')}`;
         sql += ' ORDER BY a.created_at DESC';
         
         const rows = await query(sql, params);
@@ -1416,7 +1472,7 @@ async function handleRequest(req: Request): Promise<Response> {
           INSERT INTO candidate_job_applications (candidate_id, job_order_id, pipeline_status, match_score, remarks)
           VALUES ($1, $2, $3, $4, $5)
           RETURNING *
-        `, [body.candidate_id, body.job_order_id, body.pipeline_status || 'new', body.match_score, body.remarks]);
+        `, [body.candidate_id, body.job_order_id, body.pipeline_status || 'hr_interview', body.match_score, body.remarks]);
         return jsonResponse(result[0]);
       }
     }
@@ -1425,26 +1481,17 @@ async function handleRequest(req: Request): Promise<Response> {
       const id = path.split('/')[2];
       const body = await req.json();
       
-      // Get current status for timeline
       const current = await query("SELECT pipeline_status, candidate_id FROM candidate_job_applications WHERE id = $1", [id]);
       const fromStatus = current.length > 0 ? (current[0] as any).pipeline_status : null;
       const candidateId = current.length > 0 ? (current[0] as any).candidate_id : null;
       
       const validatedBody = validateColumns(body, ALLOWED_APPLICATION_COLUMNS);
-      
-      if (Object.keys(validatedBody).length === 0) {
-        return jsonResponse({ error: 'No valid columns to update' }, 400);
-      }
+      if (Object.keys(validatedBody).length === 0) return jsonResponse({ error: 'No valid columns to update' }, 400);
       
       const updates: string[] = [];
       const values: unknown[] = [];
       let idx = 1;
-      
-      for (const [key, value] of Object.entries(validatedBody)) {
-        updates.push(`${key} = $${idx}`);
-        values.push(value);
-        idx++;
-      }
+      for (const [key, value] of Object.entries(validatedBody)) { updates.push(`${key} = $${idx}`); values.push(value); idx++; }
       
       if (validatedBody.pipeline_status && validatedBody.pipeline_status !== fromStatus) {
         updates.push(`status_changed_date = now()`);
@@ -1465,22 +1512,13 @@ async function handleRequest(req: Request): Promise<Response> {
       return jsonResponse(result[0]);
     }
 
-    // Departments - Full CRUD
+    // Departments
     if (path === '/departments') {
-      if (method === 'GET') {
-        const rows = await query("SELECT * FROM departments ORDER BY name");
-        return jsonResponse(rows);
-      }
+      if (method === 'GET') { return jsonResponse(await query("SELECT * FROM departments ORDER BY name")); }
       if (method === 'POST') {
         const body = await req.json();
-        if (!body.name || typeof body.name !== 'string' || body.name.trim() === '') {
-          return jsonResponse({ error: 'Department name is required' }, 400);
-        }
-        const result = await query(`
-          INSERT INTO departments (name) VALUES ($1)
-          ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-          RETURNING *
-        `, [body.name.trim()]);
+        if (!body.name?.trim()) return jsonResponse({ error: 'Department name is required' }, 400);
+        const result = await query(`INSERT INTO departments (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING *`, [body.name.trim()]);
         return jsonResponse(result[0]);
       }
     }
@@ -1488,44 +1526,25 @@ async function handleRequest(req: Request): Promise<Response> {
     if (path.startsWith('/departments/') && method === 'PUT') {
       const id = path.split('/')[2];
       const body = await req.json();
-      if (!body.name || typeof body.name !== 'string' || body.name.trim() === '') {
-        return jsonResponse({ error: 'Department name is required' }, 400);
-      }
-      const result = await query(`
-        UPDATE departments SET name = $1 WHERE id = $2 RETURNING *
-      `, [body.name.trim(), id]);
-      if (!result[0]) {
-        return jsonResponse({ error: 'Department not found' }, 404);
-      }
-      return jsonResponse(result[0]);
+      if (!body.name?.trim()) return jsonResponse({ error: 'Department name is required' }, 400);
+      const result = await query(`UPDATE departments SET name = $1 WHERE id = $2 RETURNING *`, [body.name.trim(), id]);
+      return jsonResponse(result[0] || { error: 'Not found' });
     }
 
     if (path.startsWith('/departments/') && method === 'DELETE') {
       const id = path.split('/')[2];
-      
-      // Check if department is in use by job orders
       const inUse = await query("SELECT COUNT(*) as count FROM job_orders WHERE department_id = $1", [id]);
-      if (parseInt((inUse[0] as any).count) > 0) {
-        return jsonResponse({ error: 'Cannot delete department that is in use by job orders' }, 400);
-      }
-      
+      if (parseInt((inUse[0] as any).count) > 0) return jsonResponse({ error: 'Department in use' }, 400);
       await execute("DELETE FROM departments WHERE id = $1", [id]);
       return jsonResponse({ success: true });
     }
 
     // CV Uploaders
     if (path === '/cv-uploaders') {
-      if (method === 'GET') {
-        const rows = await query("SELECT * FROM cv_uploaders ORDER BY name");
-        return jsonResponse(rows);
-      }
+      if (method === 'GET') { return jsonResponse(await query("SELECT * FROM cv_uploaders ORDER BY name")); }
       if (method === 'POST') {
         const body = await req.json();
-        const result = await query(`
-          INSERT INTO cv_uploaders (name) VALUES ($1)
-          ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-          RETURNING *
-        `, [body.name]);
+        const result = await query(`INSERT INTO cv_uploaders (name) VALUES ($1) ON CONFLICT DO NOTHING RETURNING *`, [body.name]);
         return jsonResponse(result[0]);
       }
     }
@@ -1535,17 +1554,9 @@ async function handleRequest(req: Request): Promise<Response> {
       if (method === 'GET') {
         const applicationId = url.searchParams.get('application_id');
         const candidateId = url.searchParams.get('candidate_id');
-        
-        if (applicationId) {
-          const rows = await query("SELECT * FROM hr_interviews WHERE application_id = $1", [applicationId]);
-          return jsonResponse(rows[0] || null);
-        }
-        if (candidateId) {
-          const rows = await query("SELECT * FROM hr_interviews WHERE candidate_id = $1 ORDER BY created_at DESC", [candidateId]);
-          return jsonResponse(rows);
-        }
-        const rows = await query("SELECT * FROM hr_interviews ORDER BY created_at DESC");
-        return jsonResponse(rows);
+        if (applicationId) return jsonResponse((await query("SELECT * FROM hr_interviews WHERE application_id = $1", [applicationId]))[0] || null);
+        if (candidateId) return jsonResponse(await query("SELECT * FROM hr_interviews WHERE candidate_id = $1 ORDER BY created_at DESC", [candidateId]));
+        return jsonResponse(await query("SELECT * FROM hr_interviews ORDER BY created_at DESC"));
       }
       if (method === 'POST') {
         const body = await req.json();
@@ -1570,17 +1581,9 @@ async function handleRequest(req: Request): Promise<Response> {
       if (method === 'GET') {
         const applicationId = url.searchParams.get('application_id');
         const candidateId = url.searchParams.get('candidate_id');
-        
-        if (applicationId) {
-          const rows = await query("SELECT * FROM tech_interviews WHERE application_id = $1", [applicationId]);
-          return jsonResponse(rows[0] || null);
-        }
-        if (candidateId) {
-          const rows = await query("SELECT * FROM tech_interviews WHERE candidate_id = $1 ORDER BY created_at DESC", [candidateId]);
-          return jsonResponse(rows);
-        }
-        const rows = await query("SELECT * FROM tech_interviews ORDER BY created_at DESC");
-        return jsonResponse(rows);
+        if (applicationId) return jsonResponse((await query("SELECT * FROM tech_interviews WHERE application_id = $1", [applicationId]))[0] || null);
+        if (candidateId) return jsonResponse(await query("SELECT * FROM tech_interviews WHERE candidate_id = $1 ORDER BY created_at DESC", [candidateId]));
+        return jsonResponse(await query("SELECT * FROM tech_interviews ORDER BY created_at DESC"));
       }
       if (method === 'POST') {
         const body = await req.json();
@@ -1605,17 +1608,9 @@ async function handleRequest(req: Request): Promise<Response> {
       if (method === 'GET') {
         const applicationId = url.searchParams.get('application_id');
         const candidateId = url.searchParams.get('candidate_id');
-        
-        if (applicationId) {
-          const rows = await query("SELECT * FROM offers WHERE application_id = $1", [applicationId]);
-          return jsonResponse(rows[0] || null);
-        }
-        if (candidateId) {
-          const rows = await query("SELECT * FROM offers WHERE candidate_id = $1 ORDER BY created_at DESC", [candidateId]);
-          return jsonResponse(rows);
-        }
-        const rows = await query("SELECT * FROM offers ORDER BY created_at DESC");
-        return jsonResponse(rows);
+        if (applicationId) return jsonResponse((await query("SELECT * FROM offers WHERE application_id = $1", [applicationId]))[0] || null);
+        if (candidateId) return jsonResponse(await query("SELECT * FROM offers WHERE candidate_id = $1 ORDER BY created_at DESC", [candidateId]));
+        return jsonResponse(await query("SELECT * FROM offers ORDER BY created_at DESC"));
       }
       if (method === 'POST') {
         const body = await req.json();
@@ -1642,25 +1637,16 @@ async function handleRequest(req: Request): Promise<Response> {
       const conditions: string[] = [];
       const params: unknown[] = [];
       
-      if (applicationId) {
-        conditions.push(`application_id = $${params.length + 1}`);
-        params.push(applicationId);
-      }
-      if (candidateId) {
-        conditions.push(`candidate_id = $${params.length + 1}`);
-        params.push(candidateId);
-      }
+      if (applicationId) { conditions.push(`application_id = $${params.length + 1}`); params.push(applicationId); }
+      if (candidateId) { conditions.push(`candidate_id = $${params.length + 1}`); params.push(candidateId); }
       
-      if (conditions.length > 0) {
-        sql += ` WHERE ${conditions.join(' AND ')}`;
-      }
+      if (conditions.length > 0) sql += ` WHERE ${conditions.join(' AND ')}`;
       sql += ' ORDER BY changed_date DESC';
       
-      const rows = await query(sql, params);
-      return jsonResponse(rows);
+      return jsonResponse(await query(sql, params));
     }
 
-    // Job order count for JO number generation
+    // Job order count
     if (path === '/job-orders/count') {
       const rows = await query("SELECT COUNT(*) as count FROM job_orders");
       return jsonResponse({ count: parseInt((rows[0] as any).count) });
@@ -1677,10 +1663,7 @@ async function handleRequest(req: Request): Promise<Response> {
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: {
-      ...corsHeaders,
-      'Content-Type': 'application/json',
-    },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }
 
