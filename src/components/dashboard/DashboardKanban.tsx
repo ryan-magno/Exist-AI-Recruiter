@@ -146,46 +146,55 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
             </span>
           </div>
 
-          {/* Row 2: Stage-specific status badges + Internal badge */}
-          <div className="flex items-center justify-between gap-1 mb-2">
-            <div className="flex items-center gap-1 flex-wrap">
-              {/* Tech interview result - only show in tech_interview stage */}
-              {isInTechInterview && candidate.techInterviewResult && candidate.techInterviewResult !== 'pending' && (
-                <span className={cn(
-                  'text-[10px] font-medium px-1.5 py-0.5 rounded border',
-                  candidate.techInterviewResult === 'pass' 
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                    : 'bg-red-50 text-red-700 border-red-200'
-                )}>
-                  Tech: {candidate.techInterviewResult === 'pass' ? 'Pass' : 'Fail'}
-                </span>
-              )}
-              {/* Offer status - only show in offer stage */}
-              {isInOffer && candidate.offerStatus && (
-                <span className={cn(
-                  'text-[10px] font-medium px-1.5 py-0.5 rounded border',
-                  candidate.offerStatus === 'accepted' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                  candidate.offerStatus === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
-                  candidate.offerStatus === 'withdrawn' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                  'bg-muted text-muted-foreground border-border'
-                )}>
-                  Offer: {candidate.offerStatus.charAt(0).toUpperCase() + candidate.offerStatus.slice(1)}
-                </span>
-              )}
+          {/* Row 2: Stage age pill */}
+          {stageAge && (
+            <div className="flex items-center gap-1.5 mb-2">
+              <div className="inline-flex items-center gap-1 bg-primary/10 text-primary rounded-full px-2 py-0.5">
+                <Clock className="w-3 h-3" />
+                <span className="text-[10px] font-medium">{stageAge}</span>
+              </div>
             </div>
-            {/* Internal badge with logo + text */}
+          )}
+
+          {/* Row 3: Internal badge + Tech/Offer status + Action buttons */}
+          <div className="flex items-center gap-1 flex-wrap mb-2">
+            {/* Internal badge */}
             {isInternal && (
               <div className="flex items-center gap-1 flex-shrink-0">
                 <img src={existLogo} alt="Internal" className="w-4 h-4 object-contain" />
                 <span className="text-[10px] font-medium text-primary">Internal</span>
               </div>
             )}
+            {/* Tech interview result - always show in tech_interview stage */}
+            {isInTechInterview && (
+              <span className={cn(
+                'text-[10px] font-medium px-1.5 py-0.5 rounded border',
+                candidate.techInterviewResult === 'pass'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  : candidate.techInterviewResult === 'fail'
+                  ? 'bg-red-50 text-red-700 border-red-200'
+                  : 'bg-muted text-muted-foreground border-border'
+              )}>
+                Tech: {candidate.techInterviewResult 
+                  ? candidate.techInterviewResult.charAt(0).toUpperCase() + candidate.techInterviewResult.slice(1)
+                  : 'Pending'}
+              </span>
+            )}
+            {/* Offer status - always show in offer stage */}
+            {isInOffer && (
+              <span className={cn(
+                'text-[10px] font-medium px-1.5 py-0.5 rounded border',
+                candidate.offerStatus === 'accepted' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                candidate.offerStatus === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                candidate.offerStatus === 'withdrawn' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                'bg-muted text-muted-foreground border-border'
+              )}>
+                Offer: {candidate.offerStatus 
+                  ? candidate.offerStatus.charAt(0).toUpperCase() + candidate.offerStatus.slice(1)
+                  : 'Pending'}
+              </span>
+            )}
           </div>
-
-          {/* Row 3: Stage age */}
-          {stageAge && (
-            <p className="text-[10px] text-muted-foreground mb-2">{stageAge}</p>
-          )}
 
           {/* Row 4: Action buttons */}
           <div className="flex items-center gap-1 border-t border-border pt-2">
