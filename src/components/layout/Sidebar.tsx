@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Upload, Briefcase, FilePlus, Archive, Users, BarChart3, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -16,66 +15,36 @@ const navItems = [
 
 export function Sidebar() {
   const location = useLocation();
-  const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <aside 
-      className={cn(
-        "fixed left-0 top-0 h-screen bg-card flex flex-col z-50 border-r border-border",
-        "transition-[width] duration-150 ease-out",
-        isHovered ? "w-52" : "w-14"
-      )}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
+    <nav className="w-16 bg-card border-r border-border flex flex-col items-center py-3 gap-1 flex-shrink-0">
       {/* Logo */}
-      <div className="h-14 flex items-center justify-center px-2 border-b border-border">
-        <img 
-          src={existLogo} 
-          alt="Exist Software Labs" 
-          className={cn(
-            "object-contain transition-all duration-150 ease-out",
-            isHovered ? "h-7" : "h-6 w-6"
-          )}
-        />
+      <div className="w-10 h-10 flex items-center justify-center mb-2">
+        <img src={existLogo} alt="Exist Software Labs" className="h-6 w-6 object-contain" />
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-2 py-3 space-y-1">
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          const Icon = item.icon;
-          
-          return (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={cn(
-                'flex items-center h-10 rounded-lg text-sm font-medium',
-                'transition-all duration-150 ease-out',
-                'hover:bg-muted',
-                isActive && 'bg-primary/10 text-primary',
-                !isActive && 'text-muted-foreground',
-                isHovered ? 'px-3 gap-3' : 'justify-center'
-              )}
-              title={!isHovered ? item.label : undefined}
-            >
-              <div className={cn(
-                "flex items-center justify-center shrink-0",
-                !isHovered && "w-10 h-10"
-              )}>
-                <Icon className="w-5 h-5" />
-              </div>
-              <span className={cn(
-                "whitespace-nowrap transition-opacity duration-100 ease-out",
-                isHovered ? "opacity-100" : "opacity-0 w-0 overflow-hidden"
-              )}>
-                {item.label}
-              </span>
-            </NavLink>
-          );
-        })}
-      </nav>
-    </aside>
+      {/* Navigation Icons */}
+      {navItems.map((item) => {
+        const isActive = location.pathname === item.path;
+        const Icon = item.icon;
+
+        return (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            title={item.label}
+            aria-label={item.label}
+            className={cn(
+              'w-10 h-10 flex items-center justify-center rounded-lg transition-colors duration-150',
+              isActive
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-secondary'
+            )}
+          >
+            <Icon className="w-5 h-5" />
+          </NavLink>
+        );
+      })}
+    </nav>
   );
 }
