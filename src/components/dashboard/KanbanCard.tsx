@@ -138,8 +138,8 @@ export function KanbanCard({ candidate, isDragging, onClick }: KanbanCardProps) 
             <p className="font-medium text-sm text-foreground truncate">
               {candidate.name}
             </p>
-            <span className={cn('status-badge text-xs', getScoreClass(candidate.matchScore))}>
-              {candidate.matchScore}%
+            <span className={cn('status-badge text-xs', getScoreClass(candidate.qualificationScore ?? candidate.matchScore))}>
+              {candidate.qualificationScore != null ? `${candidate.qualificationScore}` : `${candidate.matchScore}%`}
             </span>
           </div>
           

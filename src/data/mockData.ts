@@ -120,6 +120,21 @@ export interface Candidate {
   processingBatchId?: string;
   offerStatus?: 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'expired';
   qualificationScore?: number;
+  // New fields
+  overallSummary?: string;
+  strengths?: string[];
+  weaknesses?: string[];
+  internalUploadReason?: string;
+  internalFromDate?: string;
+  internalToDate?: string;
+  googleDriveFileUrl?: string;
+  googleDriveFileId?: string;
+  preferredEmploymentType?: string;
+  batchId?: string;
+  batchCreatedAt?: string;
+  positionsFitFor?: string[];
+  education?: Array<{ degree: string; institution: string; year?: string }>;
+  certifications?: Array<{ name: string; issuer?: string; year?: string }>;
 }
 
 export interface JobOrder {
