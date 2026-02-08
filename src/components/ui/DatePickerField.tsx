@@ -1,5 +1,5 @@
 import * as React from "react";
-import { format, parse } from "date-fns";
+import { format, parse, isValid } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,8 @@ export function DatePickerField({
 }: DatePickerFieldProps) {
   const [open, setOpen] = React.useState(false);
 
-  const date = value ? parse(value, "yyyy-MM-dd", new Date()) : undefined;
+  const parsed = value ? parse(value, "yyyy-MM-dd", new Date()) : undefined;
+  const date = parsed && isValid(parsed) ? parsed : undefined;
 
   const handleSelect = (selected: Date | undefined) => {
     if (selected) {
