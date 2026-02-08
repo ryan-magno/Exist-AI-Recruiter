@@ -25,6 +25,20 @@ const dbTechResultToLegacy: Record<string, LegacyTechInterviewResult> = {
   'conditional': 'conditional'
 };
 
+// DB pipeline status to legacy mapping
+const dbPipelineToLegacy: Record<string, LegacyPipelineStatus> = {
+  'new': 'hr_interview',
+  'screening': 'hr_interview',
+  'for_hr_interview': 'hr_interview',
+  'hr_interview': 'hr_interview',
+  'for_tech_interview': 'tech_interview',
+  'tech_interview': 'tech_interview',
+  'offer': 'offer',
+  'hired': 'hired',
+  'rejected': 'rejected',
+  'withdrawn': 'rejected',
+};
+
 interface AppContextType {
   isVectorized: boolean;
   setIsVectorized: (value: boolean) => void;
@@ -125,7 +139,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           phone: candidate.phone || '',
           linkedIn: candidate.linkedin || '',
           matchScore: candidate.qualification_score || parseFloat(app.match_score) || 0,
-          pipelineStatus: (app.pipeline_status as LegacyPipelineStatus) || 'hr_interview',
+          pipelineStatus: dbPipelineToLegacy[app.pipeline_status] || (app.pipeline_status as LegacyPipelineStatus) || 'hr_interview',
           statusChangedDate: app.status_changed_date?.split('T')[0] || new Date().toISOString().split('T')[0],
           techInterviewResult: dbTechResultToLegacy[app.tech_interview_result] || 'pending',
           skills: app.skills || candidate.skills || [],
