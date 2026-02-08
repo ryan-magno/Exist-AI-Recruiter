@@ -365,36 +365,15 @@ async function initTables() {
   console.log("Tables initialized successfully");
 }
 
-// Seed initial data
-async function seedData(forceReseed = false) {
-  // Check if already seeded
-  const existing = await query("SELECT COUNT(*) as count FROM candidate_job_applications");
-  if (!forceReseed && existing.length > 0 && parseInt((existing[0] as any).count) > 0) {
-    console.log("Data already seeded");
-    return;
-  }
-
-  // Seed departments
+// Seed departments only (no synthetic job orders)
+async function seedData() {
   await execute(`
     INSERT INTO departments (name) VALUES 
     ('Engineering'), ('Product'), ('Design'), ('Sales'), ('Marketing'), 
     ('Human Resources'), ('Finance'), ('Operations'), ('Legal'), ('Customer Success')
     ON CONFLICT (name) DO NOTHING
   `);
-
-  // Seed job orders with new enum values
-  await execute(`
-    INSERT INTO job_orders (jo_number, title, description, department_name, level, quantity, employment_type, requestor_name, status)
-    VALUES 
-    ('JO-2026-001', 'Senior Software Engineer', 'Build and maintain scalable web applications', 'Engineering', 'L3', 3, 'full_time', 'John Smith', 'open'),
-    ('JO-2026-002', 'Product Manager', 'Lead product strategy and roadmap', 'Product', 'L4', 1, 'full_time', 'Sarah Johnson', 'open'),
-    ('JO-2026-003', 'UX Designer', 'Create user-centered designs for web and mobile', 'Design', 'L2', 2, 'full_time', 'Mike Chen', 'open'),
-    ('JO-2026-004', 'DevOps Engineer', 'Manage cloud infrastructure and CI/CD pipelines', 'Engineering', 'L3', 1, 'contract', 'John Smith', 'open'),
-    ('JO-2026-005', 'Sales Representative', 'Drive revenue growth in enterprise segment', 'Sales', 'L2', 5, 'full_time', 'Lisa Wang', 'open')
-    ON CONFLICT (jo_number) DO NOTHING
-  `);
-
-  console.log("Synthetic data seeded successfully (job orders only - candidates from webhook)");
+  console.log("Departments seeded successfully");
 }
 
 // Recreate database with full SQL script
