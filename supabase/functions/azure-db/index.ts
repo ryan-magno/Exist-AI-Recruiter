@@ -53,7 +53,7 @@ function validateColumns(body: Record<string, unknown>, allowedColumns: string[]
   return validated;
 }
 
-// Create a single client per request (lazy connection)
+// Create a fresh client per request with connection timeout
 function createPgClient() {
   return new Client({
     hostname: Deno.env.get("AZURE_PG_HOST"),
@@ -62,17 +62,26 @@ function createPgClient() {
     database: Deno.env.get("AZURE_PG_DATABASE"),
     port: parseInt(Deno.env.get("AZURE_PG_PORT") || "5432"),
     tls: { enabled: true, enforce: false },
+    connection: { attempts: 1 },
   });
 }
 
-// Request-scoped client holder
+// Request-scoped client - always fresh per request
 let requestClient: Client | null = null;
 
 async function getClient(): Promise<Client> {
-  if (!requestClient) {
-    requestClient = createPgClient();
-    await requestClient.connect();
+  // Always create a fresh client to avoid stale connection issues
+  if (requestClient) {
+    try { await requestClient.end(); } catch { /* ignore */ }
+    requestClient = null;
   }
+  requestClient = createPgClient();
+  // Add a connection timeout - abort if connection takes > 5s
+  const connectPromise = requestClient.connect();
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("Connection timeout")), 5000)
+  );
+  await Promise.race([connectPromise, timeoutPromise]);
   return requestClient;
 }
 
