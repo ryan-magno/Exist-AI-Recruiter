@@ -1,44 +1,39 @@
 
 
-# Fix: Restore Score Color Classes in CSS
+# Kanban Card Redesign with Tech/Offer Status Display
 
 ## Problem
-The CSS utility classes `match-score-high`, `match-score-medium`, and `match-score-low` were removed during the enterprise redesign. The kanban card code references them but they no longer exist, so scores appear unstyled.
+1. Tech interview and offer statuses are not visible on kanban cards because the current code filters out "pending" results, meaning only pass/fail are shown
+2. The card layout doesn't match the reference design (stage age should be in a styled pill, action buttons in a different arrangement)
 
-## Solution
-Add the three missing CSS classes back to `src/index.css`.
+## Changes
+
+### File: `src/components/dashboard/DashboardKanban.tsx`
+
+**1. Show tech/offer status badges including "pending" state**
+- Remove the `!== 'pending'` filter so tech interview status always shows when in the tech_interview column
+- Show offer status always when in the offer column (already works but may have no data)
+- Add a fallback: if `techInterviewResult` is undefined or pending, show "Tech: Pending" in a neutral style
+- Similarly for offer: show "Offer: Pending" if in offer stage but no offer status set
+
+**2. Redesign card layout to match reference image**
+- Row 1: Drag handle + Name + Score badge (with color classes)
+- Row 2: Stage age in a green-tinted pill with clock and calendar icons (matching the reference)
+- Row 3: Internal/External badge + Tech/Offer status badge (stage-specific) + Action buttons (timeline, email, chat placeholder area, trash)
+- Action buttons displayed inline in a row, trash on the right with `ml-auto`
+
+**3. Stage-specific status badge logic**
+- In `tech_interview` column: Always show tech interview result (pending/pass/fail/conditional)
+- In `offer` column: Only show offer status (pending/accepted/rejected/withdrawn), hide tech result
+- In other columns: No status badges shown
 
 ## Technical Details
 
-**File: `src/index.css`** -- Add these utility classes in the `@layer components` or `@layer utilities` section:
+The `CompactKanbanCard` component (lines 61-228) will be updated:
 
-```css
-.match-score-high {
-  background-color: rgb(220, 252, 231);  /* green-100 */
-  color: rgb(21, 128, 61);               /* green-700 */
-  border: 1px solid rgb(134, 239, 172);  /* green-300 */
-  padding: 2px 8px;
-  border-radius: 9999px;
-  font-weight: 600;
-}
+- **Lines 149-183** (Row 2 section): Restructure to show stage age as a styled pill with icons, matching the green background in the reference
+- **Lines 152-153**: Remove `candidate.techInterviewResult !== 'pending'` condition; instead always show when `isInTechInterview` is true
+- **Lines 164**: Add fallback for undefined offerStatus when in offer stage
+- Stage age display (lines 185-188): Move into the styled green pill row
+- Action buttons row: Keep timeline, email, trash; laid out horizontally matching the reference
 
-.match-score-medium {
-  background-color: rgb(254, 249, 195);  /* yellow-100 */
-  color: rgb(161, 98, 7);                /* yellow-700 */
-  border: 1px solid rgb(253, 224, 71);   /* yellow-300 */
-  padding: 2px 8px;
-  border-radius: 9999px;
-  font-weight: 600;
-}
-
-.match-score-low {
-  background-color: rgb(254, 226, 226);  /* red-100 */
-  color: rgb(185, 28, 28);              /* red-700 */
-  border: 1px solid rgb(252, 165, 165); /* red-300 */
-  padding: 2px 8px;
-  border-radius: 9999px;
-  font-weight: 600;
-}
-```
-
-This is a one-file, CSS-only fix. All the kanban card logic for conditional tech interview/offer status display and internal badges is already working correctly in the component code.
