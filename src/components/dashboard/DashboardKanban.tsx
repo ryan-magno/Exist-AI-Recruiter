@@ -11,12 +11,15 @@ import {
 } from '@dnd-kit/core';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, ChevronLeft, ChevronRight } from 'lucide-react';
+import { GripVertical, ChevronLeft, ChevronRight, Clock, Mail, Trash2, Loader2 } from 'lucide-react';
 import { Candidate, PipelineStatus, pipelineStatusLabels, TechInterviewResult } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { CandidateProfileView } from '@/components/candidate/CandidateProfileView';
 import { EmailModal } from '@/components/modals/EmailModal';
+import { CandidateTimeline } from '@/components/dashboard/CandidateTimeline';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import existLogo from '@/assets/exist-logo.png';
 
 interface DashboardKanbanProps {
   candidates: Candidate[];
@@ -30,17 +33,39 @@ const columns: { id: PipelineStatus; title: string }[] = [
   { id: 'rejected', title: 'Rejected' },
 ];
 
-// ── Compressed 72px Kanban Card ──
+// ── Helper: compute stage age label ──
+function getStageAge(statusChangedDate: string): string {
+  if (!statusChangedDate) return '';
+  const changed = new Date(statusChangedDate);
+  if (isNaN(changed.getTime())) return '';
+  const now = new Date();
+  const diffMs = now.getTime() - changed.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+  const dateLabel = changed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  
+  if (diffDays === 0) return `Moved today`;
+  if (diffDays === 1) return `Since yesterday · ${dateLabel}`;
+  return `${diffDays}d ago · Since ${dateLabel}`;
+}
+
+// ── Kanban Card (restored old design) ──
 interface KanbanCardProps {
   candidate: Candidate;
   isSelected?: boolean;
   onSelect: () => void;
+  onEmail: (e: React.MouseEvent) => void;
+  onDelete: (e: React.MouseEvent) => void;
 }
 
-function CompactKanbanCard({ candidate, isSelected, onSelect }: KanbanCardProps) {
+function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete }: KanbanCardProps) {
+  const [showTimeline, setShowTimeline] = useState(false);
+  const isProcessing = candidate.processingStatus === 'processing';
+  const isFailed = candidate.processingStatus === 'failed';
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: candidate.id,
-    disabled: candidate.processingStatus === 'processing',
+    disabled: isProcessing,
   });
 
   const style = {
@@ -49,54 +74,153 @@ function CompactKanbanCard({ candidate, isSelected, onSelect }: KanbanCardProps)
   };
 
   const score = candidate.qualificationScore ?? candidate.matchScore;
-  const getScoreStyles = (s: number) => {
-    if (s >= 70) return 'bg-green-100 text-green-700 border-green-300';
-    if (s >= 50) return 'bg-amber-100 text-amber-700 border-amber-300';
-    return 'bg-red-100 text-red-700 border-red-300';
+  const getScoreClass = (s: number): string => {
+    if (s >= 90) return 'match-score-high';
+    if (s >= 75) return 'match-score-medium';
+    return 'match-score-low';
   };
 
-  const statusLabel = pipelineStatusLabels[candidate.pipelineStatus] || candidate.pipelineStatus;
+  const stageAge = getStageAge(candidate.statusChangedDate);
+
+  // Processing state
+  if (isProcessing) {
+    return (
+      <div ref={setNodeRef} style={style}
+        className="bg-card border border-dashed border-amber-300 rounded-lg p-3 cursor-not-allowed opacity-80"
+        title="AI analysis in progress (typically 30-45 seconds)"
+      >
+        <div className="flex items-start gap-2">
+          <div className="p-1 -ml-1"><GripVertical className="w-4 h-4 text-muted-foreground/30" /></div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />
+                <span className="text-xs font-medium text-amber-600">Processing...</span>
+              </div>
+              <span className="status-badge text-xs bg-amber-100 text-amber-700 border-amber-300 px-2 py-0.5 rounded-full">AI Analysis</span>
+            </div>
+            <Skeleton className="h-4 w-3/4 mb-2" />
+            <div className="flex flex-wrap gap-1 mb-2">
+              <Skeleton className="h-5 w-12 rounded" /><Skeleton className="h-5 w-16 rounded" /><Skeleton className="h-5 w-10 rounded" />
+            </div>
+            <p className="text-xs text-muted-foreground italic">Extracting skills, experience, and match score...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      onClick={onSelect}
       className={cn(
-        'flex items-center h-[72px] px-2 gap-2 rounded-lg cursor-pointer transition-all duration-150',
-        isSelected
-          ? 'bg-blue-50 border-l-4 border-l-blue-600 border border-blue-200 shadow-sm'
-          : 'border border-transparent hover:bg-secondary hover:shadow-sm'
+        'kanban-card bg-card border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow',
+        isDragging && 'shadow-lg ring-2 ring-primary opacity-90'
       )}
+      onClick={onSelect}
     >
-      {/* Drag Handle */}
-      <div
-        {...listeners}
-        {...attributes}
-        className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-muted rounded flex-shrink-0"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <GripVertical className="w-3.5 h-3.5 text-muted-foreground" />
+      <div className="flex items-start gap-2">
+        {/* Drag Handle */}
+        <div
+          {...listeners}
+          {...attributes}
+          className="cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded touch-none"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="w-4 h-4 text-muted-foreground" />
+        </div>
+        
+        <div className="flex-1 min-w-0">
+          {/* Row 1: Name + Score */}
+          <div className="flex items-center justify-between mb-1">
+            <p className="font-medium text-sm text-foreground truncate">{candidate.name}</p>
+            <span className={cn('status-badge text-[10px]', getScoreClass(score))}>
+              {candidate.qualificationScore != null ? `${candidate.qualificationScore}` : `${candidate.matchScore}%`}
+            </span>
+          </div>
+          
+          {/* Row 2: Skills */}
+          <div className="flex flex-wrap gap-1 mb-2">
+            {candidate.skills.slice(0, 3).map((skill) => (
+              <span key={skill} className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{skill}</span>
+            ))}
+            {candidate.skills.length > 3 && (
+              <span className="text-xs text-muted-foreground">+{candidate.skills.length - 3}</span>
+            )}
+          </div>
+
+          {/* Row 3: Status badges */}
+          <div className="flex items-center justify-between gap-1 mb-2">
+            <div className="flex items-center gap-1 flex-wrap">
+              {candidate.techInterviewResult && candidate.techInterviewResult !== 'pending' && (
+                <span className={cn(
+                  'text-[10px] font-medium px-1.5 py-0.5 rounded border',
+                  candidate.techInterviewResult === 'pass' 
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                    : 'bg-red-50 text-red-700 border-red-200'
+                )}>
+                  Tech: {candidate.techInterviewResult === 'pass' ? 'Pass' : 'Fail'}
+                </span>
+              )}
+              {candidate.offerStatus && (
+                <span className={cn(
+                  'text-[10px] font-medium px-1.5 py-0.5 rounded border',
+                  candidate.offerStatus === 'accepted' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                  candidate.offerStatus === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                  candidate.offerStatus === 'withdrawn' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                  'bg-muted text-muted-foreground border-border'
+                )}>
+                  Offer: {candidate.offerStatus.charAt(0).toUpperCase() + candidate.offerStatus.slice(1)}
+                </span>
+              )}
+            </div>
+            {candidate.applicantType === 'internal' && (
+              <img src={existLogo} alt="Internal" className="w-4 h-4 object-contain" title="Internal Employee" />
+            )}
+          </div>
+
+          {/* Row 4: Stage age */}
+          {stageAge && (
+            <p className="text-[10px] text-muted-foreground mb-2">{stageAge}</p>
+          )}
+
+          {/* Row 5: Action buttons */}
+          <div className="flex items-center gap-1 border-t border-border pt-2">
+            <button
+              title="Timeline History"
+              aria-label="View timeline history"
+              className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors"
+              onClick={(e) => { e.stopPropagation(); setShowTimeline(!showTimeline); }}
+            >
+              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+            <button
+              title="Send Email"
+              aria-label="Send email to candidate"
+              className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors"
+              onClick={onEmail}
+            >
+              <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+            <button
+              title="Delete Candidate"
+              aria-label="Delete candidate"
+              className="w-7 h-7 flex items-center justify-center rounded hover:bg-destructive/10 transition-colors ml-auto"
+              onClick={onDelete}
+            >
+              <Trash2 className="w-3.5 h-3.5 text-destructive" />
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Score Badge */}
-      <div className={cn(
-        'w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 border text-sm font-bold',
-        getScoreStyles(score)
-      )}>
-        {score}
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground truncate">{candidate.name}</p>
-        <p className="text-xs text-muted-foreground truncate">{candidate.positionApplied}</p>
-      </div>
-
-      {/* Status Pill */}
-      <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700 whitespace-nowrap">
-        {statusLabel}
-      </span>
+      {/* Timeline expandable section */}
+      {showTimeline && candidate.applicationId && (
+        <div className="mt-2 border-t border-border" onClick={(e) => e.stopPropagation()}>
+          <CandidateTimeline applicationId={candidate.applicationId} appliedDate={candidate.appliedDate} />
+        </div>
+      )}
     </div>
   );
 }
@@ -108,11 +232,13 @@ interface ColumnProps {
   candidates: Candidate[];
   selectedId: string | null;
   onSelect: (c: Candidate) => void;
+  onEmail: (c: Candidate) => void;
+  onDelete: (c: Candidate) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
 }
 
-function KanbanColumnView({ id, title, candidates, selectedId, onSelect, isCollapsed, onToggleCollapse }: ColumnProps) {
+function KanbanColumnView({ id, title, candidates, selectedId, onSelect, onEmail, onDelete, isCollapsed, onToggleCollapse }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const isEmpty = candidates.length === 0;
 
@@ -149,8 +275,8 @@ function KanbanColumnView({ id, title, candidates, selectedId, onSelect, isColla
       <div
         ref={setNodeRef}
         className={cn(
-          'flex-1 rounded-lg p-2 space-y-1 min-h-[200px] border border-dashed transition-all',
-          isOver ? 'border-primary bg-primary/5 ring-2 ring-primary ring-offset-1' : 'border-border bg-muted/30'
+          'flex-1 rounded-lg p-2 space-y-2 min-h-[200px] border transition-all',
+          isOver ? 'border-primary bg-primary/5 ring-2 ring-primary ring-offset-1' : 'border-border bg-secondary/80'
         )}
       >
         {isEmpty ? (
@@ -162,6 +288,8 @@ function KanbanColumnView({ id, title, candidates, selectedId, onSelect, isColla
               candidate={c}
               isSelected={selectedId === c.id}
               onSelect={() => onSelect(c)}
+              onEmail={(e) => { e.stopPropagation(); onEmail(c); }}
+              onDelete={(e) => { e.stopPropagation(); onDelete(c); }}
             />
           ))
         )}
@@ -228,6 +356,12 @@ export function DashboardKanban({ candidates }: DashboardKanbanProps) {
               candidates={getCandidatesForColumn(column.id)}
               selectedId={selectedCandidate?.id || null}
               onSelect={setSelectedCandidate}
+              onEmail={setEmailCandidate}
+              onDelete={(c) => {
+                if (confirm(`Delete candidate "${c.name}"?`)) {
+                  deleteCandidate(c.id);
+                }
+              }}
               isCollapsed={collapsedColumns.has(column.id)}
               onToggleCollapse={() => toggleCollapse(column.id)}
             />
