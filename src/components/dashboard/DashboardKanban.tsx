@@ -120,7 +120,7 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
       style={style}
       className={cn(
         'kanban-card bg-white shadow-sm rounded-lg px-3 py-3 cursor-pointer hover:shadow-md transition-shadow',
-        isInternal ? 'border-2 border-green-500' : 'border border-gray-200',
+        isInternal ? 'border border-green-400' : 'border border-gray-200',
         isDragging && 'shadow-lg ring-2 ring-primary opacity-90'
       )}
       onClick={onSelect}
