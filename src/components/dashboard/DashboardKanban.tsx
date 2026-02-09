@@ -11,7 +11,7 @@ import {
 } from '@dnd-kit/core';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, ChevronLeft, ChevronRight, Clock, Mail, Trash2, Loader2 } from 'lucide-react';
+import { GripVertical, ChevronLeft, ChevronRight, Clock, Mail, Trash2, Loader2, Calendar } from 'lucide-react';
 import { Candidate, PipelineStatus, pipelineStatusLabels, TechInterviewResult } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { CandidateProfileView } from '@/components/candidate/CandidateProfileView';
@@ -34,19 +34,18 @@ const columns: { id: PipelineStatus; title: string }[] = [
 ];
 
 // ── Helper: compute stage age label ──
-function getStageAge(statusChangedDate: string): string {
-  if (!statusChangedDate) return '';
+function getStageAge(statusChangedDate: string): { ageText: string; dateText: string } {
+  if (!statusChangedDate) return { ageText: '', dateText: '' };
   const changed = new Date(statusChangedDate);
-  if (isNaN(changed.getTime())) return '';
+  if (isNaN(changed.getTime())) return { ageText: '', dateText: '' };
   const now = new Date();
   const diffMs = now.getTime() - changed.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   
   const dateLabel = changed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   
-  if (diffDays === 0) return `Moved today`;
-  if (diffDays === 1) return `Since yesterday · ${dateLabel}`;
-  return `${diffDays}d ago · Since ${dateLabel}`;
+  const ageText = diffDays === 0 ? 'Moved today' : diffDays === 1 ? 'Since yesterday' : `${diffDays}d ago`;
+  return { ageText, dateText: `Since ${dateLabel}` };
 }
 
 // ── Kanban Card (restored old design) ──
@@ -120,115 +119,118 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
       ref={setNodeRef}
       style={style}
       className={cn(
-        'kanban-card border rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow',
-        isInternal ? 'bg-primary/5 border-primary/20' : 'bg-card',
+        'kanban-card bg-white border border-gray-200 shadow-sm rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow',
         isDragging && 'shadow-lg ring-2 ring-primary opacity-90'
       )}
       onClick={onSelect}
     >
-      <div className="flex items-start gap-2">
-        {/* Drag Handle */}
+      {/* Header: Drag Handle | Name | Score */}
+      <div className="flex items-center gap-2">
         <div
           {...listeners}
           {...attributes}
           className="cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded touch-none"
           onClick={(e) => e.stopPropagation()}
         >
-          <GripVertical className="w-4 h-4 text-muted-foreground" />
+          <GripVertical className="w-4 h-4 text-gray-400" />
         </div>
-        
-        <div className="flex-1 min-w-0">
-          {/* Row 1: Name + Score */}
-          <div className="flex items-center justify-between mb-1">
-            <p className="font-medium text-sm text-foreground truncate">{candidate.name}</p>
-            <span className={cn('status-badge text-[10px]', getScoreClass(score))}>
-              {candidate.qualificationScore != null ? `${candidate.qualificationScore}` : `${candidate.matchScore}%`}
-            </span>
-          </div>
+        <p className="font-semibold text-sm text-gray-900 truncate flex-1">{candidate.name}</p>
+        <span className={cn('status-badge text-[10px] flex-shrink-0', getScoreClass(score))}>
+          {candidate.qualificationScore != null ? `${candidate.qualificationScore}` : `${candidate.matchScore}%`}
+        </span>
+      </div>
 
-          {/* Row 2: Stage age pill */}
-          {stageAge && (
-            <div className="flex items-center gap-1.5 mb-2">
-              <div className="inline-flex items-center gap-1 bg-primary/10 text-primary rounded-full px-2 py-0.5">
-                <Clock className="w-3 h-3" />
-                <span className="text-[10px] font-medium">{stageAge}</span>
-              </div>
+      {/* Green Stage Age Bar */}
+      {stageAge.ageText && (
+        <div className="mt-2 bg-green-50 border border-green-100 text-green-700 rounded-md px-3 py-1.5 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            <span className="font-medium">{stageAge.ageText}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            <span className="font-medium">{stageAge.dateText}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Tech / Offer Status Pills */}
+      {(isInTechInterview || isInOffer) && (
+        <div className="flex items-center gap-1 flex-wrap mt-2">
+          {isInTechInterview && (
+            <span className={cn(
+              'text-[10px] font-medium px-1.5 py-0.5 rounded border',
+              candidate.techInterviewResult === 'pass'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                : candidate.techInterviewResult === 'fail'
+                ? 'bg-red-50 text-red-700 border-red-200'
+                : 'bg-gray-100 text-gray-600 border-gray-200'
+            )}>
+              Tech: {candidate.techInterviewResult 
+                ? candidate.techInterviewResult.charAt(0).toUpperCase() + candidate.techInterviewResult.slice(1)
+                : 'Pending'}
+            </span>
+          )}
+          {isInOffer && (
+            <span className={cn(
+              'text-[10px] font-medium px-1.5 py-0.5 rounded border',
+              candidate.offerStatus === 'accepted' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+              candidate.offerStatus === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+              candidate.offerStatus === 'withdrawn' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+              'bg-gray-100 text-gray-600 border-gray-200'
+            )}>
+              Offer: {candidate.offerStatus 
+                ? candidate.offerStatus.charAt(0).toUpperCase() + candidate.offerStatus.slice(1)
+                : 'Pending'}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Footer: Tags + Actions */}
+      <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
+        {/* Left: Internal/External tag */}
+        <div>
+          {isInternal && (
+            <div className="inline-flex items-center gap-1 bg-white border-2 border-green-500 text-green-600 font-bold text-xs px-2 py-0.5 rounded">
+              <img src={existLogo} alt="Internal" className="w-3.5 h-3.5 object-contain" />
+              Internal
             </div>
           )}
+        </div>
 
-          {/* Row 3: Internal badge + Tech/Offer status + Action buttons */}
-          <div className="flex items-center gap-1 flex-wrap mb-2">
-            {/* Internal badge */}
-            {isInternal && (
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <img src={existLogo} alt="Internal" className="w-4 h-4 object-contain" />
-                <span className="text-[10px] font-medium text-primary">Internal</span>
-              </div>
-            )}
-            {/* Tech interview result - always show in tech_interview stage */}
-            {isInTechInterview && (
-              <span className={cn(
-                'text-[10px] font-medium px-1.5 py-0.5 rounded border',
-                candidate.techInterviewResult === 'pass'
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                  : candidate.techInterviewResult === 'fail'
-                  ? 'bg-red-50 text-red-700 border-red-200'
-                  : 'bg-muted text-muted-foreground border-border'
-              )}>
-                Tech: {candidate.techInterviewResult 
-                  ? candidate.techInterviewResult.charAt(0).toUpperCase() + candidate.techInterviewResult.slice(1)
-                  : 'Pending'}
-              </span>
-            )}
-            {/* Offer status - always show in offer stage */}
-            {isInOffer && (
-              <span className={cn(
-                'text-[10px] font-medium px-1.5 py-0.5 rounded border',
-                candidate.offerStatus === 'accepted' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                candidate.offerStatus === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
-                candidate.offerStatus === 'withdrawn' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                'bg-muted text-muted-foreground border-border'
-              )}>
-                Offer: {candidate.offerStatus 
-                  ? candidate.offerStatus.charAt(0).toUpperCase() + candidate.offerStatus.slice(1)
-                  : 'Pending'}
-              </span>
-            )}
-          </div>
-
-          {/* Row 4: Action buttons */}
-          <div className="flex items-center gap-1 border-t border-border pt-2">
-            <button
-              title="Timeline History"
-              aria-label="View timeline history"
-              className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors"
-              onClick={(e) => { e.stopPropagation(); setShowTimeline(!showTimeline); }}
-            >
-              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-            <button
-              title="Send Email"
-              aria-label="Send email to candidate"
-              className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors"
-              onClick={onEmail}
-            >
-              <Mail className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-            <button
-              title="Delete Candidate"
-              aria-label="Delete candidate"
-              className="w-7 h-7 flex items-center justify-center rounded hover:bg-destructive/10 transition-colors ml-auto"
-              onClick={onDelete}
-            >
-              <Trash2 className="w-3.5 h-3.5 text-destructive" />
-            </button>
-          </div>
+        {/* Right: 3 action icons */}
+        <div className="flex items-center gap-3">
+          <button
+            title="Timeline History"
+            aria-label="View timeline history"
+            className="p-1 rounded hover:bg-muted transition-colors"
+            onClick={(e) => { e.stopPropagation(); setShowTimeline(!showTimeline); }}
+          >
+            <Clock className="w-3.5 h-3.5 text-gray-500" />
+          </button>
+          <button
+            title="Send Email"
+            aria-label="Send email to candidate"
+            className="p-1 rounded hover:bg-muted transition-colors"
+            onClick={onEmail}
+          >
+            <Mail className="w-3.5 h-3.5 text-gray-500" />
+          </button>
+          <button
+            title="Delete Candidate"
+            aria-label="Delete candidate"
+            className="p-1 rounded hover:bg-red-50 transition-colors"
+            onClick={onDelete}
+          >
+            <Trash2 className="w-3.5 h-3.5 text-red-400 hover:text-red-600" />
+          </button>
         </div>
       </div>
 
       {/* Timeline expandable section */}
       {showTimeline && candidate.applicationId && (
-        <div className="mt-2 border-t border-border" onClick={(e) => e.stopPropagation()}>
+        <div className="mt-2 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
           <CandidateTimeline applicationId={candidate.applicationId} appliedDate={candidate.appliedDate} />
         </div>
       )}
