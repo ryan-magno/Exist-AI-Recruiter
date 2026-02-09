@@ -82,7 +82,7 @@ export function useStreamingChat() {
         await sendStreamingMessage(trimmed, sessionId.current, {
           signal: controller.signal,
           onChunk: (chunk) => {
-            contentSoFar += chunk;
+            contentSoFar = chunk;
             const snapshot = contentSoFar;
             setMessages(prev =>
               prev.map((m, i) =>
