@@ -1,95 +1,155 @@
 
+# Overhaul: Form-Driven Pipeline Movement, Remove Drag-and-Drop, Simplify Offer Form, Internal Sort, Email Webhook
 
-# Fix: Upload Page Always Enabled + Minimal Non-Dismissible Refresh Popup
-
-## Problem 1: Upload fields disabled when candidates exist
-
-The upload page uses `isVectorized` (which is `true` when `candidates.length > 0`) to disable the uploader name input, radio group, dropzone, and file settings. This means once any candidates exist in the system, uploading new CVs is blocked. This was likely a leftover from an early demo flow and should be removed entirely.
-
-## Problem 2: Refresh notification is too large and dismissible
-
-The current `RefreshNotification` is a large card with icon, description, and dismiss button. Per the new requirements:
-- It should be smaller and more minimal
-- It cannot be closed/dismissed -- only disappears when the user clicks "Refresh"
-- It should only refresh candidates (not job orders)
-
-## Problem 3: Trigger refresh popup on webhook 200 response
-
-Currently the popup is triggered by the polling hook (`useRealtimeCandidates`). The user wants it triggered when the webhook returns HTTP 200 in the upload flow. The upload page should signal this.
+This is a large change spanning multiple files across the Kanban board, candidate profile, interview forms, offer form, email system, and sorting logic.
 
 ---
 
-## Changes
+## 1. Remove Drag-and-Drop from Kanban
 
-### File 1: `src/pages/UploadPage.tsx`
+**Files:** `src/components/dashboard/DashboardKanban.tsx`, `src/components/dashboard/KanbanBoard.tsx`, `src/components/dashboard/KanbanCard.tsx`, `src/components/dashboard/KanbanColumn.tsx`
 
-**Remove all `isVectorized` disabling logic:**
-- Line 53: Remove `isVectorized` from the destructured `useApp()` call
-- Line 443: Remove `isVectorized && "opacity-50"` from input className
-- Line 445: Remove `isVectorized` from `disabled` prop (keep `loadingUploaders`)
-- Line 450: Remove `!isVectorized` from suggestions condition
-- Line 513: Remove `disabled={isVectorized}` from RadioGroup
-- Lines 533: Remove `isVectorized && 'opacity-50 pointer-events-none'` from dropzone
-- Line 574: Remove `isVectorized ||` from FileRow disabled prop (keep `file.status !== 'ready'`)
-
-**Trigger refresh notification on webhook 200:**
-- After successful webhook response (around line 290, the `result?.status === 'processing'` block), instead of navigating to dashboard, show the refresh popup
-- Import and use a shared state/callback to trigger the notification from the layout level
-- Pass a callback from `AppLayout` through context or use a simple event approach
-
-### File 2: `src/components/ui/RefreshNotification.tsx`
-
-**Make it smaller and non-dismissible:**
-- Remove the `onDismiss` prop and the X close button
-- Shrink padding and remove the icon circle
-- Make it a compact toast-like bar with just text + refresh button
-- Keep it fixed at bottom-right
-
-### File 3: `src/hooks/useRealtimeCandidates.ts`
-
-**Refresh only candidates (not job orders):**
-- In `refreshData`, remove the `job-orders` query invalidation
-- Add a `triggerRefreshPrompt` method that can be called externally (e.g., from upload page on 200 response)
-- Remove `dismissPrompt` since the notification is no longer dismissible
-
-### File 4: `src/components/layout/AppLayout.tsx`
-
-- Remove `dismissPrompt` from the hook usage
-- Remove the `onDismiss` prop from `RefreshNotification`
+- Remove all `@dnd-kit` imports (`DndContext`, `DragOverlay`, `useDraggable`, `useDroppable`, sensors, etc.)
+- Remove the `GripVertical` drag handle from cards
+- Remove `DragOverlay` component
+- Remove `DragStartEvent`/`DragEndEvent` handlers
+- Replace `DndContext` wrapper with a plain `div`
+- Remove `isOver` ring styling from columns
+- Remove `useDroppable`/`setNodeRef` from columns
+- Cards remain clickable to open candidate profile
 
 ---
 
-## Technical Details
+## 2. Verdict Options: Remove "conditional" from HR and Tech Forms
 
-### Upload page `isVectorized` removal
+**Files:** `src/data/mockData.ts`, `src/components/candidate/HRInterviewFormTab.tsx`, `src/components/candidate/TechInterviewFormTab.tsx`
 
-Every instance of `isVectorized` in `UploadPage.tsx` will be removed. The only disabling conditions that remain are:
-- `loadingUploaders` -- while fetching uploader names
-- `isProcessing` -- while a batch is actively being sent
-- `file.status !== 'ready'` -- per-file status
+- In `mockData.ts`, update `hrVerdictLabels` and `techVerdictLabels` to only include `pass`, `fail`, and `pending` (remove `conditional`)
+- The `HRVerdict` and `TechVerdict` types keep `conditional` for backward compatibility but the dropdown will only show 3 options
+- HR form verdict: Pass (moves to tech), Fail (moves to rejected), Pending
+- Tech form verdict: Pass (moves to offer), Fail (moves to rejected), Pending
 
-### Minimal RefreshNotification design
+---
 
-```text
-+------------------------------------------+
-| New candidates ready.  [Refresh]         |
-+------------------------------------------+
+## 3. Candidate Profile Header Changes
+
+**File:** `src/components/candidate/CandidateProfileView.tsx`
+
+**Replace the status dropdown with a read-only badge:**
+- Remove the `Select`/`SelectTrigger`/`SelectContent` for pipeline status
+- Replace with a static styled badge showing the current status (using `pipelineStatusColors`)
+
+**Replace the "Move to Next Round" button with context-aware form opener:**
+- When `hr_interview`: Show "Open HR Form" button that switches to `hr-form` tab
+- When `tech_interview`: Show "Open Tech Form" button that switches to `tech-form` tab  
+- When `offer`: Show "Open Offer Form" button that switches to `offer-form` tab
+- When `hired` or `rejected`: No button shown
+
+**Always show Tech Form tab** (currently hidden when not at tech stage):
+- Remove the `isTechStageOrBeyond` condition from the tabs array
+- In the tech-form tab content, show "Not yet at Tech Interview stage" placeholder when not at tech stage or beyond (similar to the offer form's existing behavior)
+
+---
+
+## 4. Simplify Offer Form
+
+**File:** `src/components/candidate/OfferFormTab.tsx`
+
+**Remove fields:**
+- Expiry Date
+- Benefits Package  
+- Negotiation Notes
+
+**Remove from the `OfferForm` interface:** `expiryDate`, `benefits`, `negotiationNotes`
+
+**Default offer date to today** when creating a new offer (no existing data):
+- Initialize `offerDate` to `new Date().toISOString().split('T')[0]`
+
+**Remove from the save payload:** `expiry_date`, `benefits`, `negotiation_notes`
+
+**Remaining fields:** Offer Date (default today), Offer Amount, Position (pre-selected), Start Date, Status, Remarks
+
+---
+
+## 5. Database: Drop Columns from `offers` Table
+
+**Migration SQL:**
+```sql
+ALTER TABLE offers DROP COLUMN IF EXISTS expiry_date;
+ALTER TABLE offers DROP COLUMN IF EXISTS benefits;
+ALTER TABLE offers DROP COLUMN IF EXISTS negotiation_notes;
 ```
 
-A compact single-line bar, no icon, no dismiss button. Uses `bg-primary` with small padding.
+**File:** `src/hooks/useOffers.ts` - Remove `expiry_date`, `benefits`, `negotiation_notes` from the `Offer` and `OfferInsert` interfaces.
 
-### Triggering the popup on webhook 200
+---
 
-The upload page already has access to the upload response. On a successful 200 response, it will call a method exposed by `useRealtimeCandidates` to show the refresh prompt with the file count. This will be done by adding a `triggerRefreshPrompt(count)` function to the hook's return value, and making it accessible via a simple module-level event emitter or by lifting it through `AppContext`.
+## 6. Internal Candidates Sort to Top in Kanban
 
-The simplest approach: add the trigger function to `AppContext` so both `AppLayout` (which renders the notification) and `UploadPage` (which triggers it) can coordinate.
+**File:** `src/components/dashboard/DashboardKanban.tsx`
 
-### Files to modify
+Update the `getCandidatesForColumn` sort function:
+- Primary sort: internal candidates first (`applicantType === 'internal'` before `external`)
+- Secondary sort: by score descending (existing behavior)
 
-| File | Change |
-|------|--------|
-| `src/pages/UploadPage.tsx` | Remove all `isVectorized` disabling; trigger refresh prompt on 200 |
-| `src/components/ui/RefreshNotification.tsx` | Make smaller, remove dismiss button/X |
-| `src/hooks/useRealtimeCandidates.ts` | Add `triggerRefreshPrompt`; refresh only candidates; remove `dismissPrompt` |
-| `src/components/layout/AppLayout.tsx` | Remove `onDismiss` prop |
+```typescript
+const getCandidatesForColumn = (status: PipelineStatus) =>
+  candidates.filter(c => c.pipelineStatus === status).sort((a, b) => {
+    // Internal first
+    if (a.applicantType === 'internal' && b.applicantType !== 'internal') return -1;
+    if (a.applicantType !== 'internal' && b.applicantType === 'internal') return 1;
+    // Then by score
+    return (b.qualificationScore ?? b.matchScore) - (a.qualificationScore ?? a.matchScore);
+  });
+```
 
+---
+
+## 7. Email Webhook Integration
+
+**File:** `src/components/modals/EmailModal.tsx`
+
+On "Send Email", call the webhook:
+```
+POST https://workflow.exist.com.ph/webhook/81f944ac-1805-4de0-aec6-248bc04c535d
+Body: { email: candidate.email, name: candidate.name, email_type: "composed" }
+```
+
+**File:** `src/context/AppContext.tsx`
+
+When `updateCandidatePipelineStatus` successfully moves a candidate to a new stage, fire the same webhook with the appropriate `email_type`:
+- `hr_interview` to `tech_interview`: `email_type = "tech"`
+- `tech_interview` to `offer`: `email_type = "offer"`
+- `offer` to `hired`: `email_type = "hired"`
+- Any to `rejected`: `email_type = "rejected"`
+
+The webhook call will be a fire-and-forget `fetch` POST (no blocking).
+
+---
+
+## 8. Tech Form: Show "Not Yet" Placeholder
+
+**File:** `src/components/candidate/TechInterviewFormTab.tsx`
+
+Add a guard at the top (similar to `OfferFormTab`):
+- If `pipelineStatus` is `hr_interview`, show a placeholder: "Not yet at Tech Interview stage. This form will be available once the candidate passes the HR interview."
+
+---
+
+## Summary of Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/components/dashboard/DashboardKanban.tsx` | Remove all dnd-kit; update sort for internal-first |
+| `src/components/dashboard/KanbanBoard.tsx` | Remove dnd-kit (or mark unused if not imported elsewhere) |
+| `src/components/dashboard/KanbanCard.tsx` | Remove drag handle and `useDraggable` |
+| `src/components/dashboard/KanbanColumn.tsx` | Remove `useDroppable` |
+| `src/components/candidate/CandidateProfileView.tsx` | Read-only status badge; context-aware form button; always show tech tab |
+| `src/components/candidate/HRInterviewFormTab.tsx` | Remove "conditional" from verdict dropdown |
+| `src/components/candidate/TechInterviewFormTab.tsx` | Remove "conditional"; add "not yet" guard |
+| `src/components/candidate/OfferFormTab.tsx` | Remove expiry/benefits/negotiation; default offerDate to today |
+| `src/hooks/useOffers.ts` | Remove dropped fields from interfaces |
+| `src/data/mockData.ts` | Update verdict labels (remove conditional) |
+| `src/components/modals/EmailModal.tsx` | Fire webhook on send |
+| `src/context/AppContext.tsx` | Fire email webhook on stage transition |
+| **DB Migration** | Drop 3 columns from `offers` table |
