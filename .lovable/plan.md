@@ -1,62 +1,31 @@
 
+# Candidate Profile: Full-Pane, Edge-to-Edge Display
 
-# Add Internal/External Filter and Score Sort
+## Problem
+When opening a candidate profile from the Kanban board, the "X Matched Candidates" header and filter/sort bar remain visible above the profile. The profile also has gaps/padding around it instead of stretching edge-to-edge.
 
-## Overview
-Add two new controls to the candidate filter bar: a filter for Internal/External applicant type, and a sort dropdown for score (ascending/descending).
+## Solution
+Lift the selected candidate state from `DashboardKanban` up to `DashboardPage`. When a candidate is selected, render the `CandidateProfileView` directly in the right pane, replacing everything (JO detail, filters, and kanban) -- with no padding, borders, or gaps.
 
 ## Changes
 
 ### File: `src/pages/DashboardPage.tsx`
 
-**1. New state variables (after line 18)**
-- `applicantTypeFilter`: `'all' | 'internal' | 'external'` (default `'all'`)
-- `scoreSort`: `'none' | 'asc' | 'desc'` (default `'none'`)
+1. **Add state and import**: Import `CandidateProfileView` and `Candidate` type. Add `selectedCandidate` state.
 
-**2. Update `filteredMatches` memo (lines 70-82)**
-- Add applicant type filtering: `candidate.applicantType === applicantTypeFilter`
-- After filtering, apply sorting: if `scoreSort` is `'asc'` or `'desc'`, sort by `candidate.qualificationScore`
-- Add new state variables to the dependency array
+2. **Conditional rendering in right pane**: When `selectedCandidate` is set, render `CandidateProfileView` directly (no wrapper padding, no border) instead of the JO detail + filters + kanban. The profile fills the entire right pane edge-to-edge.
 
-**3. Update `hasActiveFilters` and `clearFilters` (lines 84-90)**
-- Include `applicantTypeFilter !== 'all'` and `scoreSort !== 'none'` in `hasActiveFilters`
-- Reset both new states in `clearFilters`
+3. **Pass callback to DashboardKanban**: Pass an `onSelectCandidate` prop so the kanban can notify the parent when a candidate is clicked.
 
-**4. Add new filter controls in the filter bar (after the status Select, around line 202)**
+### File: `src/components/dashboard/DashboardKanban.tsx`
 
-Add an Internal/External select:
-```
-<Select value={applicantTypeFilter} onValueChange={setApplicantTypeFilter}>
-  <SelectTrigger className="w-[140px] h-8 text-sm">
-    <SelectValue placeholder="Applicant Type" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="all">All Types</SelectItem>
-    <SelectItem value="internal">Internal</SelectItem>
-    <SelectItem value="external">External</SelectItem>
-  </SelectContent>
-</Select>
-```
+1. **Accept `onSelectCandidate` prop**: Add an optional `onSelectCandidate` callback prop.
 
-Add a Score sort select (with `ArrowUpDown` icon imported from lucide-react):
-```
-<Select value={scoreSort} onValueChange={setScoreSort}>
-  <SelectTrigger className="w-[160px] h-8 text-sm">
-    <SelectValue placeholder="Sort by Score" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="none">No Sort</SelectItem>
-    <SelectItem value="desc">Score: High to Low</SelectItem>
-    <SelectItem value="asc">Score: Low to High</SelectItem>
-  </SelectContent>
-</Select>
-```
+2. **Remove inline profile rendering**: Remove the `if (selectedCandidate) return <CandidateProfileView ...>` block (lines 353-355). Instead, when a candidate is clicked, call `onSelectCandidate` if provided (falling back to internal state if not).
 
-**5. Import update (line 3)**
-- Add `ArrowUpDown` to the lucide-react import (optional, only if used as an icon prefix)
+3. **Remove internal `selectedCandidate` state** since it's now managed by the parent.
 
-## Summary
-- Two new dropdowns added inline with existing filter controls
-- Filtering logic extended in the existing `filteredMatches` memo
-- Clear button resets all filters including the new ones
-- No new files or dependencies needed
+## Result
+- Clicking a kanban card opens the candidate profile covering the entire right pane (over the "Matched Candidates" header and filters)
+- The profile has zero padding/gaps -- it sticks to all edges of the pane
+- The back button returns to the normal JO detail + kanban view
