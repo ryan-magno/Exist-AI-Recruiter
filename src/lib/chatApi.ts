@@ -58,22 +58,32 @@ export async function sendStreamingMessage(
 
         try {
           const parsed = JSON.parse(line);
+          const eventType = String(parsed.type || '').trim();
 
-          if (parsed.type === 'item' && parsed.content) {
-            // Skip wrapped JSON from "Respond to Webhook" node
-            if (parsed.content.startsWith('{') && parsed.content.includes('"output"')) {
-              console.log('Skipping wrapped JSON from Respond to Webhook node');
+          console.log(`NDJSON event: type="${eventType}", hasContent=${parsed.hasOwnProperty('content')}`);
+
+          if (eventType === 'item' && parsed.hasOwnProperty('content')) {
+            const content = String(parsed.content);
+
+            // Skip wrapped JSON ONLY if it's definitely the Respond to Webhook output
+            if (content.startsWith('{') && content.includes('"output"') && content.includes('\\"')) {
+              console.log('NDJSON: Skipping wrapped JSON from Respond to Webhook');
               continue;
             }
-            accumulated += parsed.content;
+
+            accumulated += content;
+            console.log(`NDJSON chunk: +${content.length} chars, total: ${accumulated.length}`);
             options.onChunk(accumulated);
-          } else if (parsed.type === 'end') {
-            console.log('Stream ended, accumulated:', accumulated.length, 'chars');
-            options.onComplete();
-            return;
+          } else if (eventType === 'end') {
+            console.log('NDJSON: end event, accumulated:', accumulated.length, 'chars');
+            if (accumulated.length > 0) {
+              options.onComplete();
+              return;
+            }
+            console.log('NDJSON: ignoring end event (no content yet)');
           }
         } catch {
-          console.warn('NDJSON: Failed to parse line:', line);
+          console.warn('NDJSON: Failed to parse line:', line.substring(0, 200));
         }
       }
     }
