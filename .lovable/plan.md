@@ -1,67 +1,95 @@
 
 
-# Fix: Defensive NDJSON Parsing with Verbose Logging
+# Fix: Upload Page Always Enabled + Minimal Non-Dismissible Refresh Popup
 
-## Problem
+## Problem 1: Upload fields disabled when candidates exist
 
-Console shows "Stream ended, accumulated: 0 chars" -- content chunks are being received but not accumulated. Possible causes:
-1. The wrapped JSON filter (`startsWith('{')`) is too aggressive
-2. The `parsed.content` truthiness check fails on empty strings
-3. The first `type:"end"` event fires before any content is processed
+The upload page uses `isVectorized` (which is `true` when `candidates.length > 0`) to disable the uploader name input, radio group, dropzone, and file settings. This means once any candidates exist in the system, uploading new CVs is blocked. This was likely a leftover from an early demo flow and should be removed entirely.
+
+## Problem 2: Refresh notification is too large and dismissible
+
+The current `RefreshNotification` is a large card with icon, description, and dismiss button. Per the new requirements:
+- It should be smaller and more minimal
+- It cannot be closed/dismissed -- only disappears when the user clicks "Refresh"
+- It should only refresh candidates (not job orders)
+
+## Problem 3: Trigger refresh popup on webhook 200 response
+
+Currently the popup is triggered by the polling hook (`useRealtimeCandidates`). The user wants it triggered when the webhook returns HTTP 200 in the upload flow. The upload page should signal this.
+
+---
 
 ## Changes
 
-### File: `src/lib/chatApi.ts` (lines 57-77)
+### File 1: `src/pages/UploadPage.tsx`
 
-Replace the parsing block with a defensive version that:
+**Remove all `isVectorized` disabling logic:**
+- Line 53: Remove `isVectorized` from the destructured `useApp()` call
+- Line 443: Remove `isVectorized && "opacity-50"` from input className
+- Line 445: Remove `isVectorized` from `disabled` prop (keep `loadingUploaders`)
+- Line 450: Remove `!isVectorized` from suggestions condition
+- Line 513: Remove `disabled={isVectorized}` from RadioGroup
+- Lines 533: Remove `isVectorized && 'opacity-50 pointer-events-none'` from dropzone
+- Line 574: Remove `isVectorized ||` from FileRow disabled prop (keep `file.status !== 'ready'`)
 
-1. **Defensive type checking**: `String(parsed.type || '').trim()` to handle whitespace or unexpected values
-2. **Explicit content check**: Use `parsed.hasOwnProperty('content')` and `String(parsed.content)` instead of relying on truthiness
-3. **Stricter wrapped JSON filter**: Add `content.includes('\\"')` to the skip condition so only actual escaped-JSON payloads from the Respond to Webhook node are skipped
-4. **Only stop on end with content**: Change the `type:"end"` handler to only call `onComplete` and return when `accumulated.length > 0`; otherwise log and continue reading
-5. **Verbose logging**: Log every event type, content snippets, and chunk counts to diagnose any remaining issues
+**Trigger refresh notification on webhook 200:**
+- After successful webhook response (around line 290, the `result?.status === 'processing'` block), instead of navigating to dashboard, show the refresh popup
+- Import and use a shared state/callback to trigger the notification from the layout level
+- Pass a callback from `AppLayout` through context or use a simple event approach
 
-### Core logic replacement (lines 57-77):
+### File 2: `src/components/ui/RefreshNotification.tsx`
 
-```typescript
-if (!line) continue;
+**Make it smaller and non-dismissible:**
+- Remove the `onDismiss` prop and the X close button
+- Shrink padding and remove the icon circle
+- Make it a compact toast-like bar with just text + refresh button
+- Keep it fixed at bottom-right
 
-try {
-  const parsed = JSON.parse(line);
-  const eventType = String(parsed.type || '').trim();
+### File 3: `src/hooks/useRealtimeCandidates.ts`
 
-  console.log(`NDJSON event: type="${eventType}", hasContent=${parsed.hasOwnProperty('content')}`);
+**Refresh only candidates (not job orders):**
+- In `refreshData`, remove the `job-orders` query invalidation
+- Add a `triggerRefreshPrompt` method that can be called externally (e.g., from upload page on 200 response)
+- Remove `dismissPrompt` since the notification is no longer dismissible
 
-  if (eventType === 'item' && parsed.hasOwnProperty('content')) {
-    const content = String(parsed.content);
+### File 4: `src/components/layout/AppLayout.tsx`
 
-    // Skip wrapped JSON ONLY if it's definitely the Respond to Webhook output
-    if (content.startsWith('{') && content.includes('"output"') && content.includes('\\"')) {
-      console.log('NDJSON: Skipping wrapped JSON from Respond to Webhook');
-      continue;
-    }
+- Remove `dismissPrompt` from the hook usage
+- Remove the `onDismiss` prop from `RefreshNotification`
 
-    accumulated += content;
-    console.log(`NDJSON chunk: +${content.length} chars, total: ${accumulated.length}`);
-    options.onChunk(accumulated);
-  } else if (eventType === 'end') {
-    console.log('NDJSON: end event, accumulated:', accumulated.length, 'chars');
-    if (accumulated.length > 0) {
-      options.onComplete();
-      return;
-    }
-    console.log('NDJSON: ignoring end event (no content yet)');
-  }
-} catch {
-  console.warn('NDJSON: Failed to parse line:', line.substring(0, 200));
-}
+---
+
+## Technical Details
+
+### Upload page `isVectorized` removal
+
+Every instance of `isVectorized` in `UploadPage.tsx` will be removed. The only disabling conditions that remain are:
+- `loadingUploaders` -- while fetching uploader names
+- `isProcessing` -- while a batch is actively being sent
+- `file.status !== 'ready'` -- per-file status
+
+### Minimal RefreshNotification design
+
+```text
++------------------------------------------+
+| New candidates ready.  [Refresh]         |
++------------------------------------------+
 ```
 
-No other files need changes.
+A compact single-line bar, no icon, no dismiss button. Uses `bg-primary` with small padding.
 
-## Files to Modify
+### Triggering the popup on webhook 200
+
+The upload page already has access to the upload response. On a successful 200 response, it will call a method exposed by `useRealtimeCandidates` to show the refresh prompt with the file count. This will be done by adding a `triggerRefreshPrompt(count)` function to the hook's return value, and making it accessible via a simple module-level event emitter or by lifting it through `AppContext`.
+
+The simplest approach: add the trigger function to `AppContext` so both `AppLayout` (which renders the notification) and `UploadPage` (which triggers it) can coordinate.
+
+### Files to modify
 
 | File | Change |
 |------|--------|
-| `src/lib/chatApi.ts` | Replace parsing block (lines 57-77) with defensive type/content checks, stricter wrapped-JSON filter, end-only-with-content logic, and verbose logging |
+| `src/pages/UploadPage.tsx` | Remove all `isVectorized` disabling; trigger refresh prompt on 200 |
+| `src/components/ui/RefreshNotification.tsx` | Make smaller, remove dismiss button/X |
+| `src/hooks/useRealtimeCandidates.ts` | Add `triggerRefreshPrompt`; refresh only candidates; remove `dismissPrompt` |
+| `src/components/layout/AppLayout.tsx` | Remove `onDismiss` prop |
 
