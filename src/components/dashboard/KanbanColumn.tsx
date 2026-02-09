@@ -1,4 +1,3 @@
-import { useDroppable } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
 import { Candidate } from '@/data/mockData';
 import { KanbanCard } from './KanbanCard';
@@ -12,8 +11,6 @@ interface KanbanColumnProps {
 }
 
 export function KanbanColumn({ id, title, candidates, onCandidateClick }: KanbanColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id });
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -27,16 +24,10 @@ export function KanbanColumn({ id, title, candidates, onCandidateClick }: Kanban
         </span>
       </div>
       
-      <div
-        ref={setNodeRef}
-        className={cn(
-          'kanban-column space-y-3',
-          isOver && 'ring-2 ring-primary ring-offset-2'
-        )}
-      >
+      <div className="kanban-column space-y-3">
         {candidates.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
-            Drop candidates here
+            No candidates
           </p>
         ) : (
           candidates.map((candidate) => (

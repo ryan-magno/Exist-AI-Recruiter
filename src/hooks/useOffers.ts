@@ -8,14 +8,11 @@ export interface Offer {
   application_id: string;
   candidate_id: string;
   offer_date: string | null;
-  expiry_date: string | null;
   offer_amount: string | null;
   position: string | null;
   start_date: string | null;
   status: OfferStatus;
-  benefits: string | null;
   remarks: string | null;
-  negotiation_notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -24,14 +21,11 @@ export interface OfferInsert {
   application_id: string;
   candidate_id: string;
   offer_date?: string | null;
-  expiry_date?: string | null;
   offer_amount?: string | null;
   position?: string | null;
   start_date?: string | null;
   status?: OfferStatus;
-  benefits?: string | null;
   remarks?: string | null;
-  negotiation_notes?: string | null;
 }
 
 export function useOffer(applicationId: string | null) {

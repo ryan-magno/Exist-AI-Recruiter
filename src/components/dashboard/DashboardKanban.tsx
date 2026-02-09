@@ -1,17 +1,5 @@
 import { useState } from 'react';
-import {
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-} from '@dnd-kit/core';
-import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, ChevronLeft, ChevronRight, Clock, Mail, Trash2, Loader2, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, Mail, Trash2, Loader2, Calendar } from 'lucide-react';
 import { Candidate, PipelineStatus, pipelineStatusLabels, TechInterviewResult } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 
@@ -49,7 +37,7 @@ function getStageAge(statusChangedDate: string): { ageText: string; dateText: st
   return { ageText, dateText: `Since ${dateLabel}` };
 }
 
-// ── Kanban Card (restored old design) ──
+// ── Kanban Card ──
 interface KanbanCardProps {
   candidate: Candidate;
   isSelected?: boolean;
@@ -61,17 +49,6 @@ interface KanbanCardProps {
 function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete }: KanbanCardProps) {
   const [showTimeline, setShowTimeline] = useState(false);
   const isProcessing = candidate.processingStatus === 'processing';
-  const isFailed = candidate.processingStatus === 'failed';
-
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: candidate.id,
-    disabled: isProcessing,
-  });
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.5 : 1,
-  };
 
   const score = candidate.qualificationScore ?? candidate.matchScore;
   const getScoreClass = (s: number): string => {
@@ -85,12 +62,11 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
   // Processing state
   if (isProcessing) {
     return (
-      <div ref={setNodeRef} style={style}
+      <div
         className="bg-card border border-dashed border-amber-300 rounded-lg p-3 cursor-not-allowed opacity-80"
         title="AI analysis in progress (typically 30-45 seconds)"
       >
         <div className="flex items-start gap-2">
-          <div className="p-1 -ml-1"><GripVertical className="w-4 h-4 text-muted-foreground/30" /></div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -117,25 +93,14 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
       className={cn(
         'kanban-card bg-white shadow-sm rounded-lg px-3 py-3 cursor-pointer hover:shadow-md transition-shadow',
         isInternal ? 'border border-green-400' : 'border border-gray-200',
-        isDragging && 'shadow-lg ring-2 ring-primary opacity-90'
       )}
       onClick={onSelect}
     >
-      {/* Header: Drag Handle | Name | Score */}
+      {/* Header: Name | Score */}
       <div className="flex items-center gap-2">
-        <div
-          {...listeners}
-          {...attributes}
-          className="cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded touch-none"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <GripVertical className="w-4 h-4 text-gray-400" />
-        </div>
         <p className="font-semibold text-sm text-gray-900 truncate flex-1">{candidate.name}</p>
         <span className={cn('status-badge text-[10px] flex-shrink-0', getScoreClass(score))}>
           {candidate.qualificationScore != null ? `${candidate.qualificationScore}` : `${candidate.matchScore}%`}
@@ -250,7 +215,6 @@ interface ColumnProps {
 }
 
 function KanbanColumnView({ id, title, candidates, selectedId, onSelect, onEmail, onDelete, isCollapsed, onToggleCollapse }: ColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id });
   const isEmpty = candidates.length === 0;
 
   if (isCollapsed) {
@@ -282,13 +246,9 @@ function KanbanColumnView({ id, title, candidates, selectedId, onSelect, onEmail
         )}
       </div>
 
-      {/* Drop zone */}
+      {/* Card zone */}
       <div
-        ref={setNodeRef}
-        className={cn(
-          'flex-1 rounded-lg p-2 space-y-2 min-h-[200px] border transition-all',
-          isOver ? 'border-primary bg-primary/5 ring-2 ring-primary ring-offset-1' : 'border-slate-300 bg-slate-100'
-        )}
+        className="flex-1 rounded-lg p-2 space-y-2 min-h-[200px] border border-slate-300 bg-slate-100"
       >
         {isEmpty ? (
           <p className="text-xs text-muted-foreground text-center py-6">No candidates</p>
@@ -311,27 +271,9 @@ function KanbanColumnView({ id, title, candidates, selectedId, onSelect, onEmail
 
 // ── Main Dashboard Kanban ──
 export function DashboardKanban({ candidates, onSelectCandidate }: DashboardKanbanProps) {
-  const { updateCandidatePipelineStatus, updateCandidateTechInterviewResult, deleteCandidate, selectedJoId } = useApp();
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const { deleteCandidate } = useApp();
   const [emailCandidate, setEmailCandidate] = useState<Candidate | null>(null);
   const [collapsedColumns, setCollapsedColumns] = useState<Set<string>>(new Set());
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  );
-
-  const handleDragStart = (event: DragStartEvent) => setActiveId(event.active.id as string);
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-    if (over && active.id !== over.id) {
-      const newStatus = over.id as PipelineStatus;
-      if (columns.some(col => col.id === newStatus)) {
-        updateCandidatePipelineStatus(active.id as string, newStatus);
-      }
-    }
-  };
 
   const toggleCollapse = (colId: string) => {
     setCollapsedColumns(prev => {
@@ -342,47 +284,36 @@ export function DashboardKanban({ candidates, onSelectCandidate }: DashboardKanb
   };
 
   const getCandidatesForColumn = (status: PipelineStatus) =>
-    candidates.filter(c => c.pipelineStatus === status).sort((a, b) => (b.qualificationScore ?? b.matchScore) - (a.qualificationScore ?? a.matchScore));
-
-  const activeCandidate = candidates.find(c => c.id === activeId);
+    candidates.filter(c => c.pipelineStatus === status).sort((a, b) => {
+      // Internal candidates first
+      if (a.applicantType === 'internal' && b.applicantType !== 'internal') return -1;
+      if (a.applicantType !== 'internal' && b.applicantType === 'internal') return 1;
+      // Then by score descending
+      return (b.qualificationScore ?? b.matchScore) - (a.qualificationScore ?? a.matchScore);
+    });
 
   return (
     <>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex gap-3 overflow-x-auto pb-4">
-          {columns.map((column) => (
-            <KanbanColumnView
-              key={column.id}
-              id={column.id}
-              title={column.title}
-              candidates={getCandidatesForColumn(column.id)}
-              selectedId={null}
-              onSelect={(c) => onSelectCandidate?.(c)}
-              onEmail={setEmailCandidate}
-              onDelete={(c) => {
-                if (confirm(`Delete candidate "${c.name}"?`)) {
-                  deleteCandidate(c.id);
-                }
-              }}
-              isCollapsed={collapsedColumns.has(column.id)}
-              onToggleCollapse={() => toggleCollapse(column.id)}
-            />
-          ))}
-        </div>
-
-        <DragOverlay>
-          {activeCandidate ? (
-            <div className="bg-card border rounded-lg p-3 shadow-md ring-2 ring-primary opacity-90 w-64">
-              <div className="flex items-center gap-2">
-                <p className="font-semibold text-sm text-foreground truncate flex-1">{activeCandidate.name}</p>
-                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary">
-                  {activeCandidate.qualificationScore ?? activeCandidate.matchScore}
-                </span>
-              </div>
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+      <div className="flex gap-3 overflow-x-auto pb-4">
+        {columns.map((column) => (
+          <KanbanColumnView
+            key={column.id}
+            id={column.id}
+            title={column.title}
+            candidates={getCandidatesForColumn(column.id)}
+            selectedId={null}
+            onSelect={(c) => onSelectCandidate?.(c)}
+            onEmail={setEmailCandidate}
+            onDelete={(c) => {
+              if (confirm(`Delete candidate "${c.name}"?`)) {
+                deleteCandidate(c.id);
+              }
+            }}
+            isCollapsed={collapsedColumns.has(column.id)}
+            onToggleCollapse={() => toggleCollapse(column.id)}
+          />
+        ))}
+      </div>
 
       <EmailModal open={!!emailCandidate} onClose={() => setEmailCandidate(null)} candidate={emailCandidate} />
     </>

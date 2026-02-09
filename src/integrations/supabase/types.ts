@@ -516,12 +516,9 @@ export type Database = {
       offers: {
         Row: {
           application_id: string
-          benefits: string | null
           candidate_id: string
           created_at: string
-          expiry_date: string | null
           id: string
-          negotiation_notes: string | null
           offer_amount: string | null
           offer_date: string | null
           position: string | null
@@ -532,12 +529,9 @@ export type Database = {
         }
         Insert: {
           application_id: string
-          benefits?: string | null
           candidate_id: string
           created_at?: string
-          expiry_date?: string | null
           id?: string
-          negotiation_notes?: string | null
           offer_amount?: string | null
           offer_date?: string | null
           position?: string | null
@@ -548,12 +542,9 @@ export type Database = {
         }
         Update: {
           application_id?: string
-          benefits?: string | null
           candidate_id?: string
           created_at?: string
-          expiry_date?: string | null
           id?: string
-          negotiation_notes?: string | null
           offer_amount?: string | null
           offer_date?: string | null
           position?: string | null

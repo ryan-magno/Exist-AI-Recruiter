@@ -39,6 +39,14 @@ HR Team`);
 
   const handleSend = () => {
     if (!candidate) return;
+    
+    // Fire webhook
+    fetch('https://workflow.exist.com.ph/webhook/81f944ac-1805-4de0-aec6-248bc04c535d', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: candidate.email, name: candidate.name, email_type: 'composed' })
+    }).catch(() => {});
+    
     toast.success('Email sent successfully', {
       description: `Interview invitation sent to ${candidate.name}`
     });

@@ -31,6 +31,21 @@ const emptyForm: TechInterviewForm = {
 };
 
 export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
+  // Guard: not yet at tech stage
+  const isAtTechOrBeyond = ['tech_interview', 'offer', 'hired'].includes(candidate.pipelineStatus);
+  if (!isAtTechOrBeyond) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full py-12 text-center">
+        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+          <Code className="w-8 h-8 text-muted-foreground" />
+        </div>
+        <h3 className="text-lg font-semibold text-foreground mb-2">Not Yet at Tech Interview Stage</h3>
+        <p className="text-muted-foreground text-sm max-w-md">
+          This form will be available once the candidate passes the HR interview.
+        </p>
+      </div>
+    );
+  }
   const { updateCandidateTechForm, updateCandidatePipelineStatus, updateCandidateTechInterviewResult } = useApp();
   const [form, setForm] = useState<TechInterviewForm>(candidate.techInterviewForm || emptyForm);
   const [saving, setSaving] = useState(false);
@@ -237,7 +252,7 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
               <SelectTrigger className={cn(
                 "h-9 text-sm",
                 form.verdict === 'pass' && 'border-emerald-500 bg-emerald-100',
-                form.verdict === 'conditional' && 'border-amber-500 bg-amber-100',
+                // conditional removed
                 form.verdict === 'fail' && 'border-red-500 bg-red-100'
               )}>
                 <SelectValue placeholder="Select recommendation..." />
