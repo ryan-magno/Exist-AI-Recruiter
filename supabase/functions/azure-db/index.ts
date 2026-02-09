@@ -66,46 +66,35 @@ function createPgClient() {
   });
 }
 
-// Request-scoped client - always fresh per request
-let requestClient: Client | null = null;
-
-async function getClient(): Promise<Client> {
-  // Always create a fresh client to avoid stale connection issues
-  if (requestClient) {
-    try { await requestClient.end(); } catch { /* ignore */ }
-    requestClient = null;
-  }
-  requestClient = createPgClient();
-  // Add a connection timeout - abort if connection takes > 5s
-  const connectPromise = requestClient.connect();
-  const timeoutPromise = new Promise((_, reject) =>
+// Create and connect a fresh client per call with timeout
+async function connectClient(): Promise<Client> {
+  const client = createPgClient();
+  const connectPromise = client.connect();
+  const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error("Connection timeout")), 5000)
   );
   await Promise.race([connectPromise, timeoutPromise]);
-  return requestClient;
-}
-
-async function closeClient() {
-  if (requestClient) {
-    try {
-      await requestClient.end();
-    } catch (e) {
-      console.error("Error closing client:", e);
-    }
-    requestClient = null;
-  }
+  return client;
 }
 
 async function query(sql: string, params: unknown[] = []) {
-  const client = await getClient();
-  const result = await client.queryObject(sql, params);
-  return result.rows;
+  const client = await connectClient();
+  try {
+    const result = await client.queryObject(sql, params);
+    return result.rows;
+  } finally {
+    try { await client.end(); } catch { /* ignore */ }
+  }
 }
 
 async function execute(sql: string, params: unknown[] = []) {
-  const client = await getClient();
-  await client.queryObject(sql, params);
-  return { success: true };
+  const client = await connectClient();
+  try {
+    await client.queryObject(sql, params);
+    return { success: true };
+  } finally {
+    try { await client.end(); } catch { /* ignore */ }
+  }
 }
 
 // Initialize tables with NEW schema
@@ -1666,9 +1655,5 @@ function jsonResponse(data: unknown, status = 200): Response {
 }
 
 serve(async (req: Request) => {
-  try {
-    return await handleRequest(req);
-  } finally {
-    await closeClient();
-  }
+  return await handleRequest(req);
 });
