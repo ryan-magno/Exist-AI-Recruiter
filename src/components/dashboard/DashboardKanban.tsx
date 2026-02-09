@@ -119,7 +119,8 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
       ref={setNodeRef}
       style={style}
       className={cn(
-        'kanban-card bg-white border border-gray-200 shadow-sm rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow',
+        'kanban-card bg-white shadow-sm rounded-lg px-3 py-3 cursor-pointer hover:shadow-md transition-shadow',
+        isInternal ? 'border-2 border-green-500' : 'border border-gray-200',
         isDragging && 'shadow-lg ring-2 ring-primary opacity-90'
       )}
       onClick={onSelect}
@@ -142,7 +143,7 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
 
       {/* Green Stage Age Bar */}
       {stageAge.ageText && (
-        <div className="mt-2 bg-green-50 border border-green-100 text-green-700 rounded-md px-3 py-1.5 flex items-center justify-between text-xs">
+        <div className="mt-2 bg-green-50 border border-green-200 text-green-700 rounded-md px-3 py-1.5 flex items-center justify-between text-xs">
           <div className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
             <span className="font-medium">{stageAge.ageText}</span>
@@ -155,35 +156,31 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
       )}
 
       {/* Tech / Offer Status Pills */}
-      {(isInTechInterview || isInOffer) && (
-        <div className="flex items-center gap-1 flex-wrap mt-2">
-          {isInTechInterview && (
-            <span className={cn(
-              'text-[10px] font-medium px-1.5 py-0.5 rounded border',
-              candidate.techInterviewResult === 'pass'
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                : candidate.techInterviewResult === 'fail'
-                ? 'bg-red-50 text-red-700 border-red-200'
-                : 'bg-gray-100 text-gray-600 border-gray-200'
-            )}>
-              Tech: {candidate.techInterviewResult 
-                ? candidate.techInterviewResult.charAt(0).toUpperCase() + candidate.techInterviewResult.slice(1)
-                : 'Pending'}
-            </span>
-          )}
-          {isInOffer && (
-            <span className={cn(
-              'text-[10px] font-medium px-1.5 py-0.5 rounded border',
-              candidate.offerStatus === 'accepted' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-              candidate.offerStatus === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
-              candidate.offerStatus === 'withdrawn' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-              'bg-gray-100 text-gray-600 border-gray-200'
-            )}>
-              Offer: {candidate.offerStatus 
-                ? candidate.offerStatus.charAt(0).toUpperCase() + candidate.offerStatus.slice(1)
-                : 'Pending'}
-            </span>
-          )}
+      {isInTechInterview && (
+        <div className={cn(
+          'mt-2 w-full rounded-md px-3 py-1.5 text-xs font-medium border flex items-center',
+          candidate.techInterviewResult === 'pass'
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
+            : candidate.techInterviewResult === 'fail'
+            ? 'bg-red-50 text-red-700 border-red-300'
+            : 'bg-gray-50 text-gray-600 border-gray-300'
+        )}>
+          Tech: {candidate.techInterviewResult 
+            ? candidate.techInterviewResult.charAt(0).toUpperCase() + candidate.techInterviewResult.slice(1)
+            : 'Pending'}
+        </div>
+      )}
+      {isInOffer && (
+        <div className={cn(
+          'mt-2 w-full rounded-md px-3 py-1.5 text-xs font-medium border flex items-center',
+          candidate.offerStatus === 'accepted' ? 'bg-emerald-50 text-emerald-700 border-emerald-300' :
+          candidate.offerStatus === 'rejected' ? 'bg-red-50 text-red-700 border-red-300' :
+          candidate.offerStatus === 'withdrawn' ? 'bg-amber-50 text-amber-700 border-amber-300' :
+          'bg-gray-50 text-gray-600 border-gray-300'
+        )}>
+          Offer: {candidate.offerStatus 
+            ? candidate.offerStatus.charAt(0).toUpperCase() + candidate.offerStatus.slice(1)
+            : 'Pending'}
         </div>
       )}
 
@@ -192,7 +189,7 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
         {/* Left: Internal/External tag */}
         <div>
           {isInternal && (
-            <div className="inline-flex items-center gap-1 bg-white border-2 border-green-500 text-green-600 font-bold text-xs px-2 py-0.5 rounded">
+            <div className="inline-flex items-center gap-1 text-green-600 font-bold text-xs">
               <img src={existLogo} alt="Internal" className="w-3.5 h-3.5 object-contain" />
               Internal
             </div>
@@ -207,7 +204,7 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
             className="p-1 rounded hover:bg-muted transition-colors"
             onClick={(e) => { e.stopPropagation(); setShowTimeline(!showTimeline); }}
           >
-            <Clock className="w-3.5 h-3.5 text-gray-500" />
+            <Clock className="w-5 h-5 text-gray-500" />
           </button>
           <button
             title="Send Email"
@@ -215,7 +212,7 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
             className="p-1 rounded hover:bg-muted transition-colors"
             onClick={onEmail}
           >
-            <Mail className="w-3.5 h-3.5 text-gray-500" />
+            <Mail className="w-5 h-5 text-gray-500" />
           </button>
           <button
             title="Delete Candidate"
@@ -223,7 +220,7 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
             className="p-1 rounded hover:bg-red-50 transition-colors"
             onClick={onDelete}
           >
-            <Trash2 className="w-3.5 h-3.5 text-red-400 hover:text-red-600" />
+            <Trash2 className="w-5 h-5 text-red-400 hover:text-red-600" />
           </button>
         </div>
       </div>
