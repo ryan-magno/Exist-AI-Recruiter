@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -14,7 +14,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, ChevronLeft, ChevronRight, Clock, Mail, Trash2, Loader2, Calendar } from 'lucide-react';
 import { Candidate, PipelineStatus, pipelineStatusLabels, TechInterviewResult } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
-import { CandidateProfileView } from '@/components/candidate/CandidateProfileView';
+
 import { EmailModal } from '@/components/modals/EmailModal';
 import { CandidateTimeline } from '@/components/dashboard/CandidateTimeline';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,6 +23,7 @@ import existLogo from '@/assets/exist-logo.png';
 
 interface DashboardKanbanProps {
   candidates: Candidate[];
+  onSelectCandidate?: (candidate: Candidate) => void;
 }
 
 const columns: { id: PipelineStatus; title: string }[] = [
@@ -309,16 +310,11 @@ function KanbanColumnView({ id, title, candidates, selectedId, onSelect, onEmail
 }
 
 // ── Main Dashboard Kanban ──
-export function DashboardKanban({ candidates }: DashboardKanbanProps) {
+export function DashboardKanban({ candidates, onSelectCandidate }: DashboardKanbanProps) {
   const { updateCandidatePipelineStatus, updateCandidateTechInterviewResult, deleteCandidate, selectedJoId } = useApp();
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [emailCandidate, setEmailCandidate] = useState<Candidate | null>(null);
   const [collapsedColumns, setCollapsedColumns] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    setSelectedCandidate(null);
-  }, [selectedJoId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -350,10 +346,6 @@ export function DashboardKanban({ candidates }: DashboardKanbanProps) {
 
   const activeCandidate = candidates.find(c => c.id === activeId);
 
-  if (selectedCandidate) {
-    return <CandidateProfileView candidate={selectedCandidate} onBack={() => setSelectedCandidate(null)} />;
-  }
-
   return (
     <>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -364,8 +356,8 @@ export function DashboardKanban({ candidates }: DashboardKanbanProps) {
               id={column.id}
               title={column.title}
               candidates={getCandidatesForColumn(column.id)}
-              selectedId={selectedCandidate?.id || null}
-              onSelect={setSelectedCandidate}
+              selectedId={null}
+              onSelect={(c) => onSelectCandidate?.(c)}
               onEmail={setEmailCandidate}
               onDelete={(c) => {
                 if (confirm(`Delete candidate "${c.name}"?`)) {
