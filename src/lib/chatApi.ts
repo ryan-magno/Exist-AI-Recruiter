@@ -11,80 +11,45 @@ export async function sendStreamingMessage(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-  // Merge caller signal with timeout
   if (options.signal) {
     options.signal.addEventListener('abort', () => controller.abort());
   }
 
   try {
+    console.log('1. Sending request to n8n:', { chatInput, sessionId });
+
     const response = await fetch(WEBHOOK_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
+        'Accept': 'application/json',
       },
       body: JSON.stringify({ chatInput, sessionId }),
       signal: controller.signal,
     });
 
+    console.log('2. Response status:', response.status, response.ok);
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('No response body');
+    const data = await response.json();
+    console.log('3. Raw response data:', data);
+
+    if (!Array.isArray(data) || !data[0]?.output) {
+      console.error('Invalid response structure:', data);
+      throw new Error('Invalid response format from n8n');
     }
 
-    const decoder = new TextDecoder();
-    let buffer = '';
+    const aiMessage = data[0].output;
+    console.log('4. Extracted AI message:', aiMessage.substring(0, 100) + '...');
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      let newlineIndex: number;
-      while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-        const line = buffer.slice(0, newlineIndex).replace(/\r$/, '');
-        buffer = buffer.slice(newlineIndex + 1);
-
-        if (!line.startsWith('data: ')) continue;
-
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') {
-          options.onComplete();
-          return;
-        }
-
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.type === 'message' && typeof parsed.data === 'string') {
-            options.onChunk(parsed.data);
-          }
-        } catch {
-          // skip malformed JSON
-        }
-      }
+    if (!aiMessage || aiMessage.trim() === '') {
+      throw new Error('Empty response from AI');
     }
 
-    // Flush remaining buffer
-    if (buffer.trim()) {
-      for (const raw of buffer.split('\n')) {
-        const line = raw.replace(/\r$/, '');
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') continue;
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.type === 'message' && typeof parsed.data === 'string') {
-            options.onChunk(parsed.data);
-          }
-        } catch { /* ignore */ }
-      }
-    }
-
+    options.onChunk(aiMessage);
     options.onComplete();
   } catch (error) {
     if (controller.signal.aborted && !options.signal?.aborted) {
