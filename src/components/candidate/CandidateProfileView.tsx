@@ -8,6 +8,7 @@ import { useApp } from '@/context/AppContext';
 import { EmailModal } from '@/components/modals/EmailModal';
 import { TypewriterText } from '@/components/ui/TypewriterText';
 import { HRInterviewFormTab } from '@/components/candidate/HRInterviewFormTab';
+import existLogo from '@/assets/exist-logo.png';
 import { TechInterviewFormTab } from '@/components/candidate/TechInterviewFormTab';
 import { OfferFormTab } from '@/components/candidate/OfferFormTab';
 import { ApplicationHistoryTab } from '@/components/candidate/ApplicationHistoryTab';
@@ -90,15 +91,17 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
                 <div className="flex items-center gap-2 mb-0.5">
                   <h2 className="text-lg font-semibold text-foreground truncate">{currentCandidate.name}</h2>
                   {score != null && <MatchScoreRing score={score} size={36} strokeWidth={3} />}
-                  <span className={cn(
-                    'inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium flex-shrink-0',
-                    currentCandidate.applicantType === 'internal'
-                      ? 'bg-purple-100 text-purple-700'
-                      : 'bg-slate-100 text-slate-600'
-                  )}>
-                    <Tag className="w-2.5 h-2.5 mr-0.5" />
-                    {currentCandidate.applicantType === 'internal' ? 'Internal' : 'External'}
-                  </span>
+                  {currentCandidate.applicantType === 'internal' ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold text-green-600 bg-white border-2 border-green-500 flex-shrink-0">
+                      <img src={existLogo} alt="Internal" className="w-3.5 h-3.5 object-contain" />
+                      Internal
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-600 flex-shrink-0">
+                      <Tag className="w-2.5 h-2.5 mr-0.5" />
+                      External
+                    </span>
+                  )}
                 </div>
                 {/* Line 2: Role @ Company • Experience */}
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
