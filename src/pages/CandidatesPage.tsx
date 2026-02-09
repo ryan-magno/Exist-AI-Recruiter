@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Users, Mail, Search, X, Eye, Filter } from 'lucide-react';
+import existLogo from '@/assets/exist-logo.png';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,6 +23,7 @@ export default function CandidatesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [pipelineFilter, setPipelineFilter] = useState<string>('all');
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
 
   const candidates = getAllCandidates();
 
@@ -52,7 +54,8 @@ export default function CandidatesPage() {
           candidate.skills.some((s: string) => s.toLowerCase().includes(searchLower));
         const matchesPipeline = pipelineFilter === 'all' || candidate.pipelineStatus === pipelineFilter;
         const matchesDept = departmentFilter === 'all' || getDepartment(candidate.assignedJoId) === departmentFilter;
-        return matchesSearch && matchesPipeline && matchesDept;
+        const matchesType = typeFilter === 'all' || candidate.applicantType === typeFilter;
+        return matchesSearch && matchesPipeline && matchesDept && matchesType;
       })
       .sort((a, b) => (b.qualificationScore ?? b.matchScore) - (a.qualificationScore ?? a.matchScore));
   }, [candidates, searchQuery, pipelineFilter, departmentFilter, jobOrders]);
@@ -65,8 +68,8 @@ export default function CandidatesPage() {
 
   const handleViewJo = (joId: string) => { setSelectedJoId(joId); navigate('/dashboard'); };
   const handleOpenProfile = (c: any) => { setInitialTab('profile'); setSelectedCandidate(c); };
-  const clearFilters = () => { setSearchQuery(''); setPipelineFilter('all'); setDepartmentFilter('all'); };
-  const hasActiveFilters = searchQuery || pipelineFilter !== 'all' || departmentFilter !== 'all';
+  const clearFilters = () => { setSearchQuery(''); setPipelineFilter('all'); setDepartmentFilter('all'); setTypeFilter('all'); };
+  const hasActiveFilters = searchQuery || pipelineFilter !== 'all' || departmentFilter !== 'all' || typeFilter !== 'all';
   const uniqueDepartments = [...new Set(jobOrders.map(jo => jo.department))];
 
   if (!isVectorized) {
@@ -117,6 +120,14 @@ export default function CandidatesPage() {
                 {uniqueDepartments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-[140px] h-8 text-sm"><SelectValue placeholder="Type" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="internal">Internal</SelectItem>
+                <SelectItem value="external">External</SelectItem>
+              </SelectContent>
+            </Select>
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 gap-1 text-xs">
                 <X className="w-3.5 h-3.5" /> Clear
@@ -141,11 +152,12 @@ export default function CandidatesPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30">
-                  <TableHead className="w-[80px] text-center">Score</TableHead>
-                  <TableHead>Candidate</TableHead>
-                  <TableHead>Applied For</TableHead>
-                  <TableHead className="min-w-[160px]">Status</TableHead>
-                  <TableHead className="w-[80px] text-right">Actions</TableHead>
+                   <TableHead className="w-[80px] text-center">Score</TableHead>
+                   <TableHead>Candidate</TableHead>
+                   <TableHead className="w-[100px]">Type</TableHead>
+                   <TableHead>Applied For</TableHead>
+                   <TableHead className="min-w-[160px]">Status</TableHead>
+                   <TableHead className="w-[80px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -168,6 +180,16 @@ export default function CandidatesPage() {
                       <TableCell>
                         <p className="text-sm font-semibold text-foreground">{c.name}</p>
                         <p className="text-xs text-muted-foreground">{c.email}</p>
+                      </TableCell>
+                      <TableCell>
+                        {c.applicantType === 'internal' ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-green-600">
+                            <img src={existLogo} alt="Internal" className="w-3.5 h-3.5 object-contain" />
+                            Internal
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">External</span>
+                        )}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <button className="text-left hover:text-primary transition-colors" onClick={() => c.assignedJoId && handleViewJo(c.assignedJoId)}>
