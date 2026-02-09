@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router-dom';
 
 export default function CandidatesPage() {
   const navigate = useNavigate();
-  const { getAllCandidates, updateCandidatePipelineStatus, deleteCandidate, jobOrders, isVectorized, setSelectedJoId } = useApp();
+  const { getAllCandidates, deleteCandidate, jobOrders, isVectorized, setSelectedJoId } = useApp();
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
   const [emailCandidate, setEmailCandidate] = useState<any>(null);
   const [initialTab, setInitialTab] = useState('profile');
@@ -193,19 +193,14 @@ export default function CandidatesPage() {
                           <p className="text-xs text-muted-foreground">{getDepartment(c.assignedJoId)}</p>
                         </button>
                       </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Select value={c.pipelineStatus} onValueChange={(v) => updateCandidatePipelineStatus(c.id, v as PipelineStatus)}>
-                          <SelectTrigger className={cn(
-                            "h-7 text-xs",
-                            pipelineStatusColors[c.pipelineStatus],
-                            c.pipelineStatus === 'hr_interview' && 'bg-blue-50 border-blue-200'
-                          )}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(pipelineStatusLabels).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
+                      <TableCell>
+                        <span className={cn(
+                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
+                          pipelineStatusColors[c.pipelineStatus],
+                          c.pipelineStatus === 'hr_interview' && 'bg-blue-50 border-blue-200'
+                        )}>
+                          {pipelineStatusLabels[c.pipelineStatus]}
+                        </span>
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-0.5">
