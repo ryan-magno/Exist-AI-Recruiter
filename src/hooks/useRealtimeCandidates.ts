@@ -76,12 +76,8 @@ export function useRealtimeCandidates() {
         c => c.processing_status === 'completed' && !previousCompletedRef.current.has(c.id)
       );
 
-      // Skip notification on first check (initial load)
+      // Auto-refresh query cache when new candidates complete (but don't show popup — popup is only triggered by webhook 200)
       if (!isFirstCheckRef.current && newlyCompleted.length > 0) {
-        setNewCandidatesCount(newlyCompleted.length);
-        setShowRefreshPrompt(true);
-        
-        // Auto-refresh query cache
         queryClient.invalidateQueries({ queryKey: ['legacy-candidates'] });
       }
 
