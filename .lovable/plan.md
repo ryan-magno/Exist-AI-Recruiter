@@ -1,115 +1,73 @@
 
 
-# High-Level Architecture Refactor for Data Persistence
+# Fix: Eliminate Data Flash by Removing useState/useEffect Sync Patterns
 
-## Root Cause Analysis
+## Root Cause
 
-The previous fix failed because of **three compounding issues**:
+The previous refactors correctly moved providers and configured caching, but the data still disappears because of **synchronous rendering gaps**:
 
-1. **Query key mismatch**: The candidate data lives under the query key `['legacy-candidates']`, but `useRealtimeCandidates` (line 67-68) and `useProcessingStatus` (lines 81-82, 98-99) invalidate `['candidates']` and `['applications']` -- keys that do NOT match `['legacy-candidates']`. The `initializeDatabase` function (line 222) also invalidates `['candidates']` instead of `['legacy-candidates']`. This means background polling creates spurious refetches on non-existent keys while the actual data key is unaffected by legitimate refresh triggers.
+- `jobOrders` is a `useState([])` that gets populated by a `useEffect` watching `dbJobOrders`. On every render cycle, the first render sees `jobOrders = []` before the effect fires.
+- `isVectorized` is a `useState(false)` that gets set to `true` by a `useEffect` watching `candidates`. On the first render, it's `false`, which causes `getMatchesForJo()` and `getAllCandidates()` to return empty arrays.
+- Multiple pages (`DashboardPage`, `CandidatesPage`, `AnalyticsPage`) check `isVectorized` and show "No Candidates Yet" placeholder when it's `false`.
 
-2. **`enabled: isInitialized` gate**: The `useQuery` for candidates has `enabled: isInitialized`, and `isInitialized` starts as `false`. Every time `AppProvider` re-renders from scratch (which can happen during navigation if the component tree remounts), `isInitialized` resets to `false`, the query is disabled, and the cached data is not served until `initializeDatabase` runs again. This creates a flash of empty data.
+Even with cached React Query data available instantly, `useState` + `useEffect` introduces a one-frame delay where the UI renders with empty/default state.
 
-3. **Cache settings are too short**: `staleTime: 5min` and `gcTime: 10min` are not aggressive enough. With `refetchOnMount` still at its default (`true`), every navigation triggers a background refetch that can briefly show stale/empty state.
+## Solution
 
-## Solution (4 Steps)
+Replace all `useState` + `useEffect` sync patterns with `useMemo`, which computes derived values **synchronously** on the same render that receives the cached data.
 
-### Step 1: Move Providers to `main.tsx`
+### Changes in `src/context/AppContext.tsx`
 
-Move `QueryClientProvider`, `TooltipProvider`, and `Toaster`/`Sonner` OUT of `App.tsx` and into `main.tsx`. This ensures the `QueryClient` instance is never destroyed during route changes. `App.tsx` becomes a pure routing component inside `BrowserRouter`.
+1. **Replace `jobOrders` useState + useEffect with `useMemo`**:
+   - Remove: `const [jobOrders, setJobOrders] = useState([])`
+   - Remove: the `useEffect` that maps `dbJobOrders` to legacy format
+   - Add: `const jobOrders = useMemo(() => dbJobOrders.map(...), [dbJobOrders])`
 
-### Step 2: Aggressive QueryClient Configuration
+2. **Replace `isVectorized` useState + useEffect with `useMemo`**:
+   - Remove: `const [isVectorized, setIsVectorized] = useState(false)`
+   - Remove: the `useEffect` that sets `isVectorized` when candidates arrive
+   - Add: `const isVectorized = useMemo(() => candidates.length > 0, [candidates])`
 
-Set the `QueryClient` defaults in `main.tsx` to:
-- `staleTime: 1000 * 60 * 60` (1 hour)
-- `gcTime: 1000 * 60 * 60 * 24` (24 hours)
-- `refetchOnWindowFocus: false`
-- `refetchOnMount: false`
-- `retry: 1`
+3. **Remove `isVectorized` gates from data functions**:
+   - `getMatchesForJo`: Remove the `if (!isVectorized) return []` check -- just filter candidates directly
+   - `getAllCandidates`: Remove the `if (!isVectorized) return []` check -- just return candidates
 
-This means data fetched once stays fresh for the entire session. Navigating between pages serves cached data instantly.
+4. **Update context type**: Remove `setIsVectorized` and `setJobOrders` from the context interface since they are no longer needed as external setters (the data is derived, not manually set).
 
-### Step 3: Refactor AppContext -- Remove Manual Init Gate
+### Changes in `src/pages/UploadPage.tsx`
 
-- **Remove the `isInitialized` state** and the `enabled: isInitialized` guard on the candidates query. Instead, call `azureDb.init()` inside the `queryFn` itself (as a one-time call via a module-level flag), so the query is always enabled and the cache is always active.
-- **Remove the `useEffect` that calls `initializeDatabase` on mount**. The init call happens lazily inside the first query execution.
-- **Fix all query key references**: Change `initializeDatabase`'s invalidation calls from `['candidates']` to `['legacy-candidates']`.
+- Remove references to `setIsVectorized` -- it's no longer a setter. The `isVectorized` flag will automatically become `true` when candidates appear in the query cache after CV processing completes.
 
-### Step 4: Fix Invalidation in Polling Hooks
+## Technical Details
 
-- In `useRealtimeCandidates.ts` (lines 67-68, 102): change `queryClient.invalidateQueries({ queryKey: ['candidates'] })` to `queryClient.invalidateQueries({ queryKey: ['legacy-candidates'] })`.
-- In `useProcessingStatus.ts` (lines 81, 98): same fix -- invalidate `['legacy-candidates']` instead of `['candidates']`.
-- These are the ONLY places that should trigger refetches, and only in response to actual new data arriving (not navigation).
+**Before (broken)**:
+```text
+Render 1: jobOrders=[], isVectorized=false --> UI shows empty
+useEffect fires: setJobOrders(data), setIsVectorized(true)
+Render 2: jobOrders=data, isVectorized=true --> UI shows data
+```
+
+**After (fixed)**:
+```text
+Render 1: jobOrders=useMemo(dbJobOrders), isVectorized=useMemo(candidates.length>0) --> UI shows data immediately
+```
+
+**AppContext key changes**:
+```typescript
+// BEFORE:
+const [jobOrders, setJobOrders] = useState([]);
+const [isVectorized, setIsVectorized] = useState(false);
+useEffect(() => { if (dbJobOrders.length > 0) setJobOrders(mapped) }, [dbJobOrders]);
+useEffect(() => { if (candidates.length > 0) setIsVectorized(true) }, [candidates]);
+
+// AFTER:
+const jobOrders = useMemo(() => dbJobOrders.map(jo => ({...legacy format...})), [dbJobOrders]);
+const isVectorized = candidates.length > 0;
+```
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/main.tsx` | Add `QueryClientProvider`, `TooltipProvider`, `Toaster`, `Sonner` wrapping `<App />` with aggressive cache config |
-| `src/App.tsx` | Remove `QueryClientProvider`, `TooltipProvider`, `Toaster`, `Sonner` -- keep only `BrowserRouter` + `AppProvider` + routes |
-| `src/context/AppContext.tsx` | Remove `isInitialized` state, remove `initializeDatabase` useEffect, make init lazy inside queryFn, remove `enabled` guard, fix query key references |
-| `src/hooks/useRealtimeCandidates.ts` | Fix invalidation key from `['candidates']` to `['legacy-candidates']` |
-| `src/hooks/useProcessingStatus.ts` | Fix invalidation key from `['candidates']` to `['legacy-candidates']` |
-
-## Technical Details
-
-**main.tsx** structure:
-```typescript
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 60,       // 1 hour
-      gcTime: 1000 * 60 * 60 * 24,     // 24 hours
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-      retry: 1,
-    },
-  },
-});
-
-createRoot(document.getElementById("root")!).render(
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <App />
-    </TooltipProvider>
-  </QueryClientProvider>
-);
-```
-
-**App.tsx** becomes:
-```typescript
-const App = () => (
-  <BrowserRouter>
-    <AppProvider>
-      <AppLayout>
-        <Routes>...</Routes>
-      </AppLayout>
-    </AppProvider>
-  </BrowserRouter>
-);
-```
-
-**AppContext.tsx** candidate query (no `enabled` guard):
-```typescript
-let dbInitialized = false; // module-level flag
-
-async function ensureInit() {
-  if (!dbInitialized) {
-    await azureDb.init();
-    dbInitialized = true;
-  }
-}
-
-// Inside AppProvider:
-const { data: candidates = [] } = useQuery({
-  queryKey: ['legacy-candidates'],
-  queryFn: async () => {
-    await ensureInit();
-    return fetchLegacyCandidates();
-  },
-});
-```
-
-This removes the `isInitialized` state, the `initializeDatabase` function, and the auto-init `useEffect` entirely.
+| `src/context/AppContext.tsx` | Replace useState+useEffect sync with useMemo for jobOrders and isVectorized; remove gates from getMatchesForJo/getAllCandidates; remove setIsVectorized/setJobOrders from context |
+| `src/pages/UploadPage.tsx` | Remove `setIsVectorized` usage (no longer available) |
