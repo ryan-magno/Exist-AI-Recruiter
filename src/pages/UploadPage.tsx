@@ -50,7 +50,7 @@ const formatFileSize = (bytes: number): string => {
 
 export default function UploadPage() {
   const navigate = useNavigate();
-  const { isVectorized, setIsVectorized } = useApp();
+  const { isVectorized } = useApp();
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -73,7 +73,6 @@ export default function UploadPage() {
   useEffect(() => {
     if (!isProcessing) {
       setFiles([]);
-      setIsVectorized(false);
       setUploaderName('');
       setDefaultIsInternal(false);
     }
@@ -289,8 +288,6 @@ export default function UploadPage() {
         
         // Mark all files as complete (processing started successfully)
         setFiles(prev => prev.map(f => ({ ...f, status: 'complete' as const })));
-        setIsVectorized(true);
-        
         toast.success('CVs submitted for AI processing!', {
           description: 'Candidates will appear in the dashboard shortly as they are processed.',
           duration: 5000
@@ -362,8 +359,6 @@ export default function UploadPage() {
         setFiles(prev => prev.map(f => ({ ...f, status: 'complete' as const })));
         toast.success('CVs submitted successfully');
       }
-      
-      setIsVectorized(true);
       
       // Save uploader name to database (only if new)
       const isExistingUploaderLegacy = existingUploaders.some(n => n.toLowerCase() === uploaderName.trim().toLowerCase());

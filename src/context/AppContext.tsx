@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useMemo } from 'react';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useJobOrders, useUpdateJobOrder, useCreateJobOrder, useDeleteJobOrder, JobOrder as DBJobOrder, JobOrderInsert } from '@/hooks/useJobOrders';
 import { useUpdateApplicationStatus, PipelineStatus } from '@/hooks/useApplications';
@@ -145,11 +145,9 @@ async function fetchLegacyCandidates(): Promise<LegacyCandidate[]> {
 
 interface AppContextType {
   isVectorized: boolean;
-  setIsVectorized: (value: boolean) => void;
   candidates: LegacyCandidate[];
   setCandidates: React.Dispatch<React.SetStateAction<LegacyCandidate[]>>;
   jobOrders: LegacyJobOrder[];
-  setJobOrders: React.Dispatch<React.SetStateAction<LegacyJobOrder[]>>;
   selectedJoId: string | null;
   setSelectedJoId: (id: string | null) => void;
   sidebarCollapsed: boolean;
@@ -181,8 +179,6 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const [isVectorized, setIsVectorized] = useState(false);
-  const [jobOrders, setJobOrders] = useState<LegacyJobOrder[]>([]);
   const [selectedJoId, setSelectedJoId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isFindingMatches, setIsFindingMatches] = useState(false);
@@ -200,12 +196,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     queryFn: fetchLegacyCandidates,
   });
 
-  // Set vectorized flag when candidates are available
-  useEffect(() => {
-    if (candidates.length > 0) {
-      setIsVectorized(true);
-    }
-  }, [candidates]);
+  // Derived: candidates available = vectorized
+  const isVectorized = candidates.length > 0;
 
   // setCandidates now updates the React Query cache
   const setCandidates: React.Dispatch<React.SetStateAction<LegacyCandidate[]>> = useCallback((action) => {
@@ -219,27 +211,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await queryClient.invalidateQueries({ queryKey: ['legacy-candidates'] });
   }, [queryClient]);
 
-  // Sync database job orders to legacy state
-  useEffect(() => {
-    if (dbJobOrders.length > 0) {
-      const legacyJOs: LegacyJobOrder[] = dbJobOrders.map(jo => ({
-        id: jo.id,
-        joNumber: jo.jo_number,
-        title: jo.title,
-        description: jo.description || '',
-        level: jo.level as LegacyJobOrder['level'],
-        quantity: jo.quantity,
-        hiredCount: jo.hired_count,
-        requiredDate: jo.required_date || '',
-        createdDate: jo.created_at.split('T')[0],
-        status: jo.status as LegacyJobOrder['status'],
-        candidateIds: [],
-        department: jo.department_name || '',
-        employmentType: jo.employment_type as LegacyJobOrder['employmentType'],
-        requestorName: jo.requestor_name || ''
-      }));
-      setJobOrders(legacyJOs);
-    }
+  // Derive legacy job orders synchronously from DB data
+  const jobOrders = useMemo<LegacyJobOrder[]>(() => {
+    return dbJobOrders.map(jo => ({
+      id: jo.id,
+      joNumber: jo.jo_number,
+      title: jo.title,
+      description: jo.description || '',
+      level: jo.level as LegacyJobOrder['level'],
+      quantity: jo.quantity,
+      hiredCount: jo.hired_count,
+      requiredDate: jo.required_date || '',
+      createdDate: jo.created_at.split('T')[0],
+      status: jo.status as LegacyJobOrder['status'],
+      candidateIds: [],
+      department: jo.department_name || '',
+      employmentType: jo.employment_type as LegacyJobOrder['employmentType'],
+      requestorName: jo.requestor_name || ''
+    }));
   }, [dbJobOrders]);
 
   const handleHiredCandidate = async (joId: string, candidateId: string) => {
@@ -450,12 +439,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const getMatchesForJo = (joId: string): LegacyCandidate[] => {
-    if (!isVectorized) return [];
     return candidates.filter(c => c.assignedJoId === joId);
   };
 
   const getAllCandidates = (): LegacyCandidate[] => {
-    if (!isVectorized) return [];
     return candidates;
   };
 
@@ -463,11 +450,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider
       value={{
         isVectorized,
-        setIsVectorized,
         candidates,
         setCandidates,
         jobOrders,
-        setJobOrders,
         selectedJoId,
         setSelectedJoId,
         sidebarCollapsed,
