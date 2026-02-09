@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useJobOrders, useUpdateJobOrder, useCreateJobOrder, useDeleteJobOrder, JobOrder as DBJobOrder, JobOrderInsert } from '@/hooks/useJobOrders';
 import { useUpdateApplicationStatus, PipelineStatus } from '@/hooks/useApplications';
 import { azureDb } from '@/lib/azureDb';
@@ -39,6 +39,98 @@ const dbPipelineToLegacy: Record<string, LegacyPipelineStatus> = {
   'withdrawn': 'rejected',
 };
 
+// Fetch candidates from Azure DB and convert to legacy format
+async function fetchLegacyCandidates(): Promise<LegacyCandidate[]> {
+  const [applicationsData, candidatesData] = await Promise.all([
+    azureDb.applications.list(),
+    azureDb.candidates.list()
+  ]);
+
+  const candidateMap = new Map<string, any>();
+  candidatesData.forEach((c: any) => candidateMap.set(c.id, c));
+
+  // Fetch offers in parallel
+  const offerMap = new Map<string, string>();
+  try {
+    const offerResults = await Promise.allSettled(
+      applicationsData.map((app: any) => azureDb.offers.get(app.id))
+    );
+    offerResults.forEach((result, i) => {
+      if (result.status === 'fulfilled' && result.value?.status) {
+        offerMap.set(applicationsData[i].id, result.value.status);
+      }
+    });
+  } catch {
+    // Offers fetch failed, continue without
+  }
+
+  return applicationsData.map((app: any) => {
+    const candidate = candidateMap.get(app.candidate_id) || {};
+    
+    let expectedSalary = candidate.expected_salary || '';
+    if (expectedSalary && !expectedSalary.includes('₱') && !expectedSalary.toLowerCase().includes('php')) {
+      expectedSalary = `₱${expectedSalary}`;
+    }
+    
+    return {
+      id: app.candidate_id,
+      applicationId: app.id,
+      name: app.candidate_name || candidate.full_name || 'Unknown',
+      email: app.candidate_email || candidate.email || '',
+      phone: candidate.phone || '',
+      linkedIn: candidate.linkedin || '',
+      matchScore: candidate.qualification_score || parseFloat(app.match_score) || 0,
+      pipelineStatus: dbPipelineToLegacy[app.pipeline_status] || (app.pipeline_status as LegacyPipelineStatus) || 'hr_interview',
+      statusChangedDate: app.status_changed_date?.split('T')[0] || new Date().toISOString().split('T')[0],
+      techInterviewResult: dbTechResultToLegacy[app.tech_interview_result] || 'pending',
+      skills: app.skills || candidate.skills || [],
+      experience: `${app.years_of_experience || candidate.years_of_experience || 0} years`,
+      experienceDetails: {
+        totalYears: app.years_of_experience || candidate.years_of_experience || 0,
+        breakdown: candidate.years_of_experience_text || ''
+      },
+      matchReasons: [],
+      matchAnalysis: {
+        summary: candidate.overall_summary || '',
+        strengths: candidate.strengths || [],
+        weaknesses: candidate.weaknesses || []
+      },
+      workingConditions: app.working_conditions || '',
+      remarks: app.remarks || '',
+      techNotes: '',
+      employmentType: 'full_time' as const,
+      positionApplied: app.job_title || (candidate.positions_fit_for?.[0]) || 'Not specified',
+      expectedSalary: expectedSalary,
+      earliestStartDate: candidate.earliest_start_date || '',
+      currentPosition: candidate.current_position || '',
+      currentCompany: candidate.current_company || '',
+      assignedJoId: app.job_order_id,
+      educationalBackground: candidate.educational_background || '',
+      relevantWorkExperience: '',
+      keySkills: app.skills || candidate.skills || [],
+      appliedDate: app.applied_date?.split('T')[0] || '',
+      timeline: [],
+      applicantType: candidate.applicant_type || 'external',
+      workExperiences: [],
+      applicationHistory: [],
+      offerStatus: (offerMap.get(app.id) as LegacyCandidate['offerStatus']) || undefined,
+      qualificationScore: candidate.qualification_score || undefined,
+      overallSummary: candidate.overall_summary || undefined,
+      strengths: candidate.strengths || [],
+      weaknesses: candidate.weaknesses || [],
+      internalUploadReason: candidate.internal_upload_reason || undefined,
+      internalFromDate: candidate.internal_from_date || undefined,
+      internalToDate: candidate.internal_to_date || undefined,
+      googleDriveFileUrl: candidate.google_drive_file_url || undefined,
+      googleDriveFileId: candidate.google_drive_file_id || undefined,
+      preferredEmploymentType: candidate.preferred_employment_type || undefined,
+      batchId: candidate.batch_id || undefined,
+      batchCreatedAt: candidate.batch_created_at || undefined,
+      positionsFitFor: candidate.positions_fit_for || [],
+    };
+  });
+}
+
 interface AppContextType {
   isVectorized: boolean;
   setIsVectorized: (value: boolean) => void;
@@ -68,7 +160,6 @@ interface AppContextType {
   isFindingMatches: boolean;
   setIsFindingMatches: (value: boolean) => void;
   markJoAsFulfilled: (joId: string) => void;
-  // Database state
   dbJobOrders: DBJobOrder[];
   isLoadingJobOrders: boolean;
   initializeDatabase: () => Promise<void>;
@@ -80,7 +171,6 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [isVectorized, setIsVectorized] = useState(false);
-  const [candidates, setCandidates] = useState<LegacyCandidate[]>([]);
   const [jobOrders, setJobOrders] = useState<LegacyJobOrder[]>([]);
   const [selectedJoId, setSelectedJoId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -94,112 +184,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteJobOrderMutation = useDeleteJobOrder();
   const updateApplicationStatusMutation = useUpdateApplicationStatus();
 
-  // Fetch candidates and applications from Azure DB and convert to legacy format
-  const refreshCandidates = useCallback(async () => {
-    try {
-      const [applicationsData, candidatesData] = await Promise.all([
-        azureDb.applications.list(),
-        azureDb.candidates.list()
-      ]);
+  // Candidates managed by React Query
+  const { data: candidates = [] } = useQuery({
+    queryKey: ['legacy-candidates'],
+    queryFn: fetchLegacyCandidates,
+    enabled: isInitialized,
+  });
 
-      // Create a map of candidates for quick lookup
-      const candidateMap = new Map<string, any>();
-      candidatesData.forEach((c: any) => candidateMap.set(c.id, c));
-
-      // Fetch offers in parallel to get offer statuses for kanban display
-      const offerMap = new Map<string, string>();
-      try {
-        const offerResults = await Promise.allSettled(
-          applicationsData.map((app: any) => azureDb.offers.get(app.id))
-        );
-        offerResults.forEach((result, i) => {
-          if (result.status === 'fulfilled' && result.value?.status) {
-            offerMap.set(applicationsData[i].id, result.value.status);
-          }
-        });
-      } catch {
-        // Offers fetch failed, continue without
-      }
-
-      // Convert applications to legacy Candidate format (each application = one candidate entry per JO)
-      const legacyCandidates: LegacyCandidate[] = applicationsData.map((app: any) => {
-        const candidate = candidateMap.get(app.candidate_id) || {};
-        
-        // Format expected salary with PHP currency if not already formatted
-        let expectedSalary = candidate.expected_salary || '';
-        if (expectedSalary && !expectedSalary.includes('₱') && !expectedSalary.toLowerCase().includes('php')) {
-          expectedSalary = `₱${expectedSalary}`;
-        }
-        
-      return {
-          id: app.candidate_id,
-          applicationId: app.id,
-          name: app.candidate_name || candidate.full_name || 'Unknown',
-          email: app.candidate_email || candidate.email || '',
-          phone: candidate.phone || '',
-          linkedIn: candidate.linkedin || '',
-          matchScore: candidate.qualification_score || parseFloat(app.match_score) || 0,
-          pipelineStatus: dbPipelineToLegacy[app.pipeline_status] || (app.pipeline_status as LegacyPipelineStatus) || 'hr_interview',
-          statusChangedDate: app.status_changed_date?.split('T')[0] || new Date().toISOString().split('T')[0],
-          techInterviewResult: dbTechResultToLegacy[app.tech_interview_result] || 'pending',
-          skills: app.skills || candidate.skills || [],
-          experience: `${app.years_of_experience || candidate.years_of_experience || 0} years`,
-          experienceDetails: {
-            totalYears: app.years_of_experience || candidate.years_of_experience || 0,
-            breakdown: candidate.years_of_experience_text || ''
-          },
-          matchReasons: [],
-          matchAnalysis: {
-            summary: candidate.overall_summary || '',
-            strengths: candidate.strengths || [],
-            weaknesses: candidate.weaknesses || []
-          },
-          workingConditions: app.working_conditions || '',
-          remarks: app.remarks || '',
-          techNotes: '',
-          employmentType: 'full_time' as const,
-          positionApplied: app.job_title || (candidate.positions_fit_for?.[0]) || 'Not specified',
-          expectedSalary: expectedSalary,
-          earliestStartDate: candidate.earliest_start_date || '',
-          currentPosition: candidate.current_position || '',
-          currentCompany: candidate.current_company || '',
-          assignedJoId: app.job_order_id,
-          educationalBackground: candidate.educational_background || '',
-          relevantWorkExperience: '',
-          keySkills: app.skills || candidate.skills || [],
-          appliedDate: app.applied_date?.split('T')[0] || '',
-          timeline: [],
-          applicantType: candidate.applicant_type || 'external',
-          workExperiences: [],
-          applicationHistory: [],
-          offerStatus: (offerMap.get(app.id) as LegacyCandidate['offerStatus']) || undefined,
-          // New fields
-          qualificationScore: candidate.qualification_score || undefined,
-          overallSummary: candidate.overall_summary || undefined,
-          strengths: candidate.strengths || [],
-          weaknesses: candidate.weaknesses || [],
-          internalUploadReason: candidate.internal_upload_reason || undefined,
-          internalFromDate: candidate.internal_from_date || undefined,
-          internalToDate: candidate.internal_to_date || undefined,
-          googleDriveFileUrl: candidate.google_drive_file_url || undefined,
-          googleDriveFileId: candidate.google_drive_file_id || undefined,
-          preferredEmploymentType: candidate.preferred_employment_type || undefined,
-          batchId: candidate.batch_id || undefined,
-          batchCreatedAt: candidate.batch_created_at || undefined,
-          positionsFitFor: candidate.positions_fit_for || [],
-        };
-      });
-
-      setCandidates(legacyCandidates);
-      
-      // Set vectorized to true if we have candidates
-      if (legacyCandidates.length > 0) {
-        setIsVectorized(true);
-      }
-    } catch (error) {
-      console.error('Error fetching candidates:', error);
+  // Set vectorized flag when candidates are available
+  useEffect(() => {
+    if (candidates.length > 0) {
+      setIsVectorized(true);
     }
-  }, []);
+  }, [candidates]);
+
+  // setCandidates now updates the React Query cache
+  const setCandidates: React.Dispatch<React.SetStateAction<LegacyCandidate[]>> = useCallback((action) => {
+    queryClient.setQueryData<LegacyCandidate[]>(['legacy-candidates'], (old = []) => {
+      return typeof action === 'function' ? action(old) : action;
+    });
+  }, [queryClient]);
+
+  // refreshCandidates invalidates the query
+  const refreshCandidates = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['legacy-candidates'] });
+  }, [queryClient]);
 
   // Initialize Azure PostgreSQL database
   const initializeDatabase = async () => {
@@ -209,13 +218,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await azureDb.init();
       setIsInitialized(true);
       console.log('Database initialized successfully');
-      // Refresh data after init
       queryClient.invalidateQueries({ queryKey: ['job-orders'] });
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['departments'] });
-      // Load candidates from DB
-      await refreshCandidates();
+      // legacy-candidates will auto-fetch once isInitialized becomes true
     } catch (error) {
       console.error('Failed to initialize database:', error);
     }
@@ -251,9 +258,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const handleHiredCandidate = async (joId: string, candidateId: string) => {
     const candidate = candidates.find(c => c.id === candidateId);
-    if (candidate?.pipelineStatus === 'hired') {
-      return;
-    }
+    if (candidate?.pipelineStatus === 'hired') return;
 
     const jo = dbJobOrders.find(j => j.id === joId);
     if (!jo) return;
@@ -293,16 +298,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const previousStatus = candidate.pipelineStatus;
 
-    // Update local state immediately for responsiveness
+    // Optimistic update via cache
     setCandidates(prev => 
       prev.map(c => c.id === candidateId ? { ...c, pipelineStatus: status, statusChangedDate: new Date().toISOString().split('T')[0] } : c)
     );
 
-    // Frontend types now match DB types directly
     const dbStatus = status as PipelineStatus;
     const previousDbStatus = previousStatus as PipelineStatus;
 
-    // Persist to database (this also creates timeline entry in the edge function)
     if (candidate.applicationId) {
       try {
         await updateApplicationStatusMutation.mutateAsync({
@@ -312,7 +315,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
       } catch (error) {
         console.error('Error updating application status:', error);
-        // Revert local state on failure
         setCandidates(prev => 
           prev.map(c => c.id === candidateId ? { ...c, pipelineStatus: previousStatus } : c)
         );
@@ -321,7 +323,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // If moving to hired, handle the job order update
     if (status === 'hired' && previousStatus !== 'hired' && candidate.assignedJoId) {
       handleHiredCandidate(candidate.assignedJoId, candidateId);
     }
@@ -409,9 +410,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addJobOrder = async (jo: Omit<LegacyJobOrder, 'id' | 'joNumber' | 'createdDate' | 'candidateIds' | 'hiredCount'>) => {
     try {
-      // Get the count for JO number generation
       const { count } = await azureDb.jobOrders.count();
-      
       const joNumber = `JO-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
       
       const newJO: JobOrderInsert = {
