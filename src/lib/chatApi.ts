@@ -16,40 +16,80 @@ export async function sendStreamingMessage(
   }
 
   try {
-    console.log('1. Sending request to n8n:', { chatInput, sessionId });
+    console.log('SSE: Sending request to n8n:', { chatInput, sessionId });
 
     const response = await fetch(WEBHOOK_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Accept': 'text/event-stream',
       },
       body: JSON.stringify({ chatInput, sessionId }),
       signal: controller.signal,
     });
 
-    console.log('2. Response status:', response.status, response.ok);
+    console.log('SSE: Response status:', response.status, response.ok);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    const data = await response.json();
-    console.log('3. Raw response data:', data);
-
-    if (!Array.isArray(data) || !data[0]?.output) {
-      console.error('Invalid response structure:', data);
-      throw new Error('Invalid response format from n8n');
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Response body is not readable');
     }
 
-    const aiMessage = data[0].output;
-    console.log('4. Extracted AI message:', aiMessage.substring(0, 100) + '...');
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let accumulated = '';
 
-    if (!aiMessage || aiMessage.trim() === '') {
-      throw new Error('Empty response from AI');
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      let newlineIdx;
+      while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, newlineIdx).trim();
+        buffer = buffer.slice(newlineIdx + 1);
+
+        if (!line || !line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+
+        if (data === '[DONE]') {
+          console.log('SSE: Received [DONE], accumulated length:', accumulated.length);
+          options.onComplete();
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'message' && parsed.data) {
+            accumulated += parsed.data;
+            options.onChunk(accumulated);
+          }
+        } catch {
+          console.warn('SSE: Failed to parse data line:', data);
+        }
+      }
     }
 
-    options.onChunk(aiMessage);
+    // Flush remaining buffer
+    if (buffer.trim().startsWith('data: ')) {
+      const data = buffer.trim().slice(6).trim();
+      if (data && data !== '[DONE]') {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'message' && parsed.data) {
+            accumulated += parsed.data;
+            options.onChunk(accumulated);
+          }
+        } catch { /* skip */ }
+      }
+    }
+
+    console.log('SSE: Stream ended, accumulated length:', accumulated.length);
     options.onComplete();
   } catch (error) {
     if (controller.signal.aborted && !options.signal?.aborted) {
