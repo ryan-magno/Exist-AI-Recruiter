@@ -65,10 +65,20 @@ export async function sendStreamingMessage(
           if (eventType === 'item' && parsed.hasOwnProperty('content')) {
             const content = String(parsed.content);
 
-            // Skip wrapped JSON ONLY if it's definitely the Respond to Webhook output
-            if (content.startsWith('{') && content.includes('"output"') && content.includes('\\"')) {
-              console.log('NDJSON: Skipping wrapped JSON from Respond to Webhook');
-              continue;
+            // Check if content is wrapped JSON array with output field (from Respond to Webhook)
+            if (content.startsWith('[') || (content.startsWith('{') && content.includes('"output"'))) {
+              try {
+                const wrapped = JSON.parse(content);
+                const outputContent = Array.isArray(wrapped) ? wrapped[0]?.output : wrapped.output;
+                if (outputContent) {
+                  console.log('NDJSON: Extracting output from wrapped JSON');
+                  accumulated = outputContent;
+                  options.onChunk(accumulated);
+                  continue;
+                }
+              } catch {
+                // Not valid JSON, treat as regular content
+              }
             }
 
             accumulated += content;
