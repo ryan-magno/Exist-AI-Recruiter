@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Mail, Search, X, Eye, Filter, Trash2 } from 'lucide-react';
+import { Users, Mail, Search, X, Filter, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -148,12 +148,12 @@ export default function CandidatesPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30 border-b">
-                  <TableHead className="w-[72px] text-center px-3">Score</TableHead>
-                  <TableHead className="min-w-[180px] px-4">Candidate</TableHead>
-                  <TableHead className="w-[90px] px-3 text-center">Type</TableHead>
-                  <TableHead className="min-w-[180px] px-4">Applied For</TableHead>
-                  <TableHead className="w-[140px] px-3">Status</TableHead>
-                  <TableHead className="w-[110px] px-3 text-center">Actions</TableHead>
+                  <TableHead className="w-[60px] text-center px-2">Score</TableHead>
+                  <TableHead className="px-3">Candidate</TableHead>
+                  <TableHead className="w-[80px] px-2 text-center">Type</TableHead>
+                  <TableHead className="px-3">Applied For</TableHead>
+                  <TableHead className="w-[130px] px-2 text-center">Status</TableHead>
+                  <TableHead className="w-[80px] px-2 text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -165,7 +165,7 @@ export default function CandidatesPage() {
                       className="cursor-pointer hover:bg-secondary/50 transition-colors duration-150 h-[56px]"
                       onClick={() => handleOpenProfile(c)}
                     >
-                      <TableCell className="text-center px-3 py-2">
+                      <TableCell className="text-center px-2 py-2">
                         <span className={cn(
                           'inline-flex items-center justify-center w-9 h-9 rounded-full text-xs font-bold border',
                           getScoreStyles(score)
@@ -173,24 +173,24 @@ export default function CandidatesPage() {
                           {score}
                         </span>
                       </TableCell>
-                      <TableCell className="px-4 py-2">
-                        <p className="text-sm font-semibold text-foreground leading-tight truncate max-w-[220px]">{c.name}</p>
-                        <p className="text-xs text-muted-foreground leading-tight mt-0.5 truncate max-w-[220px]">{c.email}</p>
+                      <TableCell className="px-3 py-2">
+                        <p className="text-sm font-semibold text-foreground leading-tight truncate">{c.name}</p>
+                        <p className="text-xs text-muted-foreground leading-tight mt-0.5 truncate">{c.email}</p>
                       </TableCell>
-                      <TableCell className="px-3 py-2 text-center">
+                      <TableCell className="px-2 py-2 text-center">
                         {c.applicantType === 'internal' ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-green-50 text-green-700 border border-green-200">Internal</span>
                         ) : (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] text-muted-foreground bg-muted/50 border border-border">External</span>
                         )}
                       </TableCell>
-                      <TableCell className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                      <TableCell className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                         <button className="text-left hover:text-primary transition-colors group" onClick={() => c.assignedJoId && handleViewJo(c.assignedJoId)}>
-                          <p className="text-sm font-medium text-foreground leading-tight truncate max-w-[200px] group-hover:text-primary">{getJobTitle(c.assignedJoId)}</p>
-                          <p className="text-xs text-muted-foreground leading-tight mt-0.5 truncate max-w-[200px]">{getDepartment(c.assignedJoId)}</p>
+                          <p className="text-sm font-medium text-foreground leading-tight truncate group-hover:text-primary">{getJobTitle(c.assignedJoId)}</p>
+                          <p className="text-xs text-muted-foreground leading-tight mt-0.5 truncate">{getDepartment(c.assignedJoId)}</p>
                         </button>
                       </TableCell>
-                      <TableCell className="px-3 py-2">
+                      <TableCell className="px-2 py-2 text-center">
                         <span className={cn(
                           "inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium border whitespace-nowrap",
                           pipelineStatusColors[c.pipelineStatus],
@@ -199,7 +199,7 @@ export default function CandidatesPage() {
                           {pipelineStatusLabels[c.pipelineStatus]}
                         </span>
                       </TableCell>
-                      <TableCell className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                      <TableCell className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1">
                           <button
                             title="Send Email"
@@ -208,14 +208,6 @@ export default function CandidatesPage() {
                             onClick={() => setEmailCandidate(c)}
                           >
                             <Mail className="w-4 h-4 text-muted-foreground" />
-                          </button>
-                          <button
-                            title="View Profile"
-                            aria-label="View profile"
-                            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary transition-colors"
-                            onClick={() => handleOpenProfile(c)}
-                          >
-                            <Eye className="w-4 h-4 text-muted-foreground" />
                           </button>
                           <button
                             title="Delete Candidate"
