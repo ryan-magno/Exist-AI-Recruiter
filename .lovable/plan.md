@@ -1,72 +1,81 @@
 
 
-# Fix: n8n Webhook Returns JSON, Not SSE
+# Revert chatApi.ts to SSE Stream Reading
 
 ## Problem
 
-The current `chatApi.ts` expects Server-Sent Events (SSE) streaming, but the n8n webhook actually returns a plain JSON response:
-
-```json
-[{"output": "I am an intelligent HR assistant..."}]
-```
-
-The SSE reader loops forever waiting for `data:` lines that never come, so the assistant message stays empty.
+The n8n webhook is configured with streaming enabled (`responseMode: "streaming"`, `enableStreaming: true`), returning Server-Sent Events. The current code uses `response.json()` which fails to parse the SSE stream.
 
 ## Solution
 
-Rewrite `src/lib/chatApi.ts` to handle the actual JSON response format while keeping the same `StreamOptions` callback interface so `useStreamingChat.ts` requires no changes.
+Replace the JSON parsing in `src/lib/chatApi.ts` with an SSE stream reader that:
 
-### Changes in `src/lib/chatApi.ts`
+1. Sets `Accept: text/event-stream` header
+2. Uses `response.body.getReader()` to read the stream incrementally
+3. Parses `data:` prefixed lines, handling `data: [DONE]` as the completion signal
+4. Parses each `data:` payload as JSON with format `{"type":"message","data":"chunk text"}`
+5. Accumulates chunks and calls `options.onChunk()` with the accumulated text on each chunk
+6. Calls `options.onComplete()` when `[DONE]` is received or the stream ends
+7. Handles a line buffer to deal with chunks split across read boundaries
+8. Flushes any remaining buffer content after the read loop ends
 
-Replace the entire SSE stream-reading logic with:
-
-1. Change `Accept` header from `text/event-stream` to `application/json`
-2. Use `response.json()` instead of streaming the body
-3. Extract the message from `data[0]?.output`
-4. Validate the response structure (array with `output` field)
-5. Deliver the full text via `options.onChunk()` then call `options.onComplete()`
-6. Add `console.log` statements for debugging (response status, raw data, extracted output)
-
-The function signature and callback contract stay identical, so **no changes needed** in `useStreamingChat.ts`, `ChatbotPage.tsx`, or any other file.
-
-## Technical Details
-
-**Key code change in `chatApi.ts`:**
-```typescript
-const response = await fetch(WEBHOOK_URL, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
-  body: JSON.stringify({ chatInput, sessionId }),
-  signal: controller.signal,
-});
-
-if (!response.ok) {
-  throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-}
-
-const data = await response.json();
-
-if (!Array.isArray(data) || !data[0]?.output) {
-  throw new Error('Invalid response format from n8n');
-}
-
-const aiMessage = data[0].output;
-if (!aiMessage || aiMessage.trim() === '') {
-  throw new Error('Empty response from AI');
-}
-
-options.onChunk(aiMessage);
-options.onComplete();
-```
+No other files need changes -- `useStreamingChat.ts` and the UI components already work with the `onChunk`/`onComplete` callback pattern.
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/lib/chatApi.ts` | Replace SSE stream reader with JSON response parsing; change Accept header to `application/json`; extract `data[0].output` |
+| `src/lib/chatApi.ts` | Replace `response.json()` with SSE stream reader using `ReadableStream`, parse `data:` lines, handle `[DONE]` sentinel, buffer partial lines across chunks |
 
-No other files need changes -- the hook and UI already work with the `onChunk`/`onComplete` callback pattern.
+## Technical Details
+
+Key implementation in `chatApi.ts`:
+
+```typescript
+const response = await fetch(WEBHOOK_URL, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'text/event-stream',
+  },
+  body: JSON.stringify({ chatInput, sessionId }),
+  signal: controller.signal,
+});
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+let buffer = '';
+let accumulated = '';
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+
+  buffer += decoder.decode(value, { stream: true });
+
+  // Process complete lines
+  let newlineIdx;
+  while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
+    const line = buffer.slice(0, newlineIdx).trim();
+    buffer = buffer.slice(newlineIdx + 1);
+
+    if (!line.startsWith('data: ')) continue;
+    const data = line.slice(6).trim();
+    if (data === '[DONE]') { options.onComplete(); return; }
+
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed.type === 'message' && parsed.data) {
+        accumulated += parsed.data;
+        options.onChunk(accumulated);
+      }
+    } catch { /* skip malformed */ }
+  }
+}
+
+// Flush remaining buffer, then complete
+options.onComplete();
+```
+
+The `onChunk` callback receives the **accumulated** message so far (not just the delta), which matches how `useStreamingChat.ts` uses it -- it replaces the last assistant message's content with the snapshot.
 
