@@ -92,8 +92,8 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
                   <h2 className="text-lg font-semibold text-foreground truncate">{currentCandidate.name}</h2>
                   {score != null && <MatchScoreRing score={score} size={36} strokeWidth={3} />}
                   {currentCandidate.applicantType === 'internal' ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold text-green-600 bg-white border-2 border-green-500 flex-shrink-0">
-                      <img src={existLogo} alt="Internal" className="w-3.5 h-3.5 object-contain" />
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-green-600 bg-green-50 flex-shrink-0">
+                      <img src={existLogo} alt="Internal" className="w-4 h-4 object-contain" />
                       Internal
                     </span>
                   ) : (
