@@ -92,35 +92,35 @@ export default function CandidatesPage() {
     <div className="p-6 h-full overflow-auto">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         {/* Header */}
-        <div className="flex items-center gap-2 mb-4">
-          <Users className="w-5 h-5 text-muted-foreground" />
-          <h1>All Candidates</h1>
-          <span className="text-sm text-muted-foreground">• {candidates.length} total</span>
+        <div className="flex items-center gap-2.5 mb-5">
+          <Users className="w-5 h-5 text-primary" />
+          <h1 className="text-lg font-semibold text-foreground">All Candidates</h1>
+          <span className="text-sm text-muted-foreground font-medium">• {filteredCandidates.length} of {candidates.length}</span>
         </div>
 
         {/* Filters */}
         <div className="bg-card rounded-lg border p-3 mb-4">
-          <div className="flex flex-wrap gap-3 items-center">
+          <div className="flex flex-wrap gap-2.5 items-center">
             <div className="relative flex-1 min-w-[250px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input placeholder="Search by name, position, or skills..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-8 text-sm" />
+              <Input placeholder="Search by name, position, or skills..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9 text-sm" />
             </div>
             <Select value={pipelineFilter} onValueChange={setPipelineFilter}>
-              <SelectTrigger className="w-[160px] h-8 text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectTrigger className="w-[155px] h-9 text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 {Object.entries(pipelineStatusLabels).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger className="w-[160px] h-8 text-sm"><SelectValue placeholder="Department" /></SelectTrigger>
+              <SelectTrigger className="w-[155px] h-9 text-sm"><SelectValue placeholder="Department" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Depts</SelectItem>
                 {uniqueDepartments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[140px] h-8 text-sm"><SelectValue placeholder="Type" /></SelectTrigger>
+              <SelectTrigger className="w-[135px] h-9 text-sm"><SelectValue placeholder="Type" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="internal">Internal</SelectItem>
@@ -128,35 +128,32 @@ export default function CandidatesPage() {
               </SelectContent>
             </Select>
             {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 gap-1 text-xs">
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 gap-1.5 text-xs px-3">
                 <X className="w-3.5 h-3.5" /> Clear
               </Button>
             )}
           </div>
-          {hasActiveFilters && (
-            <p className="text-xs text-muted-foreground mt-2">{filteredCandidates.length} of {candidates.length} shown</p>
-          )}
         </div>
 
         {/* Table */}
         <div className="bg-card rounded-lg border overflow-hidden">
           {filteredCandidates.length === 0 ? (
-            <div className="text-center py-12">
+            <div className="text-center py-16">
               <Filter className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
               <h3 className="text-sm font-semibold mb-1">No candidates found</h3>
-              <p className="text-xs text-muted-foreground mb-3">Try adjusting your filters</p>
+              <p className="text-xs text-muted-foreground mb-4">Try adjusting your filters</p>
               <Button variant="outline" size="sm" onClick={clearFilters}>Clear Filters</Button>
             </div>
           ) : (
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/30">
-                   <TableHead className="w-[80px] text-center">Score</TableHead>
-                   <TableHead>Candidate</TableHead>
-                   <TableHead className="w-[100px]">Type</TableHead>
-                   <TableHead>Applied For</TableHead>
-                   <TableHead className="min-w-[160px]">Status</TableHead>
-                   <TableHead className="w-[80px] text-right">Actions</TableHead>
+                <TableRow className="bg-muted/30 border-b">
+                  <TableHead className="w-[72px] text-center px-3">Score</TableHead>
+                  <TableHead className="min-w-[180px] px-4">Candidate</TableHead>
+                  <TableHead className="w-[90px] px-3 text-center">Type</TableHead>
+                  <TableHead className="min-w-[180px] px-4">Applied For</TableHead>
+                  <TableHead className="w-[140px] px-3">Status</TableHead>
+                  <TableHead className="w-[110px] px-3 text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -165,68 +162,68 @@ export default function CandidatesPage() {
                   return (
                     <TableRow
                       key={c.id}
-                      className="cursor-pointer hover:bg-secondary/50 transition-colors duration-150"
+                      className="cursor-pointer hover:bg-secondary/50 transition-colors duration-150 h-[56px]"
                       onClick={() => handleOpenProfile(c)}
                     >
-                      <TableCell className="text-center">
+                      <TableCell className="text-center px-3 py-2">
                         <span className={cn(
-                          'inline-flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold border',
+                          'inline-flex items-center justify-center w-9 h-9 rounded-full text-xs font-bold border',
                           getScoreStyles(score)
                         )}>
                           {score}
                         </span>
                       </TableCell>
-                      <TableCell>
-                        <p className="text-sm font-semibold text-foreground">{c.name}</p>
-                        <p className="text-xs text-muted-foreground">{c.email}</p>
+                      <TableCell className="px-4 py-2">
+                        <p className="text-sm font-semibold text-foreground leading-tight truncate max-w-[220px]">{c.name}</p>
+                        <p className="text-xs text-muted-foreground leading-tight mt-0.5 truncate max-w-[220px]">{c.email}</p>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="px-3 py-2 text-center">
                         {c.applicantType === 'internal' ? (
-                          <span className="text-xs font-bold text-green-600">Internal</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-green-50 text-green-700 border border-green-200">Internal</span>
                         ) : (
-                          <span className="text-xs text-muted-foreground">External</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] text-muted-foreground bg-muted/50 border border-border">External</span>
                         )}
                       </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <button className="text-left hover:text-primary transition-colors" onClick={() => c.assignedJoId && handleViewJo(c.assignedJoId)}>
-                          <p className="text-sm font-medium text-foreground">{getJobTitle(c.assignedJoId)}</p>
-                          <p className="text-xs text-muted-foreground">{getDepartment(c.assignedJoId)}</p>
+                      <TableCell className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                        <button className="text-left hover:text-primary transition-colors group" onClick={() => c.assignedJoId && handleViewJo(c.assignedJoId)}>
+                          <p className="text-sm font-medium text-foreground leading-tight truncate max-w-[200px] group-hover:text-primary">{getJobTitle(c.assignedJoId)}</p>
+                          <p className="text-xs text-muted-foreground leading-tight mt-0.5 truncate max-w-[200px]">{getDepartment(c.assignedJoId)}</p>
                         </button>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="px-3 py-2">
                         <span className={cn(
-                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
+                          "inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium border whitespace-nowrap",
                           pipelineStatusColors[c.pipelineStatus],
-                          c.pipelineStatus === 'hr_interview' && 'bg-blue-50 border-blue-200'
+                          c.pipelineStatus === 'hr_interview' && 'bg-blue-50 border-blue-200 text-blue-700'
                         )}>
                           {pipelineStatusLabels[c.pipelineStatus]}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-0.5">
+                      <TableCell className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1">
                           <button
                             title="Send Email"
                             aria-label="Send email"
-                            className="w-7 h-7 flex items-center justify-center rounded hover:bg-secondary transition-colors"
+                            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary transition-colors"
                             onClick={() => setEmailCandidate(c)}
                           >
-                            <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                            <Mail className="w-4 h-4 text-muted-foreground" />
                           </button>
                           <button
                             title="View Profile"
                             aria-label="View profile"
-                            className="w-7 h-7 flex items-center justify-center rounded hover:bg-secondary transition-colors"
+                            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary transition-colors"
                             onClick={() => handleOpenProfile(c)}
                           >
-                            <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+                            <Eye className="w-4 h-4 text-muted-foreground" />
                           </button>
                           <button
                             title="Delete Candidate"
                             aria-label="Delete candidate"
-                            className="w-7 h-7 flex items-center justify-center rounded hover:bg-red-50 transition-colors"
+                            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-destructive/10 transition-colors"
                             onClick={() => { if (confirm(`Delete candidate "${c.name}"?`)) deleteCandidate(c.id); }}
                           >
-                            <Trash2 className="w-3.5 h-3.5 text-red-400 hover:text-red-600" />
+                            <Trash2 className="w-4 h-4 text-destructive/60 hover:text-destructive" />
                           </button>
                         </div>
                       </TableCell>
@@ -240,7 +237,7 @@ export default function CandidatesPage() {
 
         {filteredCandidates.length > 0 && (
           <p className="text-xs text-muted-foreground mt-3 text-center">
-            {filteredCandidates.length} candidate{filteredCandidates.length !== 1 ? 's' : ''}
+            Showing {filteredCandidates.length} candidate{filteredCandidates.length !== 1 ? 's' : ''}
           </p>
         )}
       </motion.div>
