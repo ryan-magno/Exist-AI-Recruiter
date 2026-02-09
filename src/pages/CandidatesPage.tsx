@@ -149,9 +149,9 @@ export default function CandidatesPage() {
               <TableHeader>
                 <TableRow className="bg-muted/30 border-b">
                   <TableHead className="w-[60px] text-center px-2">Score</TableHead>
-                  <TableHead className="px-3">Candidate</TableHead>
+                  <TableHead className="w-[200px] px-3">Candidate</TableHead>
                   <TableHead className="w-[80px] px-2 text-center">Type</TableHead>
-                  <TableHead className="px-3">Applied For</TableHead>
+                  <TableHead className="w-[200px] px-3">Applied For</TableHead>
                   <TableHead className="w-[130px] px-2 text-center">Status</TableHead>
                   <TableHead className="w-[80px] px-2 text-center">Actions</TableHead>
                 </TableRow>
