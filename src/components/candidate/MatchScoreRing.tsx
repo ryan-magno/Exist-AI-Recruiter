@@ -12,7 +12,7 @@ export function MatchScoreRing({ score, size = 40, strokeWidth = 4 }: MatchScore
   const offset = circumference - (score / 100) * circumference;
 
   const getStrokeColor = () => {
-    if (score >= 70) return 'hsl(142 71% 45%)';
+    if (score >= 75) return 'hsl(142 71% 45%)';
     if (score >= 50) return 'hsl(38 92% 50%)';
     return 'hsl(0 84% 60%)';
   };

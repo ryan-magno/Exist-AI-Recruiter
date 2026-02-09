@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Mail, Search, X, Eye, Filter } from 'lucide-react';
-import existLogo from '@/assets/exist-logo.png';
+import { Users, Mail, Search, X, Eye, Filter, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -15,7 +14,7 @@ import { useNavigate } from 'react-router-dom';
 
 export default function CandidatesPage() {
   const navigate = useNavigate();
-  const { getAllCandidates, updateCandidatePipelineStatus, jobOrders, isVectorized, setSelectedJoId } = useApp();
+  const { getAllCandidates, updateCandidatePipelineStatus, deleteCandidate, jobOrders, isVectorized, setSelectedJoId } = useApp();
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
   const [emailCandidate, setEmailCandidate] = useState<any>(null);
   const [initialTab, setInitialTab] = useState('profile');
@@ -61,7 +60,7 @@ export default function CandidatesPage() {
   }, [candidates, searchQuery, pipelineFilter, departmentFilter, jobOrders]);
 
   const getScoreStyles = (score: number) => {
-    if (score >= 70) return 'bg-green-100 text-green-700 border-green-300';
+    if (score >= 75) return 'bg-green-100 text-green-700 border-green-300';
     if (score >= 50) return 'bg-amber-100 text-amber-700 border-amber-300';
     return 'bg-red-100 text-red-700 border-red-300';
   };
@@ -183,10 +182,7 @@ export default function CandidatesPage() {
                       </TableCell>
                       <TableCell>
                         {c.applicantType === 'internal' ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-green-600">
-                            <img src={existLogo} alt="Internal" className="w-3.5 h-3.5 object-contain" />
-                            Internal
-                          </span>
+                          <span className="text-xs font-bold text-green-600">Internal</span>
                         ) : (
                           <span className="text-xs text-muted-foreground">External</span>
                         )}
@@ -228,6 +224,14 @@ export default function CandidatesPage() {
                             onClick={() => handleOpenProfile(c)}
                           >
                             <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+                          </button>
+                          <button
+                            title="Delete Candidate"
+                            aria-label="Delete candidate"
+                            className="w-7 h-7 flex items-center justify-center rounded hover:bg-red-50 transition-colors"
+                            onClick={() => { if (confirm(`Delete candidate "${c.name}"?`)) deleteCandidate(c.id); }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-400 hover:text-red-600" />
                           </button>
                         </div>
                       </TableCell>

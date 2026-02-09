@@ -36,8 +36,8 @@ export function CandidateListView({ candidates }: CandidateListViewProps) {
   const sortedCandidates = [...candidates].sort((a, b) => b.matchScore - a.matchScore);
 
   const getScoreClass = (score: number): string => {
-    if (score >= 90) return 'bg-emerald-100 text-emerald-800 border-emerald-300';
-    if (score >= 75) return 'bg-amber-100 text-amber-800 border-amber-300';
+    if (score >= 75) return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+    if (score >= 50) return 'bg-amber-100 text-amber-800 border-amber-300';
     return 'bg-red-100 text-red-800 border-red-300';
   };
 

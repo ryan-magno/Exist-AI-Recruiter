@@ -75,8 +75,8 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
 
   const score = candidate.qualificationScore ?? candidate.matchScore;
   const getScoreClass = (s: number): string => {
-    if (s >= 90) return 'match-score-high';
-    if (s >= 75) return 'match-score-medium';
+    if (s >= 75) return 'match-score-high';
+    if (s >= 50) return 'match-score-medium';
     return 'match-score-low';
   };
 

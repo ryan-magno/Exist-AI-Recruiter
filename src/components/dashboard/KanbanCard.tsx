@@ -27,8 +27,8 @@ export function KanbanCard({ candidate, isDragging, onClick }: KanbanCardProps) 
   };
 
   const getScoreClass = (score: number): string => {
-    if (score >= 90) return 'match-score-high';
-    if (score >= 75) return 'match-score-medium';
+    if (score >= 75) return 'match-score-high';
+    if (score >= 50) return 'match-score-medium';
     return 'match-score-low';
   };
 
