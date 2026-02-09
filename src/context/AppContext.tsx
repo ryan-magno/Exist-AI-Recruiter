@@ -39,8 +39,20 @@ const dbPipelineToLegacy: Record<string, LegacyPipelineStatus> = {
   'withdrawn': 'rejected',
 };
 
+// Module-level flag to ensure azureDb.init() runs only once
+let dbInitialized = false;
+
+async function ensureDbInit() {
+  if (!dbInitialized) {
+    await azureDb.init();
+    dbInitialized = true;
+  }
+}
+
 // Fetch candidates from Azure DB and convert to legacy format
 async function fetchLegacyCandidates(): Promise<LegacyCandidate[]> {
+  await ensureDbInit();
+
   const [applicationsData, candidatesData] = await Promise.all([
     azureDb.applications.list(),
     azureDb.candidates.list()
@@ -162,7 +174,6 @@ interface AppContextType {
   markJoAsFulfilled: (joId: string) => void;
   dbJobOrders: DBJobOrder[];
   isLoadingJobOrders: boolean;
-  initializeDatabase: () => Promise<void>;
   refreshCandidates: () => Promise<void>;
 }
 
@@ -175,7 +186,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [selectedJoId, setSelectedJoId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isFindingMatches, setIsFindingMatches] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
 
   // Database hooks
   const { data: dbJobOrders = [], isLoading: isLoadingJobOrders } = useJobOrders();
@@ -184,11 +194,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteJobOrderMutation = useDeleteJobOrder();
   const updateApplicationStatusMutation = useUpdateApplicationStatus();
 
-  // Candidates managed by React Query
+  // Candidates managed by React Query — NO enabled guard, init is lazy inside queryFn
   const { data: candidates = [] } = useQuery({
     queryKey: ['legacy-candidates'],
     queryFn: fetchLegacyCandidates,
-    enabled: isInitialized,
   });
 
   // Set vectorized flag when candidates are available
@@ -209,29 +218,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const refreshCandidates = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['legacy-candidates'] });
   }, [queryClient]);
-
-  // Initialize Azure PostgreSQL database
-  const initializeDatabase = async () => {
-    if (isInitialized) return;
-    try {
-      console.log('Initializing Azure PostgreSQL database...');
-      await azureDb.init();
-      setIsInitialized(true);
-      console.log('Database initialized successfully');
-      queryClient.invalidateQueries({ queryKey: ['job-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['candidates'] });
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
-      queryClient.invalidateQueries({ queryKey: ['departments'] });
-      // legacy-candidates will auto-fetch once isInitialized becomes true
-    } catch (error) {
-      console.error('Failed to initialize database:', error);
-    }
-  };
-
-  // Auto-initialize on mount
-  useEffect(() => {
-    initializeDatabase();
-  }, []);
 
   // Sync database job orders to legacy state
   useEffect(() => {
@@ -298,7 +284,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const previousStatus = candidate.pipelineStatus;
 
-    // Optimistic update via cache
     setCandidates(prev => 
       prev.map(c => c.id === candidateId ? { ...c, pipelineStatus: status, statusChangedDate: new Date().toISOString().split('T')[0] } : c)
     );
@@ -507,7 +492,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         markJoAsFulfilled,
         dbJobOrders,
         isLoadingJobOrders,
-        initializeDatabase,
         refreshCandidates
       }}
     >
