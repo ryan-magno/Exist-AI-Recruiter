@@ -48,21 +48,24 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           {isUser ? (
             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
           ) : (
-            <div className="prose prose-sm max-w-none dark:prose-invert 
-              prose-headings:text-foreground prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2
-              prose-h2:text-base prose-h2:border-b prose-h2:border-border prose-h2:pb-1
-              prose-h3:text-sm
-              prose-p:text-foreground prose-p:my-2 prose-p:leading-relaxed
-              prose-strong:text-foreground prose-strong:font-semibold
-              prose-ul:my-2 prose-ul:list-disc prose-ul:pl-4
-              prose-ol:my-2 prose-ol:list-decimal prose-ol:pl-4
-              prose-li:my-0.5 prose-li:text-foreground
-              prose-hr:my-4 prose-hr:border-border
-              prose-code:text-primary prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs
-              prose-blockquote:border-l-primary prose-blockquote:bg-muted/50 prose-blockquote:py-1 prose-blockquote:px-4
-              prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-pre:rounded-md prose-pre:p-3
-              [&_br]:block [&_br]:my-1">
-              <ReactMarkdown>{message.content || '...'}</ReactMarkdown>
+            <div className="text-sm leading-relaxed text-foreground">
+              <ReactMarkdown
+                components={{
+                  h2: ({ children }) => <h2 className="text-base font-bold mt-6 mb-3 text-foreground border-b border-border pb-1">{children}</h2>,
+                  h3: ({ children }) => <h3 className="text-sm font-bold mt-6 mb-3 text-foreground">{children}</h3>,
+                  p: ({ children }) => <p className="mb-4 leading-relaxed">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc pl-6 my-4 space-y-2">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal pl-6 my-4 space-y-2">{children}</ol>,
+                  li: ({ children }) => <li className="text-foreground">{children}</li>,
+                  hr: () => <hr className="my-6 border-t border-border" />,
+                  strong: ({ children }) => <strong className="font-bold text-foreground">{children}</strong>,
+                  code: ({ children }) => <code className="text-primary bg-muted px-1 py-0.5 rounded text-xs">{children}</code>,
+                  pre: ({ children }) => <pre className="bg-muted border border-border rounded-md p-3 my-4 overflow-x-auto">{children}</pre>,
+                  blockquote: ({ children }) => <blockquote className="border-l-2 border-primary bg-muted/50 py-1 px-4 my-4">{children}</blockquote>,
+                }}
+              >
+                {message.content || '...'}
+              </ReactMarkdown>
             </div>
           )}
 
