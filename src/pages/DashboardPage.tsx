@@ -7,8 +7,9 @@ import { useApp } from '@/context/AppContext';
 import { JobOrderList } from '@/components/dashboard/JobOrderList';
 import { JobOrderDetail } from '@/components/dashboard/JobOrderDetail';
 import { DashboardKanban } from '@/components/dashboard/DashboardKanban';
+import { CandidateProfileView } from '@/components/candidate/CandidateProfileView';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { pipelineStatusLabels, PipelineStatus } from '@/data/mockData';
+import { pipelineStatusLabels, PipelineStatus, Candidate } from '@/data/mockData';
 
 export default function DashboardPage() {
   const { selectedJoId, jobOrders, isVectorized, getMatchesForJo } = useApp();
@@ -18,6 +19,7 @@ export default function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [applicantTypeFilter, setApplicantTypeFilter] = useState<string>('all');
   const [scoreSort, setScoreSort] = useState<string>('none');
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
 
   // Filter state for job orders
   const [joDepartmentFilter, setJoDepartmentFilter] = useState<string>('all');
@@ -172,7 +174,9 @@ export default function DashboardPage() {
 
       {/* Right Pane: Detail View - Scrollable */}
       <div className="flex-1 h-full bg-background overflow-auto">
-        {selectedJo ? (
+        {selectedCandidate ? (
+          <CandidateProfileView candidate={selectedCandidate} onBack={() => setSelectedCandidate(null)} />
+        ) : selectedJo ? (
           <div className="min-h-full">
             <JobOrderDetail jobOrder={selectedJo} matchCount={filteredMatches.length} />
             
@@ -260,7 +264,7 @@ export default function DashboardPage() {
                   <EmptyMatchesState />
                 )
               ) : (
-                <DashboardKanban candidates={filteredMatches} />
+                <DashboardKanban candidates={filteredMatches} onSelectCandidate={setSelectedCandidate} />
               )}
             </div>
           </div>
