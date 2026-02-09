@@ -1,76 +1,115 @@
 
-# Fix: Robust Data Persistence Across Navigation
 
-## Root Cause
+# High-Level Architecture Refactor for Data Persistence
 
-Two issues cause data to disappear when navigating between pages:
+## Root Cause Analysis
 
-1. **React Query default cache settings**: `staleTime` is 0ms by default, meaning queries are immediately considered stale. When navigating away and back, React Query refetches and briefly shows loading/empty state.
+The previous fix failed because of **three compounding issues**:
 
-2. **Candidates not managed by React Query**: Unlike job orders (which use `useJobOrders` hook with React Query), candidates are fetched via a raw `async` call (`refreshCandidates`) and stored in plain `useState`. This means no caching, no background refetching, and no persistence across re-renders.
+1. **Query key mismatch**: The candidate data lives under the query key `['legacy-candidates']`, but `useRealtimeCandidates` (line 67-68) and `useProcessingStatus` (lines 81-82, 98-99) invalidate `['candidates']` and `['applications']` -- keys that do NOT match `['legacy-candidates']`. The `initializeDatabase` function (line 222) also invalidates `['candidates']` instead of `['legacy-candidates']`. This means background polling creates spurious refetches on non-existent keys while the actual data key is unaffected by legitimate refresh triggers.
 
-## Solution
+2. **`enabled: isInitialized` gate**: The `useQuery` for candidates has `enabled: isInitialized`, and `isInitialized` starts as `false`. Every time `AppProvider` re-renders from scratch (which can happen during navigation if the component tree remounts), `isInitialized` resets to `false`, the query is disabled, and the cached data is not served until `initializeDatabase` runs again. This creates a flash of empty data.
 
-### 1. Configure QueryClient with sensible defaults
+3. **Cache settings are too short**: `staleTime: 5min` and `gcTime: 10min` are not aggressive enough. With `refetchOnMount` still at its default (`true`), every navigation triggers a background refetch that can briefly show stale/empty state.
 
-In `src/App.tsx`, set `staleTime` and `gcTime` on the `QueryClient` so all queries retain their data across navigation:
+## Solution (4 Steps)
 
-- `staleTime: 5 * 60 * 1000` (5 minutes) -- data won't refetch unless 5 min old
-- `gcTime: 10 * 60 * 1000` (10 minutes) -- cached data kept for 10 min after unmount
-- `refetchOnWindowFocus: false` -- prevent unexpected refetches when switching tabs
+### Step 1: Move Providers to `main.tsx`
 
-### 2. Convert candidate fetching to React Query
+Move `QueryClientProvider`, `TooltipProvider`, and `Toaster`/`Sonner` OUT of `App.tsx` and into `main.tsx`. This ensures the `QueryClient` instance is never destroyed during route changes. `App.tsx` becomes a pure routing component inside `BrowserRouter`.
 
-In `src/context/AppContext.tsx`, replace the manual `refreshCandidates` + `useState` pattern with a proper React Query hook. This ensures candidates are cached the same way job orders are.
+### Step 2: Aggressive QueryClient Configuration
 
-- Create a `useQuery` call with key `['legacy-candidates']` that runs the existing `refreshCandidates` logic (fetch applications + candidates, convert to legacy format)
-- Remove the `candidates` useState and the manual `refreshCandidates` callback
-- The `setCandidates` calls for optimistic updates will use `queryClient.setQueryData` instead
-- `refreshCandidates` becomes `queryClient.invalidateQueries({ queryKey: ['legacy-candidates'] })`
+Set the `QueryClient` defaults in `main.tsx` to:
+- `staleTime: 1000 * 60 * 60` (1 hour)
+- `gcTime: 1000 * 60 * 60 * 24` (24 hours)
+- `refetchOnWindowFocus: false`
+- `refetchOnMount: false`
+- `retry: 1`
 
-### 3. Keep initializeDatabase but don't re-run data fetch
+This means data fetched once stays fresh for the entire session. Navigating between pages serves cached data instantly.
 
-The `initializeDatabase` call on mount will remain, but after init completes it will just invalidate query keys rather than manually fetching. React Query handles the rest.
+### Step 3: Refactor AppContext -- Remove Manual Init Gate
+
+- **Remove the `isInitialized` state** and the `enabled: isInitialized` guard on the candidates query. Instead, call `azureDb.init()` inside the `queryFn` itself (as a one-time call via a module-level flag), so the query is always enabled and the cache is always active.
+- **Remove the `useEffect` that calls `initializeDatabase` on mount**. The init call happens lazily inside the first query execution.
+- **Fix all query key references**: Change `initializeDatabase`'s invalidation calls from `['candidates']` to `['legacy-candidates']`.
+
+### Step 4: Fix Invalidation in Polling Hooks
+
+- In `useRealtimeCandidates.ts` (lines 67-68, 102): change `queryClient.invalidateQueries({ queryKey: ['candidates'] })` to `queryClient.invalidateQueries({ queryKey: ['legacy-candidates'] })`.
+- In `useProcessingStatus.ts` (lines 81, 98): same fix -- invalidate `['legacy-candidates']` instead of `['candidates']`.
+- These are the ONLY places that should trigger refetches, and only in response to actual new data arriving (not navigation).
 
 ## Files to Modify
 
-- **`src/App.tsx`** -- Configure QueryClient defaults
-- **`src/context/AppContext.tsx`** -- Replace manual candidate fetch with React Query, update optimistic update patterns to use `queryClient.setQueryData`
+| File | Change |
+|------|--------|
+| `src/main.tsx` | Add `QueryClientProvider`, `TooltipProvider`, `Toaster`, `Sonner` wrapping `<App />` with aggressive cache config |
+| `src/App.tsx` | Remove `QueryClientProvider`, `TooltipProvider`, `Toaster`, `Sonner` -- keep only `BrowserRouter` + `AppProvider` + routes |
+| `src/context/AppContext.tsx` | Remove `isInitialized` state, remove `initializeDatabase` useEffect, make init lazy inside queryFn, remove `enabled` guard, fix query key references |
+| `src/hooks/useRealtimeCandidates.ts` | Fix invalidation key from `['candidates']` to `['legacy-candidates']` |
+| `src/hooks/useProcessingStatus.ts` | Fix invalidation key from `['candidates']` to `['legacy-candidates']` |
 
 ## Technical Details
 
-**QueryClient config:**
+**main.tsx** structure:
 ```typescript
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
+      staleTime: 1000 * 60 * 60,       // 1 hour
+      gcTime: 1000 * 60 * 60 * 24,     // 24 hours
       refetchOnWindowFocus: false,
+      refetchOnMount: false,
       retry: 1,
     },
   },
 });
+
+createRoot(document.getElementById("root")!).render(
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <App />
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 ```
 
-**Candidate query in AppContext:**
+**App.tsx** becomes:
 ```typescript
-const { data: legacyCandidates = [] } = useQuery({
+const App = () => (
+  <BrowserRouter>
+    <AppProvider>
+      <AppLayout>
+        <Routes>...</Routes>
+      </AppLayout>
+    </AppProvider>
+  </BrowserRouter>
+);
+```
+
+**AppContext.tsx** candidate query (no `enabled` guard):
+```typescript
+let dbInitialized = false; // module-level flag
+
+async function ensureInit() {
+  if (!dbInitialized) {
+    await azureDb.init();
+    dbInitialized = true;
+  }
+}
+
+// Inside AppProvider:
+const { data: candidates = [] } = useQuery({
   queryKey: ['legacy-candidates'],
   queryFn: async () => {
-    // existing refreshCandidates logic, but return the data instead of setState
-    const [applicationsData, candidatesData] = await Promise.all([...]);
-    // ... transform ...
-    return legacyCandidates;
+    await ensureInit();
+    return fetchLegacyCandidates();
   },
 });
 ```
 
-**Optimistic updates (e.g., pipeline status change):**
-```typescript
-queryClient.setQueryData(['legacy-candidates'], (old) =>
-  old.map(c => c.id === candidateId ? { ...c, pipelineStatus: status } : c)
-);
-```
-
-This approach ensures all data is cached by React Query, survives navigation, and stays consistent across the entire app.
+This removes the `isInitialized` state, the `initializeDatabase` function, and the auto-init `useEffect` entirely.
