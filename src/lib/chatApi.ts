@@ -16,19 +16,19 @@ export async function sendStreamingMessage(
   }
 
   try {
-    console.log('SSE: Sending request to n8n:', { chatInput, sessionId });
+    console.log('NDJSON: Sending request to n8n:', { chatInput, sessionId });
 
     const response = await fetch(WEBHOOK_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
+        'Accept': 'application/json',
       },
       body: JSON.stringify({ chatInput, sessionId }),
       signal: controller.signal,
     });
 
-    console.log('SSE: Response status:', response.status, response.ok);
+    console.log('NDJSON: Response status:', response.status, response.ok);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -54,42 +54,31 @@ export async function sendStreamingMessage(
         const line = buffer.slice(0, newlineIdx).trim();
         buffer = buffer.slice(newlineIdx + 1);
 
-        if (!line || !line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-
-        if (data === '[DONE]') {
-          console.log('SSE: Received [DONE], accumulated length:', accumulated.length);
-          options.onComplete();
-          return;
-        }
+        if (!line) continue;
 
         try {
-          const parsed = JSON.parse(data);
-          if (parsed.type === 'message' && parsed.data) {
-            accumulated += parsed.data;
+          const parsed = JSON.parse(line);
+
+          if (parsed.type === 'item' && parsed.content) {
+            // Skip wrapped JSON from "Respond to Webhook" node
+            if (parsed.content.startsWith('{') && parsed.content.includes('"output"')) {
+              console.log('Skipping wrapped JSON from Respond to Webhook node');
+              continue;
+            }
+            accumulated += parsed.content;
             options.onChunk(accumulated);
+          } else if (parsed.type === 'end') {
+            console.log('Stream ended, accumulated:', accumulated.length, 'chars');
+            options.onComplete();
+            return;
           }
         } catch {
-          console.warn('SSE: Failed to parse data line:', data);
+          console.warn('NDJSON: Failed to parse line:', line);
         }
       }
     }
 
-    // Flush remaining buffer
-    if (buffer.trim().startsWith('data: ')) {
-      const data = buffer.trim().slice(6).trim();
-      if (data && data !== '[DONE]') {
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.type === 'message' && parsed.data) {
-            accumulated += parsed.data;
-            options.onChunk(accumulated);
-          }
-        } catch { /* skip */ }
-      }
-    }
-
-    console.log('SSE: Stream ended, accumulated length:', accumulated.length);
+    console.log('NDJSON: Stream ended, accumulated length:', accumulated.length);
     options.onComplete();
   } catch (error) {
     if (controller.signal.aborted && !options.signal?.aborted) {
