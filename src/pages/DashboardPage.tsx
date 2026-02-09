@@ -16,6 +16,8 @@ export default function DashboardPage() {
   // Filter state for candidates
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [applicantTypeFilter, setApplicantTypeFilter] = useState<string>('all');
+  const [scoreSort, setScoreSort] = useState<string>('none');
 
   // Filter state for job orders
   const [joDepartmentFilter, setJoDepartmentFilter] = useState<string>('all');
@@ -68,7 +70,7 @@ export default function DashboardPage() {
 
   // Filter candidates
   const filteredMatches = useMemo(() => {
-    return matches.filter(candidate => {
+    const filtered = matches.filter(candidate => {
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch = !searchQuery || 
         candidate.name.toLowerCase().includes(searchLower) ||
@@ -76,17 +78,28 @@ export default function DashboardPage() {
         candidate.skills.some((skill: string) => skill.toLowerCase().includes(searchLower));
       
       const matchesStatus = statusFilter === 'all' || candidate.pipelineStatus === statusFilter;
+      const matchesType = applicantTypeFilter === 'all' || candidate.applicantType === applicantTypeFilter;
       
-      return matchesSearch && matchesStatus;
+      return matchesSearch && matchesStatus && matchesType;
     });
-  }, [matches, searchQuery, statusFilter]);
 
-  const hasActiveFilters = searchQuery || statusFilter !== 'all';
+    if (scoreSort === 'asc') {
+      filtered.sort((a, b) => (a.qualificationScore ?? 0) - (b.qualificationScore ?? 0));
+    } else if (scoreSort === 'desc') {
+      filtered.sort((a, b) => (b.qualificationScore ?? 0) - (a.qualificationScore ?? 0));
+    }
+
+    return filtered;
+  }, [matches, searchQuery, statusFilter, applicantTypeFilter, scoreSort]);
+
+  const hasActiveFilters = searchQuery || statusFilter !== 'all' || applicantTypeFilter !== 'all' || scoreSort !== 'none';
   const hasJoFilters = joDepartmentFilter !== 'all' || joAgingFilter !== 'all';
 
   const clearFilters = () => {
     setSearchQuery('');
     setStatusFilter('all');
+    setApplicantTypeFilter('all');
+    setScoreSort('none');
   };
 
   const clearJoFilters = () => {
@@ -198,6 +211,28 @@ export default function DashboardPage() {
                     {Object.entries(pipelineStatusLabels).map(([value, label]) => (
                       <SelectItem key={value} value={value}>{label}</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={applicantTypeFilter} onValueChange={setApplicantTypeFilter}>
+                  <SelectTrigger className="w-[140px] h-8 text-sm">
+                    <SelectValue placeholder="Applicant Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="internal">Internal</SelectItem>
+                    <SelectItem value="external">External</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={scoreSort} onValueChange={setScoreSort}>
+                  <SelectTrigger className="w-[160px] h-8 text-sm">
+                    <SelectValue placeholder="Sort by Score" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Sort</SelectItem>
+                    <SelectItem value="desc">Score: High → Low</SelectItem>
+                    <SelectItem value="asc">Score: Low → High</SelectItem>
                   </SelectContent>
                 </Select>
 
