@@ -1,61 +1,71 @@
 
 
-# Kanban Card Redesign -- "Legacy" Layout
+# Kanban Card Legacy Design Corrections
 
-## Overview
-Completely restyle the `CompactKanbanCard` component to follow the specified hierarchy and visual design. The `getStageAge` helper will also be split to return separate "age text" and "date text" values for the two-column green bar.
+## 5 Targeted Changes in `src/components/dashboard/DashboardKanban.tsx`
 
-## Changes
+### 1. Green Border on Card Container for Internal Candidates
+- Move the green border from the "Internal" label (line 195) to the card container (line 121-124)
+- Card `className` gets conditional: `isInternal && 'border-2 border-green-500'`
+- The "Internal" label (line 195) loses `border-2 border-green-500` and becomes plain bold green text: `font-bold text-green-600 text-xs` with logo, no border
 
-### File: `src/components/dashboard/DashboardKanban.tsx`
+### 2. Full-Width Status Bars
+- Change the status pills container (lines 158-188) from `flex items-center gap-1 flex-wrap` to stacked full-width bars
+- Each status becomes a `w-full` bar styled like the age bar: `rounded-md px-3 py-1.5 text-xs font-medium` with appropriate background colors
+- Tech and offer statuses render as individual full-width rows (not inline pills)
 
-**1. Update `getStageAge` helper (lines 37-50)**
-Split it to return an object `{ ageText, dateText }` instead of a single string, so the green bar can show "Moved today" on the left and "Since Feb 8" on the right separately.
+### 3. Darker Inner Borders
+- Age bar (line 145): change `border-green-100` to `border-green-200`
+- Status bars: use `border-gray-300` (or `border-emerald-300`/`border-red-300` for pass/fail) instead of `border-gray-200`/`border-emerald-200`
 
-```text
-{ ageText: "Moved today" | "2d ago" | ..., dateText: "Since Feb 8" | "" }
+### 4. Larger Action Icons
+- Lines 210, 218, 226: change icon size from `w-3.5 h-3.5` to `w-5 h-5`
+
+### 5. Compact Padding
+- Card container (line 122): change `p-4` to `px-3 py-3`
+
+## Technical Summary
+
+All changes are in one file: `src/components/dashboard/DashboardKanban.tsx`, lines 117-237 (the `CompactKanbanCard` normal render section).
+
+**Line 121-124** -- Card container class:
+```
+cn(
+  'kanban-card bg-white shadow-sm rounded-lg px-3 py-3 cursor-pointer hover:shadow-md transition-shadow',
+  isInternal ? 'border-2 border-green-500' : 'border border-gray-200',
+  isDragging && 'shadow-lg ring-2 ring-primary opacity-90'
+)
 ```
 
-**2. Import `Calendar` icon (line 14)**
-Add `Calendar` to the lucide-react import for the right side of the green bar.
-
-**3. Redesign `CompactKanbanCard` normal render (lines 118-235)**
-
-New layout structure:
-
-```text
-+--------------------------------------------------+
-| [::] Drag Handle  |  Candidate Name  |  [73]     |  <-- Header row
-+--------------------------------------------------+
-| [Clock] Moved today          [Cal] Since Feb 8   |  <-- Green bar (full-width)
-+--------------------------------------------------+
-| [Tech: Pending]                                   |  <-- Status pill (conditional)
-+--------------------------------------------------+
-| [Internal] tag             [Clock] [Mail] [Trash] |  <-- Footer row
-+--------------------------------------------------+
+**Line 145** -- Age bar border:
+```
+border-green-200  (was border-green-100)
 ```
 
-Specific styling changes:
-- **Card container**: Always `bg-white border border-gray-200 shadow-sm rounded-lg p-4` regardless of internal/external status. Remove the green tint for internal candidates.
-- **Header row**: `flex items-center gap-2` with drag handle (`text-gray-400`), name (`font-semibold text-gray-900 truncate`), and score badge using existing `match-score-*` classes.
-- **Green bar**: `bg-green-50 border border-green-100 text-green-700 rounded-md px-3 py-1.5 flex items-center justify-between text-xs mt-2`. Left: Clock icon + age text. Right: Calendar icon + date label.
-- **Status pills** (tech/offer): Kept as-is with conditional logic, rendered below the green bar with `mt-2`.
-- **Footer row**: `flex items-center justify-between mt-3 pt-2 border-t border-gray-100`.
-  - Left: Internal tag styled as `bg-white border-2 border-green-500 text-green-600 font-bold text-xs px-2 py-0.5 rounded` with Exist logo. External candidates show no tag.
-  - Right: 3 icon buttons with `gap-3` -- History (Clock), Email (Mail), Delete (Trash with `text-red-400 hover:text-red-600`).
+**Lines 158-188** -- Status bars become full-width stacked:
+```
+{isInTechInterview && (
+  <div className={cn('mt-2 w-full rounded-md px-3 py-1.5 text-xs font-medium border', ...)}>
+    Tech: Pass/Fail/Pending
+  </div>
+)}
+{isInOffer && (
+  <div className={cn('mt-2 w-full rounded-md px-3 py-1.5 text-xs font-medium border', ...)}>
+    Offer: Accepted/Rejected/Pending
+  </div>
+)}
+```
+With darker borders: `border-emerald-300` for pass/accepted, `border-red-300` for fail/rejected, `border-gray-300` for pending.
 
-**4. Keep all existing functionality intact**
-- Drag-and-drop behavior unchanged
-- Timeline expandable section unchanged
-- Processing/failed states unchanged
-- Tech interview badge in tech_interview column, offer badge in offer column
-- Score color classes (`match-score-high/medium/low`) still applied
+**Lines 194-199** -- Internal label simplified:
+```
+<div className="inline-flex items-center gap-1 text-green-600 font-bold text-xs">
+  <img src={existLogo} alt="Internal" className="w-3.5 h-3.5 object-contain" />
+  Internal
+</div>
+```
 
-## Technical Details
-
-- Modify `getStageAge` return type from `string` to `{ ageText: string; dateText: string }`
-- Update all usages of `stageAge` (in `CompactKanbanCard`) to destructure the new object
-- Add `Calendar` to lucide-react imports
-- Replace lines 118-227 with the new card layout
-- No new files or dependencies needed
-
+**Lines 210, 218, 226** -- Icons enlarged:
+```
+w-5 h-5  (was w-3.5 h-3.5)
+```
