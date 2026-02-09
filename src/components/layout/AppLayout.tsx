@@ -8,7 +8,7 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const { newCandidatesCount, showRefreshPrompt, refreshData, dismissPrompt } = useRealtimeCandidates();
+  const { newCandidatesCount, showRefreshPrompt, refreshData } = useRealtimeCandidates();
 
   return (
     <div className="flex h-screen bg-background">
@@ -21,7 +21,6 @@ export function AppLayout({ children }: AppLayoutProps) {
         show={showRefreshPrompt}
         candidateCount={newCandidatesCount}
         onRefresh={refreshData}
-        onDismiss={dismissPrompt}
       />
     </div>
   );

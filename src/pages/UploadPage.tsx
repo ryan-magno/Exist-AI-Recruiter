@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
-import { useApp } from '@/context/AppContext';
+import { emitRefreshPrompt } from '@/hooks/useRealtimeCandidates';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useCVUploaderNames, useCreateCVUploader } from '@/hooks/useCVUploaders';
@@ -50,7 +50,7 @@ const formatFileSize = (bytes: number): string => {
 
 export default function UploadPage() {
   const navigate = useNavigate();
-  const { isVectorized } = useApp();
+  
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -289,9 +289,12 @@ export default function UploadPage() {
         // Mark all files as complete (processing started successfully)
         setFiles(prev => prev.map(f => ({ ...f, status: 'complete' as const })));
         toast.success('CVs submitted for AI processing!', {
-          description: 'Candidates will appear in the dashboard shortly as they are processed.',
+          description: 'Candidates will appear shortly. Use the refresh button when notified.',
           duration: 5000
         });
+        
+        // Trigger the refresh notification
+        emitRefreshPrompt(files.length);
         
         // Save uploader name to database (only if new)
         const isExistingUploader = existingUploaders.some(n => n.toLowerCase() === uploaderName.trim().toLowerCase());
@@ -303,7 +306,6 @@ export default function UploadPage() {
           }
         }
         
-        setTimeout(() => navigate('/dashboard'), 2000);
         return;
       }
       
@@ -438,16 +440,13 @@ export default function UploadPage() {
                 value={uploaderName}
                 onChange={(e) => setUploaderName(e.target.value)}
                 onFocus={() => setShowSuggestions(true)}
-                className={cn(
-                  "h-11",
-                  isVectorized && "opacity-50"
-                )}
-                disabled={isVectorized || loadingUploaders}
+                className="h-11"
+                disabled={loadingUploaders}
               />
               
               {/* Suggestions Dropdown */}
               <AnimatePresence>
-                {showSuggestions && !isVectorized && !loadingUploaders && (
+                {showSuggestions && !loadingUploaders && (
                   <motion.div
                     ref={suggestionsRef}
                     initial={{ opacity: 0, y: -10 }}
@@ -510,7 +509,7 @@ export default function UploadPage() {
               setFiles(prev => prev.map(f => ({ ...f, isInternal: val === 'internal' })));
             }}
             className="flex gap-6"
-            disabled={isVectorized}
+            disabled={false}
           >
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="external" id="external" />
@@ -530,7 +529,7 @@ export default function UploadPage() {
           className={cn(
             'dropzone text-center mb-6',
             isDragging && 'dropzone-active',
-            isVectorized && 'opacity-50 pointer-events-none',
+            
             !uploaderName.trim() && 'opacity-70'
           )}
           onDragOver={handleDragOver}
@@ -571,7 +570,7 @@ export default function UploadPage() {
                     onRemove={() => removeFile(file.id)}
                     departments={departmentNames}
                     jobOrders={activeJobOrders}
-                    disabled={isVectorized || file.status !== 'ready'}
+                    disabled={file.status !== 'ready'}
                   />
                 ))}
               </div>

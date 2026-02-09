@@ -2,6 +2,14 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApp } from '@/context/AppContext';
 
+// Module-level event emitter for triggering refresh prompt from anywhere
+type RefreshListener = (count: number) => void;
+const listeners = new Set<RefreshListener>();
+
+export function emitRefreshPrompt(count: number) {
+  listeners.forEach(fn => fn(count));
+}
+
 interface ProcessingCandidate {
   id: string;
   full_name: string;
@@ -32,6 +40,16 @@ export function useRealtimeCandidates() {
   const previousCompletedRef = useRef<Set<string>>(new Set());
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const isFirstCheckRef = useRef(true);
+
+  // Subscribe to external refresh prompt triggers
+  useEffect(() => {
+    const handler: RefreshListener = (count) => {
+      setNewCandidatesCount(count);
+      setShowRefreshPrompt(true);
+    };
+    listeners.add(handler);
+    return () => { listeners.delete(handler); };
+  }, []);
 
   // Poll for processing status changes
   const checkProcessingStatus = useCallback(async () => {
@@ -96,11 +114,8 @@ export function useRealtimeCandidates() {
   }, [checkProcessingStatus]);
 
   const refreshData = useCallback(async () => {
-    // Invalidate React Query caches
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['legacy-candidates'] }),
-      queryClient.invalidateQueries({ queryKey: ['job-orders'] }),
-    ]);
+    // Invalidate only candidates
+    await queryClient.invalidateQueries({ queryKey: ['legacy-candidates'] });
     
     // Refresh candidates in AppContext from Azure DB
     await refreshCandidates();
@@ -109,8 +124,9 @@ export function useRealtimeCandidates() {
     setShowRefreshPrompt(false);
   }, [queryClient, refreshCandidates]);
 
-  const dismissPrompt = useCallback(() => {
-    setShowRefreshPrompt(false);
+  const triggerRefreshPrompt = useCallback((count: number) => {
+    setNewCandidatesCount(count);
+    setShowRefreshPrompt(true);
   }, []);
 
   return {
@@ -118,6 +134,6 @@ export function useRealtimeCandidates() {
     showRefreshPrompt,
     processingCount,
     refreshData,
-    dismissPrompt
+    triggerRefreshPrompt
   };
 }
