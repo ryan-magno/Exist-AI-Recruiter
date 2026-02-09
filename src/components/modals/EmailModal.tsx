@@ -21,19 +21,8 @@ export function EmailModal({ open, onClose, candidate }: EmailModalProps) {
   // Update email content when candidate changes
   useEffect(() => {
     if (candidate) {
-      setSubject(`Interview Invitation for Senior Java Developer Position`);
-      setBody(`Dear ${candidate.name},
-
-We were impressed with your profile and would like to invite you for an interview for the Senior Java Developer position at our company.
-
-Your experience in ${candidate.skills.slice(0, 3).join(', ')} aligns well with what we're looking for.
-
-Please let us know your availability for the coming week, and we'll schedule a convenient time for both of us.
-
-Looking forward to hearing from you.
-
-Best regards,
-HR Team`);
+      setSubject('');
+      setBody(`Greetings ${candidate.name},`);
     }
   }, [candidate]);
 
