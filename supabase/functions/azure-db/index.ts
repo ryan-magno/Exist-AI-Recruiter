@@ -337,17 +337,28 @@ async function initTables() {
       application_id UUID NOT NULL UNIQUE REFERENCES candidate_job_applications(id) ON DELETE CASCADE,
       candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
       offer_date DATE,
-      expiry_date DATE,
       offer_amount TEXT,
       position TEXT,
       start_date DATE,
       status offer_status_enum DEFAULT 'pending',
-      benefits TEXT,
       remarks TEXT,
-      negotiation_notes TEXT,
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
     );
+
+    -- Migrations for existing tables
+    ALTER TABLE offers DROP COLUMN IF EXISTS expiry_date;
+    ALTER TABLE offers DROP COLUMN IF EXISTS benefits;
+    ALTER TABLE offers DROP COLUMN IF EXISTS negotiation_notes;
+    
+    -- Add unique constraint on application_id if missing
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'offers_application_id_key'
+      ) THEN
+        ALTER TABLE offers ADD CONSTRAINT offers_application_id_key UNIQUE (application_id);
+      END IF;
+    END $$;
 
     -- Create update_updated_at trigger function
     CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -616,17 +627,14 @@ async function recreateDatabase() {
     
     CREATE TABLE offers (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      application_id UUID NOT NULL REFERENCES candidate_job_applications(id) ON DELETE CASCADE,
+      application_id UUID NOT NULL UNIQUE REFERENCES candidate_job_applications(id) ON DELETE CASCADE,
       candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
       offer_date DATE,
-      expiry_date DATE,
       offer_amount TEXT,
       position TEXT,
       start_date DATE,
       status offer_status_enum DEFAULT 'pending',
-      benefits TEXT,
       remarks TEXT,
-      negotiation_notes TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -1602,15 +1610,14 @@ async function handleRequest(req: Request): Promise<Response> {
       if (method === 'POST') {
         const body = await req.json();
         const result = await query(`
-          INSERT INTO offers (application_id, candidate_id, offer_date, expiry_date, offer_amount, position, start_date, status, benefits, remarks, negotiation_notes)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          INSERT INTO offers (application_id, candidate_id, offer_date, offer_amount, position, start_date, status, remarks)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
           ON CONFLICT (application_id) DO UPDATE SET
-            offer_date = EXCLUDED.offer_date, expiry_date = EXCLUDED.expiry_date, offer_amount = EXCLUDED.offer_amount,
+            offer_date = EXCLUDED.offer_date, offer_amount = EXCLUDED.offer_amount,
             position = EXCLUDED.position, start_date = EXCLUDED.start_date, status = EXCLUDED.status,
-            benefits = EXCLUDED.benefits, remarks = EXCLUDED.remarks, negotiation_notes = EXCLUDED.negotiation_notes,
-            updated_at = now()
+            remarks = EXCLUDED.remarks, updated_at = now()
           RETURNING *
-        `, [body.application_id, body.candidate_id, body.offer_date || null, body.expiry_date || null, body.offer_amount || null, body.position || null, body.start_date || null, body.status || 'pending', body.benefits || null, body.remarks || null, body.negotiation_notes || null]);
+        `, [body.application_id, body.candidate_id, body.offer_date || null, body.offer_amount || null, body.position || null, body.start_date || null, body.status || 'pending', body.remarks || null]);
         return jsonResponse(result[0]);
       }
     }
