@@ -78,8 +78,7 @@ export function useProcessingStatus(options: UseProcessingStatusOptions = {}) {
         setCompletedSinceStart(newCompletedSet);
 
         // Invalidate queries to refresh data
-        queryClient.invalidateQueries({ queryKey: ['candidates'] });
-        queryClient.invalidateQueries({ queryKey: ['applications'] });
+        queryClient.invalidateQueries({ queryKey: ['legacy-candidates'] });
 
         // Show toast notification
         const completedNames = newlyCompleted
@@ -95,8 +94,7 @@ export function useProcessingStatus(options: UseProcessingStatusOptions = {}) {
             action: {
               label: 'Refresh',
               onClick: () => {
-                queryClient.invalidateQueries({ queryKey: ['candidates'] });
-                queryClient.invalidateQueries({ queryKey: ['applications'] });
+                queryClient.invalidateQueries({ queryKey: ['legacy-candidates'] });
               }
             },
             duration: 10000

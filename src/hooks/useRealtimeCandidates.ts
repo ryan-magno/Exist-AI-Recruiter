@@ -64,8 +64,7 @@ export function useRealtimeCandidates() {
         setShowRefreshPrompt(true);
         
         // Auto-refresh query cache
-        queryClient.invalidateQueries({ queryKey: ['candidates'] });
-        queryClient.invalidateQueries({ queryKey: ['applications'] });
+        queryClient.invalidateQueries({ queryKey: ['legacy-candidates'] });
       }
 
       previousCompletedRef.current = currentCompleted;
@@ -99,8 +98,7 @@ export function useRealtimeCandidates() {
   const refreshData = useCallback(async () => {
     // Invalidate React Query caches
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['candidates'] }),
-      queryClient.invalidateQueries({ queryKey: ['applications'] }),
+      queryClient.invalidateQueries({ queryKey: ['legacy-candidates'] }),
       queryClient.invalidateQueries({ queryKey: ['job-orders'] }),
     ]);
     
