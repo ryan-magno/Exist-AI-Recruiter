@@ -297,6 +297,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    // Fire email webhook on stage transition
+    const emailTypeMap: Record<string, string> = {
+      'tech_interview': 'tech',
+      'offer': 'offer',
+      'hired': 'hired',
+      'rejected': 'rejected',
+    };
+    const emailType = emailTypeMap[status];
+    if (emailType && candidate.email) {
+      fetch('https://workflow.exist.com.ph/webhook/81f944ac-1805-4de0-aec6-248bc04c535d', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: candidate.email, name: candidate.name, email_type: emailType })
+      }).catch(() => {});
+    }
+
     if (status === 'hired' && previousStatus !== 'hired' && candidate.assignedJoId) {
       handleHiredCandidate(candidate.assignedJoId, candidateId);
     }

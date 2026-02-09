@@ -22,9 +22,6 @@ export interface OfferForm {
   startDate: string;
   status: OfferStatus | '';
   remarks: string;
-  expiryDate: string;
-  benefits: string;
-  negotiationNotes: string;
 }
 
 const offerStatusLabels: Record<OfferStatus, string> = {
@@ -59,30 +56,24 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
   const isOfferStage = currentCandidate.pipelineStatus === 'offer' || currentCandidate.pipelineStatus === 'hired';
 
   const [formData, setFormData] = useState<OfferForm>({
-    offerDate: '',
+    offerDate: new Date().toISOString().split('T')[0],
     offerAmount: '',
     position: currentCandidate.positionApplied || '',
     startDate: '',
     status: '',
     remarks: '',
-    expiryDate: '',
-    benefits: '',
-    negotiationNotes: ''
   });
 
   // Load existing offer data when available
   useEffect(() => {
     if (existingOffer) {
       setFormData({
-        offerDate: existingOffer.offer_date?.split('T')[0] || '',
+        offerDate: existingOffer.offer_date?.split('T')[0] || new Date().toISOString().split('T')[0],
         offerAmount: existingOffer.offer_amount || '',
         position: existingOffer.position || currentCandidate.positionApplied || '',
         startDate: existingOffer.start_date?.split('T')[0] || '',
         status: (existingOffer.status as OfferStatus) || '',
         remarks: existingOffer.remarks || '',
-        expiryDate: existingOffer.expiry_date?.split('T')[0] || '',
-        benefits: existingOffer.benefits || '',
-        negotiationNotes: existingOffer.negotiation_notes || ''
       });
     }
   }, [existingOffer, currentCandidate.positionApplied]);
@@ -98,14 +89,11 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
         application_id: applicationId,
         candidate_id: currentCandidate.id,
         offer_date: formData.offerDate || null,
-        expiry_date: formData.expiryDate || null,
         offer_amount: formData.offerAmount || null,
         position: formData.position || null,
         start_date: formData.startDate || null,
         status: (formData.status || 'pending') as DBOfferStatus,
-        benefits: formData.benefits || null,
         remarks: formData.remarks || null,
-        negotiation_notes: formData.negotiationNotes || null
       });
       
       // If offer is accepted, move to hired
@@ -167,17 +155,6 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
 
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-sm">
-              Expiry Date
-            </Label>
-            <DatePickerField
-              value={formData.expiryDate}
-              onChange={(v) => setFormData({ ...formData, expiryDate: v })}
-              placeholder="Select expiry date"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm">
               <DollarSign className="w-4 h-4 text-muted-foreground" />
               Offer Amount (PHP)
             </Label>
@@ -229,45 +206,23 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
             </Select>
           </div>
         </div>
-
-        <div className="mt-4 space-y-2">
-          <Label className="text-sm">Benefits Package</Label>
-          <Textarea
-            placeholder="Health insurance, bonuses, allowances, etc."
-            value={formData.benefits}
-            onChange={(e) => setFormData({ ...formData, benefits: e.target.value })}
-            rows={2}
-          />
-        </div>
       </div>
 
-      {/* Remarks & Notes */}
+      {/* Remarks */}
       <div className="bg-card rounded-xl border p-4">
         <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
           <MessageSquare className="w-5 h-5 text-primary" />
-          Remarks & Notes
+          Remarks
         </h3>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label className="text-sm">Remarks</Label>
-            <Textarea
-              placeholder="General remarks about the offer..."
-              value={formData.remarks}
-              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-sm">Negotiation Notes</Label>
-            <Textarea
-              placeholder="Notes from any negotiation discussions..."
-              value={formData.negotiationNotes}
-              onChange={(e) => setFormData({ ...formData, negotiationNotes: e.target.value })}
-              rows={3}
-            />
-          </div>
+        <div className="space-y-2">
+          <Label className="text-sm">Remarks</Label>
+          <Textarea
+            placeholder="General remarks about the offer..."
+            value={formData.remarks}
+            onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+            rows={3}
+          />
         </div>
       </div>
 

@@ -37,18 +37,16 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
     }).catch(err => console.error('Error loading full candidate data:', err));
   }, [candidate.id]);
 
-  const isTechStageOrBeyond = ['tech_interview', 'offer', 'hired'].includes(currentCandidate.pipelineStatus);
-
-  const getNextAction = () => {
+  const getFormAction = () => {
     switch (currentCandidate.pipelineStatus) {
-      case 'hr_interview': return { label: 'Move to Tech Interview', status: 'tech_interview' as PipelineStatus };
-      case 'tech_interview': return { label: 'Move to Offer', status: 'offer' as PipelineStatus };
-      case 'offer': return { label: 'Mark as Hired', status: 'hired' as PipelineStatus };
+      case 'hr_interview': return { label: 'Open HR Form', tab: 'hr-form' };
+      case 'tech_interview': return { label: 'Open Tech Form', tab: 'tech-form' };
+      case 'offer': return { label: 'Open Offer Form', tab: 'offer-form' };
       default: return null;
     }
   };
 
-  const nextAction = getNextAction();
+  const formAction = getFormAction();
 
   const handleDownloadCV = () => {
     if (currentCandidate.googleDriveFileUrl) {
@@ -63,7 +61,7 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
     { id: 'cv', label: 'CV', icon: FileText },
     { id: 'history', label: 'History', icon: History },
     { id: 'hr-form', label: 'HR Form', icon: UserCheck },
-    ...(isTechStageOrBeyond ? [{ id: 'tech-form', label: 'Tech Form', icon: Code }] : []),
+    { id: 'tech-form', label: 'Tech Form', icon: Code },
     { id: 'offer-form', label: 'Offer', icon: FileCheck },
   ];
 
@@ -124,28 +122,18 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
 
             {/* Right: Actions */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Status dropdown */}
-              <Select
-                value={currentCandidate.pipelineStatus}
-                onValueChange={(v) => updateCandidatePipelineStatus(currentCandidate.id, v as PipelineStatus)}
-              >
-                <SelectTrigger className={cn("h-8 text-xs w-[150px]", pipelineStatusColors[currentCandidate.pipelineStatus])}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(pipelineStatusLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Read-only status badge */}
+              <span className={cn("inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border", pipelineStatusColors[currentCandidate.pipelineStatus])}>
+                {pipelineStatusLabels[currentCandidate.pipelineStatus]}
+              </span>
 
-              {nextAction && (
+              {formAction && (
                 <Button
                   size="sm"
                   className="h-8 text-xs"
-                  onClick={() => updateCandidatePipelineStatus(currentCandidate.id, nextAction.status)}
+                  onClick={() => setActiveTab(formAction.tab)}
                 >
-                  {nextAction.label}
+                  {formAction.label}
                 </Button>
               )}
 
@@ -197,7 +185,7 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
           {activeTab === 'cv' && <CVPreview candidate={currentCandidate} />}
           {activeTab === 'history' && <ApplicationHistoryTab candidate={currentCandidate} />}
           {activeTab === 'hr-form' && <HRInterviewFormTab candidate={currentCandidate} />}
-          {activeTab === 'tech-form' && isTechStageOrBeyond && <TechInterviewFormTab candidate={currentCandidate} />}
+          {activeTab === 'tech-form' && <TechInterviewFormTab candidate={currentCandidate} />}
           {activeTab === 'offer-form' && <OfferFormTab candidate={currentCandidate} />}
         </div>
       </div>

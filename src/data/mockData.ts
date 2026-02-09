@@ -204,17 +204,15 @@ export const joStatusLabels: Record<JobOrder['status'], string> = {
   'archived': 'Archived'
 };
 
-export const hrVerdictLabels: Record<HRVerdict, string> = {
+export const hrVerdictLabels: Record<string, string> = {
   'pass': 'Pass - Proceed to Tech',
   'fail': 'Fail - Reject',
-  'conditional': 'Conditional',
   'pending': 'Pending'
 };
 
-export const techVerdictLabels: Record<TechVerdict, string> = {
+export const techVerdictLabels: Record<string, string> = {
   'pass': 'Pass - Proceed to Offer',
   'fail': 'Fail - Reject',
-  'conditional': 'Conditional',
   'pending': 'Pending'
 };
 

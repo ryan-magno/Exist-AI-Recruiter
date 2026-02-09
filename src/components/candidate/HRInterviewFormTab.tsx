@@ -337,7 +337,7 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
               <SelectTrigger className={cn(
                 "h-9 text-sm",
                 form.verdict === 'pass' && 'border-emerald-500 bg-emerald-100',
-                form.verdict === 'conditional' && 'border-amber-500 bg-amber-100',
+                // conditional removed
                 form.verdict === 'fail' && 'border-red-500 bg-red-100'
               )}>
                 <SelectValue placeholder="Select recommendation..." />
