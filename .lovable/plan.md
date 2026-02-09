@@ -1,71 +1,18 @@
 
 
-# Kanban Card Legacy Design Corrections
+# Reduce Internal Candidate Kanban Card Border Intensity
 
-## 5 Targeted Changes in `src/components/dashboard/DashboardKanban.tsx`
+## What Changes
+One small styling tweak in `src/components/dashboard/DashboardKanban.tsx`:
 
-### 1. Green Border on Card Container for Internal Candidates
-- Move the green border from the "Internal" label (line 195) to the card container (line 121-124)
-- Card `className` gets conditional: `isInternal && 'border-2 border-green-500'`
-- The "Internal" label (line 195) loses `border-2 border-green-500` and becomes plain bold green text: `font-bold text-green-600 text-xs` with logo, no border
+Change the internal candidate card border from `border-2 border-green-500` (thick, intense green) to `border border-green-400` (standard 1px width, slightly softer green) -- matching the weight of the selected job order's `border-primary` style.
 
-### 2. Full-Width Status Bars
-- Change the status pills container (lines 158-188) from `flex items-center gap-1 flex-wrap` to stacked full-width bars
-- Each status becomes a `w-full` bar styled like the age bar: `rounded-md px-3 py-1.5 text-xs font-medium` with appropriate background colors
-- Tech and offer statuses render as individual full-width rows (not inline pills)
+## Technical Detail
 
-### 3. Darker Inner Borders
-- Age bar (line 145): change `border-green-100` to `border-green-200`
-- Status bars: use `border-gray-300` (or `border-emerald-300`/`border-red-300` for pass/fail) instead of `border-gray-200`/`border-emerald-200`
+In the `CompactKanbanCard` component, update the card container's conditional class:
 
-### 4. Larger Action Icons
-- Lines 210, 218, 226: change icon size from `w-3.5 h-3.5` to `w-5 h-5`
+**Before:** `isInternal ? 'border-2 border-green-500' : 'border border-gray-200'`
 
-### 5. Compact Padding
-- Card container (line 122): change `p-4` to `px-3 py-3`
+**After:** `isInternal ? 'border border-green-400' : 'border border-gray-200'`
 
-## Technical Summary
-
-All changes are in one file: `src/components/dashboard/DashboardKanban.tsx`, lines 117-237 (the `CompactKanbanCard` normal render section).
-
-**Line 121-124** -- Card container class:
-```
-cn(
-  'kanban-card bg-white shadow-sm rounded-lg px-3 py-3 cursor-pointer hover:shadow-md transition-shadow',
-  isInternal ? 'border-2 border-green-500' : 'border border-gray-200',
-  isDragging && 'shadow-lg ring-2 ring-primary opacity-90'
-)
-```
-
-**Line 145** -- Age bar border:
-```
-border-green-200  (was border-green-100)
-```
-
-**Lines 158-188** -- Status bars become full-width stacked:
-```
-{isInTechInterview && (
-  <div className={cn('mt-2 w-full rounded-md px-3 py-1.5 text-xs font-medium border', ...)}>
-    Tech: Pass/Fail/Pending
-  </div>
-)}
-{isInOffer && (
-  <div className={cn('mt-2 w-full rounded-md px-3 py-1.5 text-xs font-medium border', ...)}>
-    Offer: Accepted/Rejected/Pending
-  </div>
-)}
-```
-With darker borders: `border-emerald-300` for pass/accepted, `border-red-300` for fail/rejected, `border-gray-300` for pending.
-
-**Lines 194-199** -- Internal label simplified:
-```
-<div className="inline-flex items-center gap-1 text-green-600 font-bold text-xs">
-  <img src={existLogo} alt="Internal" className="w-3.5 h-3.5 object-contain" />
-  Internal
-</div>
-```
-
-**Lines 210, 218, 226** -- Icons enlarged:
-```
-w-5 h-5  (was w-3.5 h-3.5)
-```
+This makes both borders use the same `border` (1px) width, with a softer green tone (`green-400` instead of `green-500`).
