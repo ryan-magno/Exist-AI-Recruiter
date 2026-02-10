@@ -32,7 +32,8 @@ const ALLOWED_CANDIDATE_COLUMNS = [
   'google_drive_file_id', 'google_drive_file_url',
   'batch_id', 'batch_created_at',
   // Processing status fields
-  'processing_status', 'processing_batch_id'
+  'processing_status', 'processing_batch_id',
+  'notice_period'
 ];
 
 const ALLOWED_APPLICATION_COLUMNS = [
@@ -203,6 +204,7 @@ async function initTables() {
       google_drive_file_url TEXT,
       uploaded_by TEXT,
       uploaded_by_user_id UUID,
+      notice_period TEXT,
       created_at TIMESTAMPTZ DEFAULT now(),
       updated_at TIMESTAMPTZ DEFAULT now()
     );
@@ -346,10 +348,26 @@ async function initTables() {
       updated_at TIMESTAMPTZ DEFAULT now()
     );
 
+    -- Activity Log table
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      activity_type TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id UUID NOT NULL,
+      performed_by_name TEXT,
+      action_date TIMESTAMPTZ NOT NULL DEFAULT now(),
+      details JSONB,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_activity_log_action_date ON activity_log(action_date DESC);
+    CREATE INDEX IF NOT EXISTS idx_activity_log_entity ON activity_log(entity_type, entity_id);
+    CREATE INDEX IF NOT EXISTS idx_activity_log_activity_type ON activity_log(activity_type);
+
     -- Migrations for existing tables
     ALTER TABLE offers DROP COLUMN IF EXISTS expiry_date;
     ALTER TABLE offers DROP COLUMN IF EXISTS benefits;
     ALTER TABLE offers DROP COLUMN IF EXISTS negotiation_notes;
+    ALTER TABLE candidates ADD COLUMN IF NOT EXISTS notice_period TEXT;
     
     -- Add unique constraint on application_id if missing
     DO $$ BEGIN
@@ -505,6 +523,7 @@ async function recreateDatabase() {
       google_drive_file_url TEXT,
       uploaded_by TEXT,
       uploaded_by_user_id UUID,
+      notice_period TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -639,7 +658,22 @@ async function recreateDatabase() {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
     
+    -- Activity Log table
+    CREATE TABLE activity_log (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      activity_type TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id UUID NOT NULL,
+      performed_by_name TEXT,
+      action_date TIMESTAMPTZ NOT NULL DEFAULT now(),
+      details JSONB,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
+
     -- Create indexes
+    CREATE INDEX idx_activity_log_action_date ON activity_log(action_date DESC);
+    CREATE INDEX idx_activity_log_entity ON activity_log(entity_type, entity_id);
+    CREATE INDEX idx_activity_log_activity_type ON activity_log(activity_type);
     CREATE INDEX idx_candidates_email ON candidates(email);
     CREATE INDEX idx_candidates_applicant_type ON candidates(applicant_type);
     CREATE INDEX idx_candidates_batch_id ON candidates(batch_id);
@@ -1644,6 +1678,56 @@ async function handleRequest(req: Request): Promise<Response> {
     if (path === '/job-orders/count') {
       const rows = await query("SELECT COUNT(*) as count FROM job_orders");
       return jsonResponse({ count: parseInt((rows[0] as any).count) });
+    }
+
+    // Activity Log
+    if (path === '/activity-log') {
+      if (method === 'GET') {
+        const entityType = url.searchParams.get('entity_type');
+        const activityType = url.searchParams.get('activity_type');
+        const startDate = url.searchParams.get('start_date');
+        const endDate = url.searchParams.get('end_date');
+        const limitParam = url.searchParams.get('limit');
+        const offsetParam = url.searchParams.get('offset');
+        
+        let sql = "SELECT * FROM activity_log";
+        const conditions: string[] = [];
+        const params: unknown[] = [];
+        
+        if (entityType) { params.push(entityType); conditions.push(`entity_type = $${params.length}`); }
+        if (activityType) {
+          const types = activityType.split(',');
+          if (types.length === 1) {
+            params.push(activityType); conditions.push(`activity_type = $${params.length}`);
+          } else {
+            const placeholders = types.map((_, i) => `$${params.length + i + 1}`);
+            types.forEach(t => params.push(t));
+            conditions.push(`activity_type IN (${placeholders.join(',')})`);
+          }
+        }
+        if (startDate) { params.push(startDate); conditions.push(`action_date >= $${params.length}::timestamptz`); }
+        if (endDate) { params.push(endDate); conditions.push(`action_date <= $${params.length}::timestamptz`); }
+        
+        if (conditions.length > 0) sql += ` WHERE ${conditions.join(' AND ')}`;
+        sql += ' ORDER BY action_date DESC';
+        
+        const limit = parseInt(limitParam || '50');
+        const offset = parseInt(offsetParam || '0');
+        params.push(limit); sql += ` LIMIT $${params.length}`;
+        params.push(offset); sql += ` OFFSET $${params.length}`;
+        
+        const rows = await query(sql, params);
+        return jsonResponse(rows);
+      }
+      if (method === 'POST') {
+        const body = await req.json();
+        const result = await query(`
+          INSERT INTO activity_log (activity_type, entity_type, entity_id, performed_by_name, action_date, details)
+          VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+          RETURNING *
+        `, [body.activity_type, body.entity_type, body.entity_id, body.performed_by_name || null, body.action_date || new Date().toISOString(), JSON.stringify(body.details || {})]);
+        return jsonResponse(result[0]);
+      }
     }
 
     return jsonResponse({ error: 'Not found' }, 404);

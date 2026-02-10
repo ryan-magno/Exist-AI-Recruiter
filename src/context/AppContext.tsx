@@ -3,6 +3,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useJobOrders, useUpdateJobOrder, useCreateJobOrder, useDeleteJobOrder, JobOrder as DBJobOrder, JobOrderInsert } from '@/hooks/useJobOrders';
 import { useUpdateApplicationStatus, PipelineStatus } from '@/hooks/useApplications';
 import { azureDb } from '@/lib/azureDb';
+import { logActivity } from '@/lib/activityLogger';
 import { toast } from 'sonner';
 
 // Legacy types for compatibility
@@ -287,6 +288,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           status: dbStatus,
           previousStatus: previousDbStatus
         });
+        logActivity({
+          activityType: 'pipeline_moved', entityType: 'application', entityId: candidate.applicationId,
+          details: { candidate_id: candidateId, candidate_name: candidate.name, from_status: previousStatus, to_status: status }
+        });
       } catch (error) {
         console.error('Error updating application status:', error);
         setCandidates(prev => 
@@ -367,11 +372,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const updateJobOrderStatus = async (joId: string, status: LegacyJobOrder['status']) => {
+    const oldJo = dbJobOrders.find(j => j.id === joId);
     try {
       await updateJobOrderMutation.mutateAsync({
         id: joId,
         updates: { status: status as DBJobOrder['status'] }
       });
+      if (status === 'archived' && oldJo?.status !== 'archived') {
+        logActivity({ activityType: 'jo_archived', entityType: 'job_order', entityId: joId, details: { jo_number: oldJo?.jo_number, title: oldJo?.title } });
+      }
     } catch (error) {
       toast.error('Failed to update job order status');
     }
@@ -416,7 +425,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         requestor_name: jo.requestorName
       };
 
-      await createJobOrderMutation.mutateAsync(newJO);
+      const created = await createJobOrderMutation.mutateAsync(newJO);
+      logActivity({
+        activityType: 'jo_created', entityType: 'job_order', entityId: (created as any).id,
+        details: { jo_number: joNumber, title: jo.title, requestor_name: jo.requestorName, department_name: jo.department, level: jo.level, employment_type: jo.employmentType, quantity: jo.quantity, required_date: jo.requiredDate }
+      });
     } catch (error) {
       console.error('Error creating job order:', error);
       toast.error('Failed to create job order');
@@ -424,7 +437,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteJobOrder = async (joId: string) => {
+    const joToDelete = dbJobOrders.find(j => j.id === joId);
     try {
+      if (joToDelete) {
+        logActivity({
+          activityType: 'jo_deleted', entityType: 'job_order', entityId: joId,
+          details: { jo_number: joToDelete.jo_number, title: joToDelete.title, requestor_name: joToDelete.requestor_name, department_name: joToDelete.department_name }
+        });
+      }
       await deleteJobOrderMutation.mutateAsync(joId);
       toast.success('Job Order deleted permanently');
     } catch (error) {
@@ -433,11 +453,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const unarchiveJobOrder = async (joId: string) => {
+    const oldJo = dbJobOrders.find(j => j.id === joId);
     try {
       await updateJobOrderMutation.mutateAsync({
         id: joId,
         updates: { status: 'open' }
       });
+      logActivity({ activityType: 'jo_unarchived', entityType: 'job_order', entityId: joId, details: { jo_number: oldJo?.jo_number, title: oldJo?.title, new_status: 'open' } });
       toast.success('Job Order restored to active');
     } catch (error) {
       toast.error('Failed to restore job order');

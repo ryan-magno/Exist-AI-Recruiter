@@ -109,4 +109,20 @@ export const azureDb = {
     listByCandidate: (candidateId: string) => apiCall<any[]>(`/offers?candidate_id=${candidateId}`),
     upsert: (data: any) => apiCall<any>('/offers', { method: 'POST', body: JSON.stringify(data) }),
   },
+
+  // Activity Log
+  activityLog: {
+    list: (params?: { entity_type?: string; activity_type?: string; start_date?: string; end_date?: string; limit?: number; offset?: number }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.entity_type) searchParams.set('entity_type', params.entity_type);
+      if (params?.activity_type) searchParams.set('activity_type', params.activity_type);
+      if (params?.start_date) searchParams.set('start_date', params.start_date);
+      if (params?.end_date) searchParams.set('end_date', params.end_date);
+      if (params?.limit) searchParams.set('limit', params.limit.toString());
+      if (params?.offset) searchParams.set('offset', params.offset.toString());
+      const q = searchParams.toString();
+      return apiCall<any[]>(`/activity-log${q ? `?${q}` : ''}`);
+    },
+    create: (data: any) => apiCall<any>('/activity-log', { method: 'POST', body: JSON.stringify(data) }),
+  },
 };
