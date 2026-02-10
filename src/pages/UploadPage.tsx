@@ -282,18 +282,17 @@ export default function UploadPage() {
       
       toast.dismiss(loadingToastId);
       
-      // Check if it's a background processing response (new async flow)
-      if (result?.status === 'processing') {
-        console.log('Background processing started, batch:', result.batch_id);
+      // Check if webhook returned completed (HTTP 200 + status: completed)
+      if (result?.status === 'completed') {
+        console.log('Webhook processing completed immediately');
         
-        // Mark all files as complete (processing started successfully)
         setFiles(prev => prev.map(f => ({ ...f, status: 'complete' as const })));
-        toast.success('CVs submitted for AI processing!', {
-          description: 'Candidates will appear shortly. Use the refresh button when notified.',
-          duration: 5000
+        toast.success('CVs processed successfully!', {
+          description: 'Candidates are ready. Refreshing...',
+          duration: 3000
         });
         
-        // Trigger the refresh notification
+        // Trigger refresh notification only on completed
         emitRefreshPrompt(files.length);
         
         // Save uploader name to database (only if new)
@@ -306,6 +305,30 @@ export default function UploadPage() {
           }
         }
         
+        return;
+      }
+
+      // Background processing started — no refresh prompt yet
+      if (result?.status === 'processing') {
+        console.log('Background processing started, batch:', result.batch_id);
+        
+        setFiles(prev => prev.map(f => ({ ...f, status: 'complete' as const })));
+        toast.success('CVs submitted for AI processing!', {
+          description: 'Candidates will appear once processing completes.',
+          duration: 5000
+        });
+        
+        // Save uploader name to database (only if new)
+        const isExistingUploader2 = existingUploaders.some(n => n.toLowerCase() === uploaderName.trim().toLowerCase());
+        if (!isExistingUploader2) {
+          try {
+            await createUploader.mutateAsync(uploaderName.trim());
+          } catch (error) {
+            console.error('Error saving uploader:', error);
+          }
+        }
+        
+        // No emitRefreshPrompt here — polling will handle silent cache refresh
         return;
       }
       
