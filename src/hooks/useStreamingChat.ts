@@ -7,12 +7,12 @@ import { toast } from '@/hooks/use-toast';
 const WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome',
   role: 'assistant',
-  content: `Hi! I'm your HR Assistant. I can help you with candidate searches, job order analysis, interview preparation, and more.
+  content: `Hi there! I'm **Gab**, your HR Assistant. I can help you search for candidates, analyze job orders, prepare for interviews, and much more.
 
 Try asking me something like:
 - "Who are the best candidates for our Data Engineer position?"
-- "Summarize the qualifications of the latest applicants"
-- "Generate interview questions for a Senior Developer role"`,
+- "Who has a PMP certification?"
+- "Summarize this candidate's resume"`,
   timestamp: new Date(),
 };
 
