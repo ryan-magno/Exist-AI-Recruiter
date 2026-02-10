@@ -41,6 +41,7 @@ export interface HRInterviewForm {
   interviewMethod: 'phone' | 'virtual' | 'in-person';
   noticePeriod: 'immediate' | '1-week' | '2-weeks' | '1-month' | '2-months-plus';
   expectedSalary: string;
+  earliestStartDate: string;
   workSetupPreference: 'on-site' | 'hybrid' | 'remote' | 'flexible';
   employmentStatusPreference: 'regular' | 'contractual' | 'freelance' | 'part-time';
   relocationWillingness: 'yes' | 'no' | 'maybe' | 'na';
