@@ -58,8 +58,9 @@ export function useProcessingStatus(options: UseProcessingStatusOptions = {}) {
       if (batchId) params.set('batch_id', batchId);
       if (lastCheckTime.current) params.set('since', lastCheckTime.current);
 
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/azure-db/candidates/processing-status?${params.toString()}`
+        `${apiUrl}/candidates/processing-status?${params.toString()}`
       );
 
       if (!response.ok) throw new Error('Failed to fetch processing status');

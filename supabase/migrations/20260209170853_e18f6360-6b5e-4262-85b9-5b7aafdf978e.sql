@@ -1,3 +1,0 @@
-ALTER TABLE offers DROP COLUMN IF EXISTS expiry_date;
-ALTER TABLE offers DROP COLUMN IF EXISTS benefits;
-ALTER TABLE offers DROP COLUMN IF EXISTS negotiation_notes;

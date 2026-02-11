@@ -1,7 +1,7 @@
 // Azure PostgreSQL API client
-// This is the sole data layer - no Supabase, just direct API calls to Edge Function
+// This is the sole data layer - direct API calls to Express server
 
-const AZURE_DB_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/azure-db`;
+const AZURE_DB_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 async function apiCall<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${AZURE_DB_URL}${path}`, {

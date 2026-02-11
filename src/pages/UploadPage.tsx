@@ -38,8 +38,8 @@ const UPLOAD_REASONS = [
   { value: 'other', label: 'Other' },
 ];
 
-// Use our edge function as a proxy to bypass CORS issues with the n8n webhook
-const WEBHOOK_PROXY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/azure-db/webhook-proxy`;
+// Use our API server as a proxy to bypass CORS issues with the n8n webhook
+const WEBHOOK_PROXY_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/webhook-proxy`;
 
 // Helper to format file size
 const formatFileSize = (bytes: number): string => {

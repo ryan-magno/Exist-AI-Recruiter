@@ -54,8 +54,9 @@ export function useRealtimeCandidates() {
   // Poll for processing status changes
   const checkProcessingStatus = useCallback(async () => {
     try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/azure-db/candidates/processing-status`
+        `${apiUrl}/candidates/processing-status`
       );
 
       if (!response.ok) return;
