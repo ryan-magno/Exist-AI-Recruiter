@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DatePickerField } from '@/components/ui/DatePickerField';
 import { Candidate, TechInterviewForm, TechVerdict, techVerdictLabels } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
+import { useTechInterview, useUpsertTechInterview } from '@/hooks/useInterviews';
+import { logActivity } from '@/lib/activityLogger';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -15,14 +17,16 @@ interface TechInterviewFormTabProps {
   candidate: Candidate;
 }
 
+const todayStr = () => new Date().toISOString().split('T')[0];
+
 const emptyForm: TechInterviewForm = {
   interviewerName: '',
-  interviewDate: '',
+  interviewDate: todayStr(),
   interviewMethod: 'virtual',
-  technicalSkillsScore: 3,
-  problemSolvingScore: 3,
-  systemDesignScore: 3,
-  codingChallengeScore: 3,
+  technicalSkillsScore: 0,
+  problemSolvingScore: 0,
+  systemDesignScore: 0,
+  codingChallengeScore: 0,
   strengthAreas: '',
   weaknessAreas: '',
   technicalNotes: '',
@@ -31,8 +35,41 @@ const emptyForm: TechInterviewForm = {
 };
 
 export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
-  // Guard: not yet at tech stage
   const isAtTechOrBeyond = ['tech_interview', 'offer', 'hired'].includes(candidate.pipelineStatus);
+  const { updateCandidateTechForm, updateCandidatePipelineStatus, updateCandidateTechInterviewResult } = useApp();
+  const applicationId = candidate.applicationId || null;
+  const { data: existingInterview, isLoading: loadingInterview } = useTechInterview(applicationId);
+  const upsertTechInterview = useUpsertTechInterview();
+  const [form, setForm] = useState<TechInterviewForm>({ ...emptyForm });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [isExistingRecord, setIsExistingRecord] = useState(false);
+
+  useEffect(() => {
+    if (loadingInterview) return;
+    if (existingInterview) {
+      setIsExistingRecord(true);
+      setForm({
+        interviewerName: existingInterview.interviewer_name || '',
+        interviewDate: existingInterview.interview_date || todayStr(),
+        interviewMethod: (existingInterview.interview_mode as any) || 'virtual',
+        technicalSkillsScore: existingInterview.technical_knowledge_rating || 0,
+        problemSolvingScore: existingInterview.problem_solving_rating || 0,
+        systemDesignScore: existingInterview.system_design_rating || 0,
+        codingChallengeScore: existingInterview.coding_challenge_score || 0,
+        strengthAreas: existingInterview.technical_strengths || '',
+        weaknessAreas: existingInterview.areas_for_improvement || '',
+        technicalNotes: existingInterview.coding_challenge_notes || '',
+        verdict: (existingInterview.verdict as TechVerdict) || '',
+        verdictRationale: existingInterview.verdict_rationale || '',
+      });
+    } else {
+      setIsExistingRecord(false);
+      setForm({ ...emptyForm, interviewDate: todayStr() });
+    }
+  }, [candidate.id, existingInterview, loadingInterview]);
+
+  // Guard: not yet at tech stage
   if (!isAtTechOrBeyond) {
     return (
       <div className="flex flex-col items-center justify-center h-full py-12 text-center">
@@ -46,29 +83,58 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
       </div>
     );
   }
-  const { updateCandidateTechForm, updateCandidatePipelineStatus, updateCandidateTechInterviewResult } = useApp();
-  const [form, setForm] = useState<TechInterviewForm>(candidate.techInterviewForm || emptyForm);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    setForm(candidate.techInterviewForm || emptyForm);
-  }, [candidate.id]);
-
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.interviewerName) {
       toast.error('Please enter the interviewer name');
       return;
     }
+    if (!applicationId) {
+      toast.error('No application found for this candidate');
+      return;
+    }
     
     setSaving(true);
-    setTimeout(() => {
+    try {
+      // Step 1: Save to DB
+      const techData = {
+        application_id: applicationId,
+        candidate_id: candidate.id,
+        interview_date: form.interviewDate || null,
+        interviewer_name: form.interviewerName || null,
+        interview_mode: form.interviewMethod || null,
+        technical_knowledge_rating: form.technicalSkillsScore || null,
+        problem_solving_rating: form.problemSolvingScore || null,
+        code_quality_rating: null,
+        system_design_rating: form.systemDesignScore || null,
+        coding_challenge_score: form.codingChallengeScore || null,
+        coding_challenge_notes: form.technicalNotes || null,
+        technical_strengths: form.strengthAreas || null,
+        areas_for_improvement: form.weaknessAreas || null,
+        verdict: form.verdict || null,
+        verdict_rationale: form.verdictRationale || null,
+      };
+      await upsertTechInterview.mutateAsync(techData as any);
+
+      // Step 2: Log activity
+      logActivity({
+        activityType: isExistingRecord ? 'tech_interview_updated' : 'tech_interview_submitted',
+        entityType: 'interview',
+        entityId: applicationId,
+        performedByName: form.interviewerName,
+        details: {
+          candidate_id: candidate.id,
+          candidate_name: candidate.name,
+          application_id: applicationId,
+          interview_date: form.interviewDate,
+          verdict: form.verdict || null,
+        }
+      });
+
+      // Step 3: Update local state
       updateCandidateTechForm(candidate.id, form);
-      setSaving(false);
-      setSaved(true);
-      toast.success('Tech Interview form saved');
       
-      // Auto-move based on verdict
+      // Step 4: Auto-move based on verdict
       if (form.verdict === 'pass' && candidate.pipelineStatus === 'tech_interview') {
         updateCandidatePipelineStatus(candidate.id, 'offer');
         updateCandidateTechInterviewResult(candidate.id, 'pass');
@@ -78,9 +144,16 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
         updateCandidateTechInterviewResult(candidate.id, 'fail');
         toast.info('Candidate marked as rejected');
       }
-      
+
+      setSaved(true);
+      toast.success('Tech Interview form saved');
       setTimeout(() => setSaved(false), 2000);
-    }, 500);
+    } catch (error) {
+      console.error('Error saving tech form:', error);
+      toast.error('Failed to save Tech Interview form');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const updateField = <K extends keyof TechInterviewForm>(key: K, value: TechInterviewForm[K]) => {
@@ -96,10 +169,10 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
           <button
             key={i}
             type="button"
-            onClick={() => onChange(i)}
+            onClick={() => onChange(i === value ? 0 : i)}
             className={cn(
               'w-8 h-8 rounded-md border-2 flex items-center justify-center transition-all font-semibold text-sm',
-              i <= value 
+              value > 0 && i <= value 
                 ? 'bg-violet-100 border-violet-400 text-violet-700' 
                 : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted hover:border-violet-300'
             )}
@@ -113,7 +186,7 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
               key={i} 
               className={cn(
                 'w-4 h-4 transition-colors',
-                i <= value ? 'fill-violet-400 text-violet-400' : 'text-muted-foreground'
+                i <= value && value > 0 ? 'fill-violet-400 text-violet-400' : 'text-muted-foreground'
               )} 
             />
           ))}
@@ -123,6 +196,10 @@ export function TechInterviewFormTab({ candidate }: TechInterviewFormTabProps) {
   );
 
   const avgScore = ((form.technicalSkillsScore + form.problemSolvingScore + form.systemDesignScore + form.codingChallengeScore) / 4).toFixed(1);
+
+  if (loadingInterview) {
+    return <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+  }
 
   return (
     <div className="space-y-6 pb-6">

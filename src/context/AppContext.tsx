@@ -81,9 +81,6 @@ async function fetchLegacyCandidates(): Promise<LegacyCandidate[]> {
     const candidate = candidateMap.get(app.candidate_id) || {};
     
     let expectedSalary = candidate.expected_salary || '';
-    if (expectedSalary && !expectedSalary.includes('₱') && !expectedSalary.toLowerCase().includes('php')) {
-      expectedSalary = `₱${expectedSalary}`;
-    }
     
     return {
       id: app.candidate_id,
@@ -288,9 +285,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
           status: dbStatus,
           previousStatus: previousDbStatus
         });
+        // Verdict lookup for pipeline movement logging
+        let verdict: string | null = null;
+        let verdictSource: string | null = null;
+        try {
+          if (previousStatus === 'hr_interview' || previousDbStatus === 'for_hr_interview' as any) {
+            const hrInterview = await azureDb.hrInterviews.get(candidate.applicationId);
+            verdict = hrInterview?.verdict || null;
+            verdictSource = 'hr_interview';
+          } else if (previousStatus === 'tech_interview' || previousDbStatus === 'for_tech_interview' as any) {
+            const techInterview = await azureDb.techInterviews.get(candidate.applicationId);
+            verdict = techInterview?.verdict || null;
+            verdictSource = 'tech_interview';
+          }
+        } catch { /* verdict lookup is best-effort */ }
+
         logActivity({
           activityType: 'pipeline_moved', entityType: 'application', entityId: candidate.applicationId,
-          details: { candidate_id: candidateId, candidate_name: candidate.name, from_status: previousStatus, to_status: status }
+          details: { candidate_id: candidateId, candidate_name: candidate.name, from_status: previousStatus, to_status: status, verdict, verdict_source: verdictSource }
         });
       } catch (error) {
         console.error('Error updating application status:', error);
@@ -387,6 +399,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const updateJobOrder = async (joId: string, updates: Partial<LegacyJobOrder>) => {
+    const oldJo = dbJobOrders.find(j => j.id === joId);
     try {
       const dbUpdates: Partial<DBJobOrder> = {};
       if (updates.title) dbUpdates.title = updates.title;
@@ -402,6 +415,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (updates.requestorName) dbUpdates.requestor_name = updates.requestorName;
       
       await updateJobOrderMutation.mutateAsync({ id: joId, updates: dbUpdates });
+
+      // Log JO edit with change detection
+      if (oldJo) {
+        const fieldMap: Record<string, string> = {
+          title: 'title', description: 'description', level: 'level',
+          quantity: 'quantity', requiredDate: 'required_date', department: 'department_name',
+          employmentType: 'employment_type', requestorName: 'requestor_name',
+        };
+        const changedFields: string[] = [];
+        for (const [legacyKey, dbKey] of Object.entries(fieldMap)) {
+          if (updates[legacyKey as keyof LegacyJobOrder] !== undefined && updates[legacyKey as keyof LegacyJobOrder] !== (oldJo as any)[dbKey]) {
+            changedFields.push(dbKey);
+          }
+        }
+        if (changedFields.length > 0) {
+          logActivity({
+            activityType: 'jo_edited', entityType: 'job_order', entityId: joId,
+            details: { jo_number: oldJo.jo_number, title: updates.title || oldJo.title, changed_fields: changedFields }
+          });
+        }
+        // Archive/Unarchive detection
+        if (updates.status === 'archived' && oldJo.status !== 'archived') {
+          logActivity({ activityType: 'jo_archived', entityType: 'job_order', entityId: joId, details: { jo_number: oldJo.jo_number, title: oldJo.title } });
+        }
+        if (oldJo.status === 'archived' && updates.status && updates.status !== 'archived') {
+          logActivity({ activityType: 'jo_unarchived', entityType: 'job_order', entityId: joId, details: { jo_number: oldJo.jo_number, title: oldJo.title, new_status: updates.status } });
+        }
+      }
     } catch (error) {
       toast.error('Failed to update job order');
     }

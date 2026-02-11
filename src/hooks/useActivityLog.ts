@@ -53,9 +53,14 @@ export const activityTypeLabels: Record<string, string> = {
 };
 
 export const pipelineStatusReadable: Record<string, string> = {
+  'new': 'New',
+  'screening': 'Screening',
+  'for_hr_interview': 'HR Interview',
   'hr_interview': 'HR Interview',
+  'for_tech_interview': 'Tech Interview',
   'tech_interview': 'Tech Interview',
   'offer': 'Offer',
   'hired': 'Hired',
   'rejected': 'Rejected',
+  'withdrawn': 'Withdrawn',
 };
