@@ -14,11 +14,33 @@ dotenv.config({ path: resolve(__dirname, '..', '.env') });
 const app = express();
 const PORT = process.env.API_PORT || 3001;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// ---------- Validate required env vars ----------
+const REQUIRED_ENV = ['PGHOST', 'PGUSER', 'PGPASSWORD', 'PGDATABASE'];
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    console.error(`❌ Missing required environment variable: ${key}`);
+    console.error('   Make sure .env exists in the project root with PGHOST, PGUSER, PGPASSWORD, PGDATABASE');
+    process.exit(1);
+  }
+}
 
-// PostgreSQL connection pool
+// ---------- Middleware ----------
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+
+// Request logger (concise)
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    if (req.path !== '/health') {
+      console.log(`${req.method} ${req.path} ${res.statusCode} ${ms}ms`);
+    }
+  });
+  next();
+});
+
+// ---------- PostgreSQL connection pool ----------
 const pool = new pg.Pool({
   host: process.env.PGHOST,
   user: process.env.PGUSER,
@@ -28,22 +50,65 @@ const pool = new pg.Pool({
   ssl: { rejectUnauthorized: false },
   max: 10,
   idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
 
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
+  console.error('⚠️  Unexpected error on idle client:', err.message);
 });
 
-// Helper: run query
-async function query(sql, params = []) {
-  const result = await pool.query(sql, params);
-  return result.rows;
+// ---------- Startup DB verification ----------
+async function verifyDatabaseConnection() {
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const client = await pool.connect();
+      const result = await client.query('SELECT NOW() as now, current_database() as db');
+      client.release();
+      console.log(`✅ Database connected: ${result.rows[0].db} (${process.env.PGHOST})`);
+      return true;
+    } catch (err) {
+      console.error(`❌ DB connection attempt ${attempt}/${MAX_RETRIES} failed: ${err.message}`);
+      if (attempt < MAX_RETRIES) {
+        const delay = attempt * 2000;
+        console.log(`   Retrying in ${delay / 1000}s...`);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  }
+  console.error('❌ Could not connect to database after all retries. Server will start but queries will fail.');
+  return false;
 }
 
-// Helper: run execute (no return)
+// ---------- Health check ----------
+app.get('/health', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT 1');
+    res.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
+  } catch (err) {
+    res.status(503).json({ status: 'error', db: 'disconnected', error: err.message });
+  }
+});
+
+// ---------- Query helpers with error context ----------
+async function query(sql, params = []) {
+  try {
+    const result = await pool.query(sql, params);
+    return result.rows;
+  } catch (err) {
+    console.error(`Query error: ${err.message}\n  SQL: ${sql.substring(0, 200)}...`);
+    throw err;
+  }
+}
+
 async function execute(sql, params = []) {
-  await pool.query(sql, params);
-  return { success: true };
+  try {
+    await pool.query(sql, params);
+    return { success: true };
+  } catch (err) {
+    console.error(`Execute error: ${err.message}\n  SQL: ${sql.substring(0, 200)}...`);
+    throw err;
+  }
 }
 
 // Column whitelists for SQL injection prevention
@@ -999,10 +1064,41 @@ async function getCandidateFull(id) {
 // CATCH-ALL
 // =====================================================
 app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
+  res.status(404).json({ error: `Not found: ${req.method} ${req.path}` });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 API server running at http://localhost:${PORT}`);
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+// ---------- Start server with DB verification ----------
+async function start() {
+  await verifyDatabaseConnection();
+
+  const server = app.listen(PORT, () => {
+    console.log(`🚀 API server running at http://localhost:${PORT}`);
+    console.log(`   Health check: http://localhost:${PORT}/health`);
+  });
+
+  // Graceful shutdown
+  const shutdown = async (signal) => {
+    console.log(`\n${signal} received. Shutting down gracefully...`);
+    server.close(() => {
+      pool.end().then(() => {
+        console.log('Database pool closed.');
+        process.exit(0);
+      });
+    });
+    setTimeout(() => process.exit(1), 10000);
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}
+
+start().catch(err => {
+  console.error('Fatal startup error:', err);
+  process.exit(1);
 });

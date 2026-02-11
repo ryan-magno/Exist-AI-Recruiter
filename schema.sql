@@ -238,6 +238,7 @@ CREATE TABLE hr_interviews (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   PRIMARY KEY (id),
+  UNIQUE (application_id),
   FOREIGN KEY (application_id) REFERENCES candidate_job_applications(id) ON DELETE CASCADE,
   FOREIGN KEY (candidate_id) REFERENCES candidates(id) ON DELETE CASCADE
 );
@@ -262,6 +263,7 @@ CREATE TABLE tech_interviews (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   PRIMARY KEY (id),
+  UNIQUE (application_id),
   FOREIGN KEY (application_id) REFERENCES candidate_job_applications(id) ON DELETE CASCADE,
   FOREIGN KEY (candidate_id) REFERENCES candidates(id) ON DELETE CASCADE
 );

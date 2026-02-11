@@ -516,57 +516,57 @@ INSERT INTO application_history (candidate_id, job_order_id, jo_number, jo_title
 INSERT INTO activity_log (activity_type, entity_type, entity_id, performed_by_name, action_date, details) VALUES
 
   -- Job order activities
-  ('jo_created', 'job_order', 'c0000000-0000-0000-0000-000000000001', 'Maria Santos', NOW() - INTERVAL '30 days', '{"jo_number": "JO-2026-001", "title": "Senior Full-Stack Developer", "department": "Engineering"}'::jsonb),
-  ('jo_created', 'job_order', 'c0000000-0000-0000-0000-000000000002', 'Jose Reyes', NOW() - INTERVAL '20 days', '{"jo_number": "JO-2026-002", "title": "Product Manager", "department": "Product"}'::jsonb),
-  ('jo_edited', 'job_order', 'c0000000-0000-0000-0000-000000000001', 'Maria Santos', NOW() - INTERVAL '28 days', '{"field": "description", "action": "Updated job description with more details"}'::jsonb),
-  ('jo_edited', 'job_order', 'c0000000-0000-0000-0000-000000000004', 'Carlos Tan', NOW() - INTERVAL '15 days', '{"field": "status", "from": "open", "to": "on_hold", "reason": "Budget review"}'::jsonb),
-  ('jo_archived', 'job_order', 'c0000000-0000-0000-0000-000000000006', 'Lisa Go', NOW() - INTERVAL '10 days', '{"jo_number": "JO-2025-008", "title": "Marketing Intern", "reason": "Position filled"}'::jsonb),
+  ('jo_created', 'job_order', 'c0000000-0000-0000-0000-000000000001', 'Maria Santos', NOW() - INTERVAL '30 days', '{"jo_number": "JO-2026-001", "title": "Senior Full-Stack Developer", "department_name": "Engineering", "requestor_name": "Maria Santos", "level": "L3", "quantity": 3, "employment_type": "full_time"}'::jsonb),
+  ('jo_created', 'job_order', 'c0000000-0000-0000-0000-000000000002', 'Jose Reyes', NOW() - INTERVAL '20 days', '{"jo_number": "JO-2026-002", "title": "Product Manager", "department_name": "Product", "requestor_name": "Jose Reyes", "level": "L4", "quantity": 1, "employment_type": "full_time"}'::jsonb),
+  ('jo_edited', 'job_order', 'c0000000-0000-0000-0000-000000000001', 'Maria Santos', NOW() - INTERVAL '28 days', '{"jo_number": "JO-2026-001", "title": "Senior Full-Stack Developer", "department_name": "Engineering", "changed_fields": ["description"]}'::jsonb),
+  ('jo_edited', 'job_order', 'c0000000-0000-0000-0000-000000000004', 'Carlos Tan', NOW() - INTERVAL '15 days', '{"jo_number": "JO-2026-004", "title": "DevOps Engineer", "department_name": "Engineering", "changed_fields": ["status"]}'::jsonb),
+  ('jo_archived', 'job_order', 'c0000000-0000-0000-0000-000000000006', 'Lisa Go', NOW() - INTERVAL '10 days', '{"jo_number": "JO-2025-008", "title": "Marketing Intern", "department_name": "Marketing", "requestor_name": "Lisa Go"}'::jsonb),
 
   -- CV upload activities
-  ('cv_uploaded', 'candidate', 'd0000000-0000-0000-0000-000000000001', 'HR Admin', NOW() - INTERVAL '25 days', '{"candidate_name": "Juan Dela Cruz", "filename": "JuanDelaCruz_CV.pdf"}'::jsonb),
-  ('cv_uploaded', 'candidate', 'd0000000-0000-0000-0000-000000000002', 'HR Admin', NOW() - INTERVAL '22 days', '{"candidate_name": "Maria Garcia", "filename": "MariaGarcia_CV.pdf"}'::jsonb),
-  ('cv_uploaded', 'candidate', 'd0000000-0000-0000-0000-000000000004', 'Recruitment Team', NOW() - INTERVAL '18 days', '{"candidate_name": "Ana Reyes", "filename": "AnaReyes_CV.pdf"}'::jsonb),
-  ('cv_uploaded', 'candidate', 'd0000000-0000-0000-0000-000000000012', 'HR Admin', NOW() - INTERVAL '15 days', '{"candidate_name": "Isabella Cruz", "filename": "IsabellaCruz_CV.pdf"}'::jsonb),
-  ('cv_uploaded', 'candidate', 'd0000000-0000-0000-0000-000000000013', 'Recruitment Team', NOW() - INTERVAL '10 days', '{"candidate_name": "Mark Tan", "filename": "MarkTan_CV.pdf"}'::jsonb),
-  ('cv_uploaded', 'candidate', 'd0000000-0000-0000-0000-000000000014', 'HR Admin', NOW() - INTERVAL '12 days', '{"candidate_name": "Grace Lee", "filename": "GraceLee_CV.pdf"}'::jsonb),
+  ('cv_uploaded', 'candidate', 'd0000000-0000-0000-0000-000000000001', 'HR Admin', NOW() - INTERVAL '25 days', '{"candidate_name": "Juan Dela Cruz", "cv_filename": "JuanDelaCruz_CV.pdf", "applicant_type": "external"}'::jsonb),
+  ('cv_uploaded', 'candidate', 'd0000000-0000-0000-0000-000000000002', 'HR Admin', NOW() - INTERVAL '22 days', '{"candidate_name": "Maria Garcia", "cv_filename": "MariaGarcia_CV.pdf", "applicant_type": "external"}'::jsonb),
+  ('cv_uploaded', 'candidate', 'd0000000-0000-0000-0000-000000000004', 'Recruitment Team', NOW() - INTERVAL '18 days', '{"candidate_name": "Ana Reyes", "cv_filename": "AnaReyes_CV.pdf", "applicant_type": "external"}'::jsonb),
+  ('cv_uploaded', 'candidate', 'd0000000-0000-0000-0000-000000000012', 'HR Admin', NOW() - INTERVAL '15 days', '{"candidate_name": "Isabella Cruz", "cv_filename": "IsabellaCruz_CV.pdf", "applicant_type": "external"}'::jsonb),
+  ('cv_uploaded', 'candidate', 'd0000000-0000-0000-0000-000000000013', 'Recruitment Team', NOW() - INTERVAL '10 days', '{"candidate_name": "Mark Tan", "cv_filename": "MarkTan_CV.pdf", "applicant_type": "external"}'::jsonb),
+  ('cv_uploaded', 'candidate', 'd0000000-0000-0000-0000-000000000014', 'HR Admin', NOW() - INTERVAL '12 days', '{"candidate_name": "Grace Lee", "cv_filename": "GraceLee_CV.pdf", "applicant_type": "external"}'::jsonb),
 
   -- Pipeline moved activities
-  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000001', 'Sarah Lim', NOW() - INTERVAL '20 days', '{"candidate_name": "Juan Dela Cruz", "from": "hr_interview", "to": "tech_interview", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000001', 'Alex Reyes', NOW() - INTERVAL '15 days', '{"candidate_name": "Juan Dela Cruz", "from": "tech_interview", "to": "offer", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000001', 'Maria Santos', NOW() - INTERVAL '3 days', '{"candidate_name": "Juan Dela Cruz", "from": "offer", "to": "hired", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000002', 'Sarah Lim', NOW() - INTERVAL '15 days', '{"candidate_name": "Maria Garcia", "from": "hr_interview", "to": "tech_interview", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000003', 'Sarah Lim', NOW() - INTERVAL '15 days', '{"candidate_name": "Carlos Santos", "from": "hr_interview", "to": "tech_interview", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000003', 'Alex Reyes', NOW() - INTERVAL '8 days', '{"candidate_name": "Carlos Santos", "from": "tech_interview", "to": "offer", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000004', 'Sarah Lim', NOW() - INTERVAL '25 days', '{"candidate_name": "Patricia Lim", "from": "hr_interview", "to": "rejected", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000005', 'Sarah Lim', NOW() - INTERVAL '20 days', '{"candidate_name": "Kevin Ong", "from": "hr_interview", "to": "rejected", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000006', 'Sarah Lim', NOW() - INTERVAL '8 days', '{"candidate_name": "Isabella Cruz", "from": "hr_interview", "to": "tech_interview", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000008', 'Mark Rivera', NOW() - INTERVAL '12 days', '{"candidate_name": "Ana Reyes", "from": "hr_interview", "to": "tech_interview", "jo_title": "Product Manager"}'::jsonb),
-  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000008', 'Jose Reyes', NOW() - INTERVAL '5 days', '{"candidate_name": "Ana Reyes", "from": "tech_interview", "to": "offer", "jo_title": "Product Manager"}'::jsonb),
-  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000009', 'Mark Rivera', NOW() - INTERVAL '7 days', '{"candidate_name": "Grace Lee", "from": "hr_interview", "to": "tech_interview", "jo_title": "Product Manager"}'::jsonb),
-  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000010', 'Anna Cruz', NOW() - INTERVAL '30 days', '{"candidate_name": "Miguel Torres", "from": "hr_interview", "to": "tech_interview", "jo_title": "UX/UI Designer"}'::jsonb),
+  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000001', 'Sarah Lim', NOW() - INTERVAL '20 days', '{"candidate_name": "Juan Dela Cruz", "from_status": "hr_interview", "to_status": "tech_interview"}'::jsonb),
+  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000001', 'Alex Reyes', NOW() - INTERVAL '15 days', '{"candidate_name": "Juan Dela Cruz", "from_status": "tech_interview", "to_status": "offer"}'::jsonb),
+  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000001', 'Maria Santos', NOW() - INTERVAL '3 days', '{"candidate_name": "Juan Dela Cruz", "from_status": "offer", "to_status": "hired"}'::jsonb),
+  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000002', 'Sarah Lim', NOW() - INTERVAL '15 days', '{"candidate_name": "Maria Garcia", "from_status": "hr_interview", "to_status": "tech_interview"}'::jsonb),
+  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000003', 'Sarah Lim', NOW() - INTERVAL '15 days', '{"candidate_name": "Carlos Santos", "from_status": "hr_interview", "to_status": "tech_interview"}'::jsonb),
+  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000003', 'Alex Reyes', NOW() - INTERVAL '8 days', '{"candidate_name": "Carlos Santos", "from_status": "tech_interview", "to_status": "offer"}'::jsonb),
+  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000004', 'Sarah Lim', NOW() - INTERVAL '25 days', '{"candidate_name": "Patricia Lim", "from_status": "hr_interview", "to_status": "rejected"}'::jsonb),
+  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000005', 'Sarah Lim', NOW() - INTERVAL '20 days', '{"candidate_name": "Kevin Ong", "from_status": "hr_interview", "to_status": "rejected"}'::jsonb),
+  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000006', 'Sarah Lim', NOW() - INTERVAL '8 days', '{"candidate_name": "Isabella Cruz", "from_status": "hr_interview", "to_status": "tech_interview"}'::jsonb),
+  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000008', 'Mark Rivera', NOW() - INTERVAL '12 days', '{"candidate_name": "Ana Reyes", "from_status": "hr_interview", "to_status": "tech_interview"}'::jsonb),
+  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000008', 'Jose Reyes', NOW() - INTERVAL '5 days', '{"candidate_name": "Ana Reyes", "from_status": "tech_interview", "to_status": "offer"}'::jsonb),
+  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000009', 'Mark Rivera', NOW() - INTERVAL '7 days', '{"candidate_name": "Grace Lee", "from_status": "hr_interview", "to_status": "tech_interview"}'::jsonb),
+  ('pipeline_moved', 'application', 'e0000000-0000-0000-0000-000000000010', 'Anna Cruz', NOW() - INTERVAL '30 days', '{"candidate_name": "Miguel Torres", "from_status": "hr_interview", "to_status": "tech_interview"}'::jsonb),
 
   -- HR interview activities
-  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000001', 'Sarah Lim', NOW() - INTERVAL '20 days', '{"candidate_name": "Juan Dela Cruz", "verdict": "pass", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000002', 'Sarah Lim', NOW() - INTERVAL '17 days', '{"candidate_name": "Maria Garcia", "verdict": "pass", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000003', 'Sarah Lim', NOW() - INTERVAL '17 days', '{"candidate_name": "Carlos Santos", "verdict": "pass", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000004', 'Sarah Lim', NOW() - INTERVAL '25 days', '{"candidate_name": "Patricia Lim", "verdict": "fail", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000005', 'Sarah Lim', NOW() - INTERVAL '20 days', '{"candidate_name": "Kevin Ong", "verdict": "fail", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000006', 'Sarah Lim', NOW() - INTERVAL '10 days', '{"candidate_name": "Isabella Cruz", "verdict": "pass", "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000008', 'Mark Rivera', NOW() - INTERVAL '14 days', '{"candidate_name": "Ana Reyes", "verdict": "pass", "jo_title": "Product Manager"}'::jsonb),
-  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000009', 'Mark Rivera', NOW() - INTERVAL '9 days', '{"candidate_name": "Grace Lee", "verdict": "pass", "jo_title": "Product Manager"}'::jsonb),
+  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000001', 'Sarah Lim', NOW() - INTERVAL '20 days', '{"candidate_name": "Juan Dela Cruz", "verdict": "pass", "jo_number": "JO-2026-001", "interview_date": "2026-01-20"}'::jsonb),
+  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000002', 'Sarah Lim', NOW() - INTERVAL '17 days', '{"candidate_name": "Maria Garcia", "verdict": "pass", "jo_number": "JO-2026-001", "interview_date": "2026-01-25"}'::jsonb),
+  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000003', 'Sarah Lim', NOW() - INTERVAL '17 days', '{"candidate_name": "Carlos Santos", "verdict": "pass", "jo_number": "JO-2026-001", "interview_date": "2026-01-23"}'::jsonb),
+  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000004', 'Sarah Lim', NOW() - INTERVAL '25 days', '{"candidate_name": "Patricia Lim", "verdict": "fail", "jo_number": "JO-2026-001", "interview_date": "2026-01-10"}'::jsonb),
+  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000005', 'Sarah Lim', NOW() - INTERVAL '20 days', '{"candidate_name": "Kevin Ong", "verdict": "fail", "jo_number": "JO-2026-001", "interview_date": "2026-01-16"}'::jsonb),
+  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000006', 'Sarah Lim', NOW() - INTERVAL '10 days', '{"candidate_name": "Isabella Cruz", "verdict": "pass", "jo_number": "JO-2026-001", "interview_date": "2026-02-01"}'::jsonb),
+  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000008', 'Mark Rivera', NOW() - INTERVAL '14 days', '{"candidate_name": "Ana Reyes", "verdict": "pass", "jo_number": "JO-2026-002", "interview_date": "2026-01-28"}'::jsonb),
+  ('hr_interview_saved', 'hr_interview', 'e0000000-0000-0000-0000-000000000009', 'Mark Rivera', NOW() - INTERVAL '9 days', '{"candidate_name": "Grace Lee", "verdict": "pass", "jo_number": "JO-2026-002", "interview_date": "2026-02-03"}'::jsonb),
 
   -- Tech interview activities
-  ('tech_interview_saved', 'tech_interview', 'e0000000-0000-0000-0000-000000000001', 'Alex Reyes', NOW() - INTERVAL '16 days', '{"candidate_name": "Juan Dela Cruz", "verdict": "pass", "score": 90, "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('tech_interview_saved', 'tech_interview', 'e0000000-0000-0000-0000-000000000003', 'Alex Reyes', NOW() - INTERVAL '10 days', '{"candidate_name": "Carlos Santos", "verdict": "pass", "score": 85, "jo_title": "Senior Full-Stack Developer"}'::jsonb),
-  ('tech_interview_saved', 'tech_interview', 'e0000000-0000-0000-0000-000000000008', 'Jose Reyes', NOW() - INTERVAL '7 days', '{"candidate_name": "Ana Reyes", "verdict": "pass", "score": 88, "jo_title": "Product Manager"}'::jsonb),
+  ('tech_interview_saved', 'tech_interview', 'e0000000-0000-0000-0000-000000000001', 'Alex Reyes', NOW() - INTERVAL '16 days', '{"candidate_name": "Juan Dela Cruz", "verdict": "pass", "score": 90, "jo_number": "JO-2026-001", "interview_date": "2026-01-25"}'::jsonb),
+  ('tech_interview_saved', 'tech_interview', 'e0000000-0000-0000-0000-000000000003', 'Alex Reyes', NOW() - INTERVAL '10 days', '{"candidate_name": "Carlos Santos", "verdict": "pass", "score": 85, "jo_number": "JO-2026-001", "interview_date": "2026-01-28"}'::jsonb),
+  ('tech_interview_saved', 'tech_interview', 'e0000000-0000-0000-0000-000000000008', 'Jose Reyes', NOW() - INTERVAL '7 days', '{"candidate_name": "Ana Reyes", "verdict": "pass", "score": 88, "jo_number": "JO-2026-002", "interview_date": "2026-02-03"}'::jsonb),
 
   -- Offer activities
-  ('offer_created', 'offer', 'e0000000-0000-0000-0000-000000000001', 'Maria Santos', NOW() - INTERVAL '13 days', '{"candidate_name": "Juan Dela Cruz", "amount": "PHP 115,000/month", "position": "Senior Full-Stack Developer"}'::jsonb),
-  ('offer_created', 'offer', 'e0000000-0000-0000-0000-000000000003', 'Maria Santos', NOW() - INTERVAL '2 days', '{"candidate_name": "Carlos Santos", "amount": "PHP 105,000/month", "position": "Senior Full-Stack Developer"}'::jsonb),
-  ('offer_created', 'offer', 'e0000000-0000-0000-0000-000000000008', 'Jose Reyes', NOW() - INTERVAL '3 days', '{"candidate_name": "Ana Reyes", "amount": "PHP 140,000/month", "position": "Product Manager"}'::jsonb),
+  ('offer_created', 'offer', 'e0000000-0000-0000-0000-000000000001', 'Maria Santos', NOW() - INTERVAL '13 days', '{"candidate_name": "Juan Dela Cruz", "offer_amount": "PHP 115,000/month", "jo_number": "JO-2026-001", "status": "accepted", "start_date": "2026-03-01"}'::jsonb),
+  ('offer_created', 'offer', 'e0000000-0000-0000-0000-000000000003', 'Maria Santos', NOW() - INTERVAL '2 days', '{"candidate_name": "Carlos Santos", "offer_amount": "PHP 105,000/month", "jo_number": "JO-2026-001", "status": "pending", "start_date": "2026-02-15"}'::jsonb),
+  ('offer_created', 'offer', 'e0000000-0000-0000-0000-000000000008', 'Jose Reyes', NOW() - INTERVAL '3 days', '{"candidate_name": "Ana Reyes", "offer_amount": "PHP 140,000/month", "jo_number": "JO-2026-002", "status": "pending", "start_date": "2026-04-01"}'::jsonb),
 
   -- Misc activities
-  ('jo_edited', 'job_order', 'c0000000-0000-0000-0000-000000000001', 'Maria Santos', NOW() - INTERVAL '5 days', '{"field": "hired_count", "from": 0, "to": 1, "hired_candidate": "Juan Dela Cruz"}'::jsonb),
-  ('jo_closed', 'job_order', 'c0000000-0000-0000-0000-000000000005', 'Rico Lim', NOW() - INTERVAL '58 days', '{"jo_number": "JO-2025-010", "title": "Sales Executive", "reason": "All positions filled"}'::jsonb);
+  ('jo_edited', 'job_order', 'c0000000-0000-0000-0000-000000000001', 'Maria Santos', NOW() - INTERVAL '5 days', '{"jo_number": "JO-2026-001", "title": "Senior Full-Stack Developer", "department_name": "Engineering", "changed_fields": ["hired_count"]}'::jsonb),
+  ('jo_closed', 'job_order', 'c0000000-0000-0000-0000-000000000005', 'Rico Lim', NOW() - INTERVAL '58 days', '{"jo_number": "JO-2025-010", "title": "Sales Executive", "department_name": "Sales", "requestor_name": "Rico Lim"}'::jsonb);
 
 COMMIT;
