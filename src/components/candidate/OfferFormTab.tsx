@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Candidate } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { useOffer, useUpsertOffer, OfferStatus as DBOfferStatus } from '@/hooks/useOffers';
+import { logActivity } from '@/lib/activityLogger';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DatePickerField } from '@/components/ui/DatePickerField';
@@ -84,6 +85,8 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
       return;
     }
     
+    const isCreating = !existingOffer;
+    
     try {
       await upsertOfferMutation.mutateAsync({
         application_id: applicationId,
@@ -94,6 +97,22 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
         start_date: formData.startDate || null,
         status: (formData.status || 'pending') as DBOfferStatus,
         remarks: formData.remarks || null,
+      });
+      
+      // Log offer activity
+      logActivity({
+        activityType: isCreating ? 'offer_created' : 'offer_updated',
+        entityType: 'offer',
+        entityId: applicationId,
+        details: {
+          candidate_id: currentCandidate.id,
+          candidate_name: currentCandidate.name,
+          application_id: applicationId,
+          offer_amount: formData.offerAmount || null,
+          start_date: formData.startDate || null,
+          status: formData.status || 'pending',
+          ...(!isCreating && { new_status: formData.status }),
+        }
       });
       
       // If offer is accepted, move to hired
@@ -156,10 +175,10 @@ export function OfferFormTab({ candidate }: OfferFormTabProps) {
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-sm">
               <DollarSign className="w-4 h-4 text-muted-foreground" />
-              Offer Amount (PHP)
+              Offer Amount
             </Label>
             <Input
-              placeholder="e.g., ₱150,000/month"
+              placeholder="e.g., 150,000/month"
               value={formData.offerAmount}
               onChange={(e) => setFormData({ ...formData, offerAmount: e.target.value })}
             />

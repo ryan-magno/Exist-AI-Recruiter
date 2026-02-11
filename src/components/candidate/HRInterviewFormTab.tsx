@@ -303,7 +303,7 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
               Expected Salary / Rate
             </Label>
             <Input
-              placeholder="e.g., ₱150,000 - ₱180,000/month"
+              placeholder="e.g., 30,000 - 40,000"
               value={form.expectedSalary}
               onChange={e => updateField('expectedSalary', e.target.value)}
               className="h-9 text-sm"
