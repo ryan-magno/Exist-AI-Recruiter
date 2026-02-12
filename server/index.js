@@ -4,6 +4,8 @@ import pg from 'pg';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import multer from 'multer';
+import FormData from 'form-data';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -15,14 +17,20 @@ const app = express();
 const PORT = process.env.API_PORT || 3001;
 
 // ---------- Validate required env vars ----------
-const REQUIRED_ENV = ['PGHOST', 'PGUSER', 'PGPASSWORD', 'PGDATABASE'];
+const REQUIRED_ENV = ['PGHOST', 'PGUSER', 'PGPASSWORD', 'PGDATABASE', 'N8N_CV_WEBHOOK_URL', 'WEBHOOK_CALLBACK_URL'];
 for (const key of REQUIRED_ENV) {
   if (!process.env[key]) {
     console.error(`❌ Missing required environment variable: ${key}`);
-    console.error('   Make sure .env exists in the project root with PGHOST, PGUSER, PGPASSWORD, PGDATABASE');
+    console.error('   Make sure .env exists in the project root with all required vars (see .env.example)');
     process.exit(1);
   }
 }
+
+// ---------- Multer config (for CV file uploads) ----------
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per file
+});
 
 // ---------- Middleware ----------
 app.use(cors());
@@ -213,6 +221,10 @@ app.put('/job-orders/:id', async (req, res) => {
     const validatedBody = validateColumns(req.body, ALLOWED_JOB_ORDER_COLUMNS);
     if (Object.keys(validatedBody).length === 0) return res.status(400).json({ error: 'No valid columns to update' });
 
+    // Fetch old status before updating (for webhook action logic)
+    const oldRows = await query("SELECT status FROM job_orders WHERE id = $1", [id]);
+    const oldStatus = oldRows[0]?.status;
+
     const updates = [];
     const values = [];
     let idx = 1;
@@ -225,7 +237,13 @@ app.put('/job-orders/:id', async (req, res) => {
     values.push(id);
 
     const result = await query(`UPDATE job_orders SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`, values);
-    sendJobOrderWebhook(result[0], 'update').catch(console.error);
+
+    // Determine webhook action: archiving or closing sends 'delete', otherwise 'update'
+    const newStatus = result[0]?.status;
+    const isDeactivating = (newStatus === 'archived' || newStatus === 'closed') && (oldStatus !== 'archived' && oldStatus !== 'closed');
+    const webhookAction = isDeactivating ? 'delete' : 'update';
+    sendJobOrderWebhook(result[0], webhookAction).catch(console.error);
+
     res.json(result[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -245,7 +263,7 @@ app.delete('/job-orders/:id', async (req, res) => {
 });
 
 // Job Order Webhook
-const JO_WEBHOOK_URL = 'https://workflow.exist.com.ph/webhook/job-order-webhook-path';
+const JO_WEBHOOK_URL = process.env.N8N_JO_WEBHOOK_URL || 'https://workflow.exist.com.ph/webhook/job-order-webhook-path';
 async function sendJobOrderWebhook(jobOrder, action) {
   try {
     const response = await fetch(JO_WEBHOOK_URL, {
@@ -743,24 +761,51 @@ app.post('/activity-log', async (req, res) => {
 });
 
 // =====================================================
+// EMAIL WEBHOOK PROXY (frontend -> n8n email service)
+// =====================================================
+app.post('/email-webhook', async (req, res) => {
+  const emailWebhookUrl = process.env.N8N_EMAIL_WEBHOOK_URL;
+  if (!emailWebhookUrl) {
+    console.warn('⚠️  N8N_EMAIL_WEBHOOK_URL not configured, skipping email webhook');
+    return res.json({ success: true, skipped: true });
+  }
+  try {
+    const response = await fetch(emailWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
+    });
+    console.log(`Email webhook: ${response.status} (${req.body.email_type || 'unknown'})`);
+    res.json({ success: true, status: response.status });
+  } catch (err) {
+    console.error('Email webhook error:', err.message);
+    // Fire-and-forget semantics: don't fail the request
+    res.json({ success: false, error: err.message });
+  }
+});
+
+// =====================================================
 // WEBHOOK PROXY (CV upload -> n8n)
 // =====================================================
-app.post('/webhook-proxy', async (req, res) => {
+app.post('/webhook-proxy', upload.array('files'), async (req, res) => {
+  const batchId = crypto.randomUUID();
+  const processingCandidates = [];
+
   try {
-    // This endpoint receives multipart form data from the frontend
-    // For now, we'll handle the JSON metadata approach
-    const webhookUrl = 'https://workflow.exist.com.ph/webhook/vector-db-loader';
+    const files = req.files || [];
+    let metadata = [];
+    try {
+      metadata = JSON.parse(req.body.metadata || '[]');
+    } catch { metadata = []; }
+    const uploaderName = req.body.uploader_name || null;
 
-    // Forward the raw request body to the webhook
-    // Note: For file uploads, the frontend should send FormData
-    const body = req.body;
-    const metadata = body.metadata || [];
-    const uploaderName = body.uploader_name;
+    console.log(`📤 Webhook proxy batch ${batchId}: ${files.length} file(s), ${metadata.length} metadata entries`);
 
-    const batchId = crypto.randomUUID();
-    console.log(`Starting webhook proxy, batch: ${batchId}, files: ${metadata.length}`);
+    if (files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
 
-    const processingCandidates = [];
+    // Step 1: Create placeholder candidate rows (status = 'processing')
     for (let i = 0; i < metadata.length; i++) {
       const fileMeta = metadata[i];
       try {
@@ -773,25 +818,104 @@ app.post('/webhook-proxy', async (req, res) => {
         `, [
           `Processing CV ${i + 1}...`,
           fileMeta.applicant_type || 'external',
-          uploaderName || null,
+          uploaderName,
           fileMeta.filename || null,
           batchId,
           i
         ]);
         processingCandidates.push(result[0].id);
       } catch (err) {
-        console.error(`Error creating processing placeholder for file ${i}:`, err);
+        console.error(`Error creating placeholder for file ${i}:`, err.message);
       }
     }
 
+    // Step 2: Build FormData to forward to n8n
+    const n8nForm = new FormData();
+    n8nForm.append('uploader_name', uploaderName || '');
+    n8nForm.append('upload_timestamp', req.body.upload_timestamp || new Date().toISOString());
+    n8nForm.append('total_files', String(files.length));
+    n8nForm.append('batch_id', batchId);
+    n8nForm.append('callback_url', process.env.WEBHOOK_CALLBACK_URL);
+
+    // Enrich metadata with batch_id and candidate_ids for n8n to pass back
+    const enrichedMetadata = metadata.map((m, i) => ({
+      ...m,
+      batch_id: batchId,
+      candidate_id: processingCandidates[i] || null,
+    }));
+    n8nForm.append('metadata', JSON.stringify(enrichedMetadata));
+
+    // Append file buffers
+    for (let i = 0; i < files.length; i++) {
+      n8nForm.append('files', files[i].buffer, {
+        filename: files[i].originalname,
+        contentType: files[i].mimetype,
+      });
+    }
+
+    // Step 3: Forward to n8n webhook
+    const n8nUrl = process.env.N8N_CV_WEBHOOK_URL;
+    console.log(`   Forwarding to n8n: ${n8nUrl}`);
+
+    const n8nResponse = await new Promise((resolve, reject) => {
+      const request = n8nForm.submit(n8nUrl, (err, response) => {
+        if (err) return reject(err);
+        let body = '';
+        response.on('data', chunk => body += chunk);
+        response.on('end', () => resolve({ status: response.statusCode, body }));
+      });
+      request.on('error', reject);
+      // 60s timeout for n8n
+      request.setTimeout(60000, () => {
+        request.destroy(new Error('n8n request timeout (60s)'));
+      });
+    });
+
+    console.log(`   n8n responded: ${n8nResponse.status}`);
+
+    if (n8nResponse.status >= 400) {
+      console.error(`   n8n error body: ${n8nResponse.body}`);
+      // Mark placeholders as error
+      for (const cid of processingCandidates) {
+        await execute(`UPDATE candidates SET processing_status = 'error', updated_at = now() WHERE id = $1`, [cid]).catch(() => {});
+      }
+      return res.status(503).json({
+        error: 'CV processing service returned an error',
+        status: 'error',
+        batch_id: batchId,
+        n8n_status: n8nResponse.status,
+      });
+    }
+
+    // Success — n8n accepted the files; it will call back to /webhook-callback
     res.json({
       status: 'processing',
       batch_id: batchId,
       candidate_ids: processingCandidates,
-      message: 'CVs are being processed.'
+      message: 'CVs are being processed by the AI pipeline.',
     });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(`❌ Webhook proxy error:`, error.message);
+
+    // Mark any created placeholders as error
+    for (const cid of processingCandidates) {
+      await execute(`UPDATE candidates SET processing_status = 'error', updated_at = now() WHERE id = $1`, [cid]).catch(() => {});
+    }
+
+    // Distinguish between n8n connectivity issues and other errors
+    const isNetworkError = ['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'EAI_AGAIN'].some(c => error.message.includes(c))
+      || error.message.includes('timeout');
+
+    if (isNetworkError) {
+      return res.status(503).json({
+        error: 'CV processing service is unavailable. Please try again later.',
+        status: 'error',
+        batch_id: batchId,
+      });
+    }
+
+    res.status(500).json({ error: error.message, status: 'error', batch_id: batchId });
   }
 });
 

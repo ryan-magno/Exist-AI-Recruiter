@@ -736,6 +736,7 @@ function FileRow({ file, index, onUpdate, onRemove, departments, jobOrders, disa
                 value={file.applyingFor || 'ai-decide'}
                 onValueChange={(val) => onUpdate({ applyingFor: val })}
                 disabled={disabled}
+                modal={false}
               >
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Let AI decide" />
@@ -800,6 +801,7 @@ function FileRow({ file, index, onUpdate, onRemove, departments, jobOrders, disa
                     value={file.department || ''}
                     onValueChange={(val) => onUpdate({ department: val })}
                     disabled={disabled}
+                    modal={false}
                   >
                     <SelectTrigger className="h-10">
                       <SelectValue placeholder="Select department" />
@@ -822,6 +824,7 @@ function FileRow({ file, index, onUpdate, onRemove, departments, jobOrders, disa
                     value={file.uploadReason || ''}
                     onValueChange={(val) => onUpdate({ uploadReason: val as UploadedFile['uploadReason'] })}
                     disabled={disabled}
+                    modal={false}
                   >
                     <SelectTrigger className="h-10">
                       <SelectValue placeholder="Select reason" />

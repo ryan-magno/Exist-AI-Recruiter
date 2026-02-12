@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Mail, Download, Sparkles, ExternalLink, FileText, Briefcase, Calendar, DollarSign, User, Code, GraduationCap, Clock, Target, History, UserCheck, Building, Tag, FileCheck, Award, AlertTriangle, CheckCircle2, Share2 } from 'lucide-react';
+import { ArrowLeft, Mail, Download, Sparkles, ExternalLink, FileText, Briefcase, Calendar, DollarSign, User, Code, GraduationCap, Clock, Target, History, UserCheck, Building, Tag, FileCheck, Award, AlertTriangle, CheckCircle2, Share2, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Candidate, pipelineStatusLabels, pipelineStatusColors, PipelineStatus, techInterviewLabels, techInterviewColors, TechInterviewResult, WorkExperience } from '@/data/mockData';
@@ -71,7 +71,7 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
     <>
       <div className="h-full flex flex-col bg-card">
         {/* ── STICKY HEADER ── */}
-        <header className="sticky top-0 z-10 bg-card border-b border-border">
+        <header className="sticky top-0 z-10 bg-card border-b border-border mt-3">
           <div className="h-20 px-4 flex items-center justify-between gap-4">
             {/* Left: Back + Info */}
             <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -116,6 +116,29 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
                     </>
                   )}
                   <span>{currentCandidate.experienceDetails?.totalYears || 0} yr exp</span>
+                </div>
+                {/* Line 3: Phone & Email (click to copy) */}
+                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                  {currentCandidate.phone && (
+                    <button
+                      className="inline-flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
+                      onClick={() => { navigator.clipboard.writeText(currentCandidate.phone); toast.success('Phone copied'); }}
+                      title="Click to copy phone"
+                    >
+                      <Phone className="w-3 h-3" />
+                      {currentCandidate.phone}
+                    </button>
+                  )}
+                  {currentCandidate.email && (
+                    <button
+                      className="inline-flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
+                      onClick={() => { navigator.clipboard.writeText(currentCandidate.email); toast.success('Email copied'); }}
+                      title="Click to copy email"
+                    >
+                      <Mail className="w-3 h-3" />
+                      {currentCandidate.email}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

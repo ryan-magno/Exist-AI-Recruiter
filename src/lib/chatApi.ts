@@ -1,6 +1,6 @@
 import type { StreamOptions } from '@/types/chat.types';
 
-const WEBHOOK_URL = 'https://workflow.exist.com.ph/webhook/51c69627-4831-44a4-8d91-1824a7d38ebf';
+const WEBHOOK_URL = import.meta.env.VITE_N8N_CHAT_WEBHOOK_URL || 'https://workflow.exist.com.ph/webhook/51c69627-4831-44a4-8d91-1824a7d38ebf';
 const TIMEOUT_MS = 30_000;
 
 export async function sendStreamingMessage(

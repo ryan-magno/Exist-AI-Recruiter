@@ -13,7 +13,7 @@ import HistoryPage from "./pages/HistoryPage";
 import NotFound from "./pages/NotFound";
 
 const App = () => (
-  <BrowserRouter>
+  <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
     <AppProvider>
       <AppLayout>
         <Routes>

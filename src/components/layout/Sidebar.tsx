@@ -18,7 +18,7 @@ export function Sidebar() {
   const location = useLocation();
 
   return (
-    <nav className="w-16 bg-card border-r border-border flex flex-col items-center py-3 gap-1 flex-shrink-0">
+    <nav className="w-16 bg-card border-r border-border flex flex-col items-center py-3 gap-1 flex-shrink-0 relative z-[60]">
       {/* Logo */}
       <div className="w-10 h-10 flex items-center justify-center mb-2">
         <img src={existLogo} alt="Exist Software Labs" className="h-6 w-6 object-contain" />

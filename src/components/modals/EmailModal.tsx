@@ -37,8 +37,8 @@ export function EmailModal({ open, onClose, candidate }: EmailModalProps) {
       message_body: body
     };
 
-    // Fire webhook
-    fetch('https://workflow.exist.com.ph/webhook/81f944ac-1805-4de0-aec6-248bc04c535d', {
+    // Fire email webhook via API server (proxied to n8n)
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/email-webhook`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

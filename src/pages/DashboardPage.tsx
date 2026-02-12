@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FileText, Users, Search, X, Filter, Building, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,11 @@ export default function DashboardPage() {
   // Filter state for job orders
   const [joDepartmentFilter, setJoDepartmentFilter] = useState<string>('all');
   const [joAgingFilter, setJoAgingFilter] = useState<string>('all');
+
+  // Close candidate profile when a different JO is selected
+  useEffect(() => {
+    setSelectedCandidate(null);
+  }, [selectedJoId]);
 
   const selectedJo = jobOrders.find(jo => jo.id === selectedJoId);
   const matches = selectedJoId ? getMatchesForJo(selectedJoId) : [];

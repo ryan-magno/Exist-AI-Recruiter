@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useJobOrders, useUpdateJobOrder, useCreateJobOrder, useDeleteJobOrder, JobOrder as DBJobOrder, JobOrderInsert } from '@/hooks/useJobOrders';
 import { useUpdateApplicationStatus, PipelineStatus } from '@/hooks/useApplications';
@@ -42,12 +42,20 @@ const dbPipelineToLegacy: Record<string, LegacyPipelineStatus> = {
 
 // Module-level flag to ensure azureDb.init() runs only once
 let dbInitialized = false;
+let dbInitPromise: Promise<void> | null = null;
 
 async function ensureDbInit() {
-  if (!dbInitialized) {
-    await azureDb.init();
-    dbInitialized = true;
+  if (dbInitialized) return;
+  // Prevent concurrent init calls from racing — share a single in-flight promise
+  if (!dbInitPromise) {
+    dbInitPromise = azureDb.init()
+      .then(() => { dbInitialized = true; })
+      .catch((err) => {
+        dbInitPromise = null; // Allow retry on next call
+        throw err;
+      });
   }
+  return dbInitPromise;
 }
 
 // Fetch candidates from Azure DB and convert to legacy format
@@ -189,10 +197,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateApplicationStatusMutation = useUpdateApplicationStatus();
 
   // Candidates managed by React Query — NO enabled guard, init is lazy inside queryFn
-  const { data: candidates = [] } = useQuery({
+  const { data: candidates = [], error: candidatesError, isError: isCandidatesError } = useQuery({
     queryKey: ['legacy-candidates'],
     queryFn: fetchLegacyCandidates,
   });
+
+  // Surface data fetch errors to the user so silent failures don't produce blank pages
+  useEffect(() => {
+    if (isCandidatesError && candidatesError) {
+      console.error('Failed to load candidates:', candidatesError);
+      toast.error('Failed to load candidates', {
+        description: candidatesError instanceof Error ? candidatesError.message : 'Check that the server is running.',
+        duration: 8000,
+      });
+    }
+  }, [isCandidatesError, candidatesError]);
 
   // Derived: candidates available = vectorized
   const isVectorized = candidates.length > 0;
@@ -323,7 +342,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     const emailType = emailTypeMap[status];
     if (emailType && candidate.email) {
-      fetch('https://workflow.exist.com.ph/webhook/81f944ac-1805-4de0-aec6-248bc04c535d', {
+      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/email-webhook`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: candidate.email, name: candidate.name, email_type: emailType, subject: null, body: null })

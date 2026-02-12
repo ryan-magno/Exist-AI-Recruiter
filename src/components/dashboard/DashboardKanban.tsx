@@ -1,12 +1,23 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock, Mail, Trash2, Loader2, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, Mail, Trash2, Loader2, Calendar, XCircle, UserPlus } from 'lucide-react';
 import { Candidate, PipelineStatus, pipelineStatusLabels, TechInterviewResult } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 
 import { EmailModal } from '@/components/modals/EmailModal';
 import { CandidateTimeline } from '@/components/dashboard/CandidateTimeline';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import existLogo from '@/assets/exist-logo.png';
 
 interface DashboardKanbanProps {
@@ -23,10 +34,10 @@ const columns: { id: PipelineStatus; title: string }[] = [
 ];
 
 // ── Helper: compute stage age label ──
-function getStageAge(statusChangedDate: string): { ageText: string; dateText: string } {
-  if (!statusChangedDate) return { ageText: '', dateText: '' };
+function getStageAge(statusChangedDate: string): { ageText: string; dateText: string; days: number } {
+  if (!statusChangedDate) return { ageText: '', dateText: '', days: 0 };
   const changed = new Date(statusChangedDate);
-  if (isNaN(changed.getTime())) return { ageText: '', dateText: '' };
+  if (isNaN(changed.getTime())) return { ageText: '', dateText: '', days: 0 };
   const now = new Date();
   const diffMs = now.getTime() - changed.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -34,19 +45,28 @@ function getStageAge(statusChangedDate: string): { ageText: string; dateText: st
   const dateLabel = changed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   
   const ageText = diffDays === 0 ? 'Moved today' : diffDays === 1 ? 'Since yesterday' : `${diffDays}d ago`;
-  return { ageText, dateText: `Since ${dateLabel}` };
+  return { ageText, dateText: `Since ${dateLabel}`, days: diffDays };
+}
+
+// ── Helper: age-based colors ──
+function getAgeColors(days: number) {
+  if (days <= 5) return { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' };
+  if (days <= 10) return { bg: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-700' };
+  return { bg: 'bg-red-50', border: 'border-red-300', text: 'text-red-700' };
 }
 
 // ── Kanban Card ──
 interface KanbanCardProps {
   candidate: Candidate;
   isSelected?: boolean;
+  columnId: PipelineStatus;
   onSelect: () => void;
   onEmail: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
+  onReject: (e: React.MouseEvent) => void;
 }
 
-function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete }: KanbanCardProps) {
+function CompactKanbanCard({ candidate, isSelected, columnId, onSelect, onEmail, onDelete, onReject }: KanbanCardProps) {
   const [showTimeline, setShowTimeline] = useState(false);
   const isProcessing = candidate.processingStatus === 'processing';
 
@@ -107,19 +127,22 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
         </span>
       </div>
 
-      {/* Green Stage Age Bar */}
-      {stageAge.ageText && (
-        <div className="mt-2 bg-green-50 border border-green-200 text-green-700 rounded-md px-3 py-1.5 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            <span className="font-medium">{stageAge.ageText}</span>
+      {/* Stage Age Bar - color coded by days */}
+      {stageAge.ageText && (() => {
+        const ageColors = getAgeColors(stageAge.days);
+        return (
+          <div className={cn('mt-2 rounded-md px-3 py-1.5 flex items-center justify-between text-xs border', ageColors.bg, ageColors.border, ageColors.text)}>
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              <span className="font-medium">{stageAge.ageText}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              <span className="font-medium">{stageAge.dateText}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <Calendar className="w-3 h-3" />
-            <span className="font-medium">{stageAge.dateText}</span>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Tech / Offer Status Pills */}
       {isInTechInterview && (
@@ -150,6 +173,17 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
         </div>
       )}
 
+      {/* Add to HRIS button for hired candidates */}
+      {columnId === 'hired' && (
+        <button
+          className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium border border-primary bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+          onClick={(e) => { e.stopPropagation(); toast.info('HRIS integration coming soon'); }}
+        >
+          <UserPlus className="w-3.5 h-3.5" />
+          Add to HRIS
+        </button>
+      )}
+
       {/* Footer: Tags + Actions */}
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
         {/* Left: Internal/External tag */}
@@ -162,31 +196,41 @@ function CompactKanbanCard({ candidate, isSelected, onSelect, onEmail, onDelete 
           )}
         </div>
 
-        {/* Right: 3 action icons */}
-        <div className="flex items-center gap-3">
+        {/* Right: action icons */}
+        <div className="flex items-center gap-1.5">
           <button
             title="Timeline History"
             aria-label="View timeline history"
-            className="p-1 rounded hover:bg-muted transition-colors"
+            className="p-0.5 rounded hover:bg-muted transition-colors"
             onClick={(e) => { e.stopPropagation(); setShowTimeline(!showTimeline); }}
           >
-            <Clock className="w-5 h-5 text-gray-500" />
+            <Clock className="w-4 h-4 text-gray-500" />
           </button>
           <button
             title="Send Email"
             aria-label="Send email to candidate"
-            className="p-1 rounded hover:bg-muted transition-colors"
+            className="p-0.5 rounded hover:bg-muted transition-colors"
             onClick={onEmail}
           >
-            <Mail className="w-5 h-5 text-gray-500" />
+            <Mail className="w-4 h-4 text-gray-500" />
           </button>
+          {columnId !== 'rejected' && columnId !== 'hired' && (
+            <button
+              title="Reject Candidate"
+              aria-label="Reject candidate"
+              className="p-0.5 rounded hover:bg-red-50 transition-colors"
+              onClick={onReject}
+            >
+              <XCircle className="w-4 h-4 text-red-400 hover:text-red-600" />
+            </button>
+          )}
           <button
             title="Delete Candidate"
             aria-label="Delete candidate"
-            className="p-1 rounded hover:bg-red-50 transition-colors"
+            className="p-0.5 rounded hover:bg-red-50 transition-colors"
             onClick={onDelete}
           >
-            <Trash2 className="w-5 h-5 text-red-400 hover:text-red-600" />
+            <Trash2 className="w-4 h-4 text-red-400 hover:text-red-600" />
           </button>
         </div>
       </div>
@@ -210,11 +254,12 @@ interface ColumnProps {
   onSelect: (c: Candidate) => void;
   onEmail: (c: Candidate) => void;
   onDelete: (c: Candidate) => void;
+  onReject: (c: Candidate) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
 }
 
-function KanbanColumnView({ id, title, candidates, selectedId, onSelect, onEmail, onDelete, isCollapsed, onToggleCollapse }: ColumnProps) {
+function KanbanColumnView({ id, title, candidates, selectedId, onSelect, onEmail, onDelete, onReject, isCollapsed, onToggleCollapse }: ColumnProps) {
   const isEmpty = candidates.length === 0;
 
   if (isCollapsed) {
@@ -248,7 +293,7 @@ function KanbanColumnView({ id, title, candidates, selectedId, onSelect, onEmail
 
       {/* Card zone */}
       <div
-        className="flex-1 rounded-lg p-2 space-y-2 min-h-[200px] border border-slate-300 bg-slate-100"
+        className="flex-1 rounded-lg p-2 space-y-2 min-h-[200px] border border-slate-300 bg-slate-200/70"
       >
         {isEmpty ? (
           <p className="text-xs text-muted-foreground text-center py-6">No candidates</p>
@@ -258,9 +303,11 @@ function KanbanColumnView({ id, title, candidates, selectedId, onSelect, onEmail
               key={c.id}
               candidate={c}
               isSelected={selectedId === c.id}
+              columnId={id as PipelineStatus}
               onSelect={() => onSelect(c)}
               onEmail={(e) => { e.stopPropagation(); onEmail(c); }}
               onDelete={(e) => { e.stopPropagation(); onDelete(c); }}
+              onReject={(e) => { e.stopPropagation(); onReject(c); }}
             />
           ))
         )}
@@ -271,8 +318,9 @@ function KanbanColumnView({ id, title, candidates, selectedId, onSelect, onEmail
 
 // ── Main Dashboard Kanban ──
 export function DashboardKanban({ candidates, onSelectCandidate }: DashboardKanbanProps) {
-  const { deleteCandidate } = useApp();
+  const { deleteCandidate, updateCandidatePipelineStatus } = useApp();
   const [emailCandidate, setEmailCandidate] = useState<Candidate | null>(null);
+  const [rejectCandidate, setRejectCandidate] = useState<Candidate | null>(null);
   const [collapsedColumns, setCollapsedColumns] = useState<Set<string>>(new Set());
 
   const toggleCollapse = (colId: string) => {
@@ -309,6 +357,7 @@ export function DashboardKanban({ candidates, onSelectCandidate }: DashboardKanb
                 deleteCandidate(c.id);
               }
             }}
+            onReject={(c) => setRejectCandidate(c)}
             isCollapsed={collapsedColumns.has(column.id)}
             onToggleCollapse={() => toggleCollapse(column.id)}
           />
@@ -316,6 +365,35 @@ export function DashboardKanban({ candidates, onSelectCandidate }: DashboardKanb
       </div>
 
       <EmailModal open={!!emailCandidate} onClose={() => setEmailCandidate(null)} candidate={emailCandidate} />
+
+      {/* Reject Candidate Dialog */}
+      <AlertDialog open={!!rejectCandidate} onOpenChange={(open) => { if (!open) setRejectCandidate(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <XCircle className="w-5 h-5 text-red-600" />
+              </div>
+              <AlertDialogTitle>Reject Candidate?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              Are you sure you want to reject <strong>{rejectCandidate?.name}</strong>? They will be moved to the rejected column.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (rejectCandidate) updateCandidatePipelineStatus(rejectCandidate.id, 'rejected');
+                setRejectCandidate(null);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Reject
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
