@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock, Mail, Trash2, Loader2, Calendar, XCircle, UserPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, Mail, Trash2, Loader2, Calendar, XCircle, UserPlus, Phone } from 'lucide-react';
 import { Candidate, PipelineStatus, pipelineStatusLabels, TechInterviewResult } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 
@@ -126,6 +126,22 @@ function CompactKanbanCard({ candidate, isSelected, columnId, onSelect, onEmail,
           {candidate.qualificationScore != null ? `${candidate.qualificationScore}` : `${candidate.matchScore}%`}
         </span>
       </div>
+
+      {/* Mobile number with copy functionality */}
+      {candidate.phone && (
+        <button
+          className="text-xs text-muted-foreground leading-tight mt-1 truncate flex items-center gap-1 hover:text-primary transition-colors"
+          onClick={(e) => { 
+            e.stopPropagation(); 
+            navigator.clipboard.writeText(candidate.phone); 
+            toast.success('Phone copied'); 
+          }}
+          title="Click to copy"
+        >
+          <Phone className="w-3 h-3 flex-shrink-0" />
+          {candidate.phone}
+        </button>
+      )}
 
       {/* Stage Age Bar - color coded by days */}
       {stageAge.ageText && (() => {

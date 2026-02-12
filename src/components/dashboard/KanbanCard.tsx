@@ -1,7 +1,8 @@
-import { Loader2 } from 'lucide-react';
+import { Loader2, Phone } from 'lucide-react';
 import { Candidate } from '@/data/mockData';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 import existLogo from '@/assets/exist-logo.png';
 
 interface KanbanCardProps {
@@ -10,6 +11,7 @@ interface KanbanCardProps {
 }
 
 export function KanbanCard({ candidate, onClick }: KanbanCardProps) {
+  const { toast } = useToast();
   const isProcessing = candidate.processingStatus === 'processing';
   const isFailed = candidate.processingStatus === 'failed';
 
@@ -96,6 +98,22 @@ export function KanbanCard({ candidate, onClick }: KanbanCardProps) {
               {candidate.qualificationScore != null ? `${candidate.qualificationScore}` : `${candidate.matchScore}%`}
             </span>
           </div>
+          
+          {/* Mobile number with copy functionality */}
+          {candidate.phone && (
+            <button
+              className="text-xs text-muted-foreground leading-tight mb-2 truncate flex items-center gap-1 hover:text-primary transition-colors"
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                navigator.clipboard.writeText(candidate.phone); 
+                toast({ description: 'Phone copied' }); 
+              }}
+              title="Click to copy"
+            >
+              <Phone className="w-3 h-3 flex-shrink-0" />
+              {candidate.phone}
+            </button>
+          )}
           
           <div className="flex flex-wrap gap-1 mb-2">
             {candidate.skills.slice(0, 3).map((skill) => (

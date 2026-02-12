@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 
 import { AppProvider } from "@/context/AppContext";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -12,8 +13,21 @@ import ChatbotPage from "./pages/ChatbotPage";
 import HistoryPage from "./pages/HistoryPage";
 import NotFound from "./pages/NotFound";
 
+// Reset scroll position on route change so navigating to a new page
+// always starts at the top of the content area
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    // The scrollable container is <main> inside AppLayout, not window
+    const main = document.querySelector('main');
+    if (main) main.scrollTop = 0;
+  }, [pathname]);
+  return null;
+}
+
 const App = () => (
-  <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+  <BrowserRouter>
+    <ScrollToTop />
     <AppProvider>
       <AppLayout>
         <Routes>

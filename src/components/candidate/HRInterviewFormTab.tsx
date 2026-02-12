@@ -65,10 +65,10 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
         interviewMethod: (existingInterview.interview_mode as any) || 'virtual',
         noticePeriod: (existingInterview.notice_period as any) || 'immediate',
         expectedSalary: existingInterview.expected_salary || '',
-        earliestStartDate: candidate.earliestStartDate || '',
-        workSetupPreference: (existingInterview.preferred_work_setup as any) || 'flexible',
-        employmentStatusPreference: 'regular',
-        relocationWillingness: 'na',
+        earliestStartDate: existingInterview.earliest_start_date || candidate.earliestStartDate || '',
+        workSetupPreference: (existingInterview.preferred_work_setup as any) || candidate.workSetupPreference || 'flexible',
+        employmentStatusPreference: candidate.employmentStatusPreference || 'regular',
+        relocationWillingness: candidate.relocationWillingness || 'na',
         motivationAnswer: '',
         conflictResolutionAnswer: '',
         careerAlignmentAnswer: '',
@@ -87,6 +87,9 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
         interviewDate: todayStr(),
         expectedSalary: candidate.expectedSalary || '',
         earliestStartDate: candidate.earliestStartDate || '',
+        workSetupPreference: candidate.workSetupPreference || 'flexible',
+        employmentStatusPreference: candidate.employmentStatusPreference || 'regular',
+        relocationWillingness: candidate.relocationWillingness || 'na',
       });
     }
   }, [candidate.id, existingInterview, loadingInterview]);
@@ -112,6 +115,7 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
         interview_mode: form.interviewMethod || null,
         availability: null,
         expected_salary: form.expectedSalary || null,
+        earliest_start_date: form.earliestStartDate || null,
         preferred_work_setup: form.workSetupPreference || null,
         notice_period: form.noticePeriod || null,
         communication_rating: form.communicationScore || null,
@@ -126,11 +130,13 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
 
       await upsertHRInterview.mutateAsync(hrData as any);
 
-      // Step 2: Sync fields to candidate profile
+      // Step 2: Sync fields to candidate profile (overwrite with HR form data)
       const candidateUpdates: Record<string, any> = {};
       if (form.expectedSalary) candidateUpdates.expected_salary = form.expectedSalary;
       if (form.earliestStartDate) candidateUpdates.earliest_start_date = form.earliestStartDate;
-      if (form.workSetupPreference && form.workSetupPreference !== 'flexible') candidateUpdates.preferred_work_setup = form.workSetupPreference;
+      if (form.workSetupPreference) candidateUpdates.preferred_work_setup = form.workSetupPreference;
+      if (form.employmentStatusPreference) candidateUpdates.employment_status_preference = form.employmentStatusPreference;
+      if (form.relocationWillingness) candidateUpdates.relocation_willingness = form.relocationWillingness;
       if (form.noticePeriod) candidateUpdates.notice_period = form.noticePeriod;
 
       if (Object.keys(candidateUpdates).length > 0) {
@@ -165,6 +171,27 @@ export function HRInterviewFormTab({ candidate }: HRInterviewFormTabProps) {
           activityType: 'profile_updated', entityType: 'candidate', entityId: candidate.id,
           performedByName: form.interviewerName,
           details: { candidate_name: candidate.name, field_changed: 'earliest_start_date', old_value: candidate.earliestStartDate || 'Not set', new_value: form.earliestStartDate, source: 'hr_interview' }
+        });
+      }
+      if (form.workSetupPreference && candidate.workSetupPreference !== form.workSetupPreference) {
+        logActivity({
+          activityType: 'profile_updated', entityType: 'candidate', entityId: candidate.id,
+          performedByName: form.interviewerName,
+          details: { candidate_name: candidate.name, field_changed: 'work_setup_preference', old_value: candidate.workSetupPreference || 'Not set', new_value: form.workSetupPreference, source: 'hr_interview' }
+        });
+      }
+      if (form.employmentStatusPreference && candidate.employmentStatusPreference !== form.employmentStatusPreference) {
+        logActivity({
+          activityType: 'profile_updated', entityType: 'candidate', entityId: candidate.id,
+          performedByName: form.interviewerName,
+          details: { candidate_name: candidate.name, field_changed: 'employment_status_preference', old_value: candidate.employmentStatusPreference || 'Not set', new_value: form.employmentStatusPreference, source: 'hr_interview' }
+        });
+      }
+      if (form.relocationWillingness && candidate.relocationWillingness !== form.relocationWillingness) {
+        logActivity({
+          activityType: 'profile_updated', entityType: 'candidate', entityId: candidate.id,
+          performedByName: form.interviewerName,
+          details: { candidate_name: candidate.name, field_changed: 'relocation_willingness', old_value: candidate.relocationWillingness || 'Not set', new_value: form.relocationWillingness, source: 'hr_interview' }
         });
       }
 

@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Users, Search, X, Filter, Building, Clock } from 'lucide-react';
+import { FileText, Users, Search, X, Filter, Building, Clock, LayoutGrid, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useApp } from '@/context/AppContext';
 import { JobOrderList } from '@/components/dashboard/JobOrderList';
 import { JobOrderDetail } from '@/components/dashboard/JobOrderDetail';
 import { DashboardKanban } from '@/components/dashboard/DashboardKanban';
+import { DashboardTableView } from '@/components/dashboard/DashboardTableView';
 import { CandidateProfileView } from '@/components/candidate/CandidateProfileView';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { pipelineStatusLabels, PipelineStatus, Candidate } from '@/data/mockData';
@@ -20,6 +21,14 @@ export default function DashboardPage() {
   const [applicantTypeFilter, setApplicantTypeFilter] = useState<string>('all');
   const [scoreSort, setScoreSort] = useState<string>('none');
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+  const [viewMode, setViewMode] = useState<'kanban' | 'table'>(() => {
+    return (localStorage.getItem('jo-view-mode') as 'kanban' | 'table') || 'kanban';
+  });
+
+  const handleViewModeChange = (mode: 'kanban' | 'table') => {
+    setViewMode(mode);
+    localStorage.setItem('jo-view-mode', mode);
+  };
 
   // Filter state for job orders
   const [joDepartmentFilter, setJoDepartmentFilter] = useState<string>('all');
@@ -197,6 +206,32 @@ export default function DashboardPage() {
                     {selectedJo.hiredCount}/{selectedJo.quantity} filled
                   </span>
                 </div>
+
+                {/* View Mode Toggle */}
+                <div className="flex items-center border border-border rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => handleViewModeChange('kanban')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+                      viewMode === 'kanban'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    Kanban
+                  </button>
+                  <button
+                    onClick={() => handleViewModeChange('table')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+                      viewMode === 'table'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    Table
+                  </button>
+                </div>
               </div>
 
               {/* Filter Controls */}
@@ -268,8 +303,10 @@ export default function DashboardPage() {
                 ) : (
                   <EmptyMatchesState />
                 )
-              ) : (
+              ) : viewMode === 'kanban' ? (
                 <DashboardKanban candidates={filteredMatches} onSelectCandidate={setSelectedCandidate} />
+              ) : (
+                <DashboardTableView candidates={filteredMatches} onSelectCandidate={setSelectedCandidate} />
               )}
             </div>
           </div>

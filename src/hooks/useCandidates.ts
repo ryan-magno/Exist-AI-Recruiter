@@ -14,23 +14,17 @@ export interface Candidate {
   applicant_type: 'internal' | 'external';
   skills: string[] | null;
   positions_fit_for: string[] | null;
-  years_of_experience: number | null;
-  educational_background: string | null;
-  cv_url: string | null;
-  cv_filename: string | null;
-  availability: string | null;
+  years_of_experience_text: string | null;
   preferred_work_setup: string | null;
   preferred_employment_type: string | null;
   expected_salary: string | null;
   earliest_start_date: string | null;
   uploaded_by: string | null;
-  uploaded_by_user_id: string | null;
   created_at: string;
   updated_at: string;
   linkedin: string | null;
   current_position: string | null;
   current_company: string | null;
-  years_of_experience_text: string | null;
   overall_summary: string | null;
   strengths: string[] | null;
   weaknesses: string[] | null;
@@ -43,10 +37,9 @@ export interface Candidate {
   batch_id: string | null;
   batch_created_at: string | null;
   processing_status: ProcessingStatus | null;
-  processing_batch_id: string | null;
-  processing_started_at: string | null;
-  processing_completed_at: string | null;
-  processing_index: number | null;
+  notice_period: string | null;
+  employment_status_preference: string | null;
+  relocation_willingness: string | null;
 }
 
 export interface CandidateFull extends Candidate {
@@ -55,8 +48,8 @@ export interface CandidateFull extends Candidate {
   work_experiences: CandidateWorkExperience[];
 }
 
-export interface CandidateInsert { full_name: string; email?: string | null; phone?: string | null; applicant_type?: 'internal' | 'external'; skills?: string[] | null; years_of_experience?: number | null; educational_background?: string | null; availability?: string | null; preferred_work_setup?: string | null; expected_salary?: string | null; cv_url?: string | null; cv_filename?: string | null; uploaded_by?: string | null; }
-export interface CandidateUpdate { full_name?: string; email?: string | null; phone?: string | null; applicant_type?: 'internal' | 'external'; skills?: string[] | null; years_of_experience?: number | null; educational_background?: string | null; availability?: string | null; preferred_work_setup?: string | null; expected_salary?: string | null; }
+export interface CandidateInsert { full_name: string; email?: string | null; phone?: string | null; applicant_type?: 'internal' | 'external'; skills?: string[] | null; years_of_experience_text?: string | null; preferred_work_setup?: string | null; expected_salary?: string | null; uploaded_by?: string | null; google_drive_file_id?: string | null; google_drive_file_url?: string | null; }
+export interface CandidateUpdate { full_name?: string; email?: string | null; phone?: string | null; applicant_type?: 'internal' | 'external'; skills?: string[] | null; years_of_experience_text?: string | null; preferred_work_setup?: string | null; expected_salary?: string | null; notice_period?: string | null; employment_status_preference?: string | null; relocation_willingness?: string | null; }
 
 export interface WebhookCandidateData { webhook_output: any; uploader_name: string; applicant_type: 'internal' | 'external'; job_order_id?: string | null; internal_metadata?: { from_date?: string; to_date?: string; department?: string; upload_reason?: string; } | null; }
 

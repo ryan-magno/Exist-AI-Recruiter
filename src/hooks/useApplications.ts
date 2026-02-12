@@ -21,13 +21,13 @@ export interface Application {
   candidate_name?: string;
   candidate_email?: string;
   skills?: string[];
-  years_of_experience?: number;
+  years_of_experience_text?: string;
   jo_number?: string;
   job_title?: string;
 }
 
 export interface ApplicationWithDetails extends Application {
-  candidate?: { id: string; full_name: string; email: string | null; skills: string[] | null; years_of_experience: number | null; };
+  candidate?: { id: string; full_name: string; email: string | null; skills: string[] | null; years_of_experience_text: string | null; };
   job_order?: { id: string; jo_number: string; title: string; };
 }
 
@@ -62,7 +62,7 @@ export function useApplicationsForJobOrder(jobOrderId: string | null) {
       const apps = await azureDb.applications.list({ job_order_id: jobOrderId });
       return apps.map((app: Application) => ({
         ...app,
-        candidate: { id: app.candidate_id, full_name: app.candidate_name || 'Unknown', email: app.candidate_email || null, skills: app.skills || null, years_of_experience: app.years_of_experience || null },
+        candidate: { id: app.candidate_id, full_name: app.candidate_name || 'Unknown', email: app.candidate_email || null, skills: app.skills || null, years_of_experience_text: app.years_of_experience_text || null },
         job_order: { id: app.job_order_id, jo_number: app.jo_number || '', title: app.job_title || '' }
       })) as ApplicationWithDetails[];
     },
@@ -90,7 +90,7 @@ export function useApplication(id: string | null) {
       const apps = await azureDb.applications.list();
       const app = apps.find((a: Application) => a.id === id);
       if (!app) return null;
-      return { ...app, candidate: { id: app.candidate_id, full_name: app.candidate_name || 'Unknown', email: app.candidate_email || null, skills: app.skills || null, years_of_experience: app.years_of_experience || null }, job_order: { id: app.job_order_id, jo_number: app.jo_number || '', title: app.job_title || '' } } as ApplicationWithDetails;
+      return { ...app, candidate: { id: app.candidate_id, full_name: app.candidate_name || 'Unknown', email: app.candidate_email || null, skills: app.skills || null, years_of_experience_text: app.years_of_experience_text || null }, job_order: { id: app.job_order_id, jo_number: app.jo_number || '', title: app.job_title || '' } } as ApplicationWithDetails;
     },
     enabled: !!id
   });

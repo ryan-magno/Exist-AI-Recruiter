@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 interface CandidateTimelineProps {
   applicationId: string;
   appliedDate: string;
+  horizontal?: boolean;
 }
 
 // Map DB pipeline status to display labels
@@ -50,7 +51,7 @@ const formatDate = (dateString: string): string => {
   });
 };
 
-export function CandidateTimeline({ applicationId, appliedDate }: CandidateTimelineProps) {
+export function CandidateTimeline({ applicationId, appliedDate, horizontal }: CandidateTimelineProps) {
   const { data: timelineData, isLoading } = useTimeline(applicationId);
 
   if (isLoading) {
@@ -63,19 +64,20 @@ export function CandidateTimeline({ applicationId, appliedDate }: CandidateTimel
   }
 
   // Build timeline entries including the initial "Applied" entry
-  const timeline = timelineData || [];
+  const timeline = [...(timelineData || [])];
+  const reversedTimeline = [...timeline].reverse();
   const fullTimeline = [
     {
       id: 'applied',
       status: 'applied' as const,
       date: appliedDate,
-      durationDays: timeline.length > 0 ? timeline[timeline.length - 1].duration_days : undefined
+      durationDays: reversedTimeline.length > 0 ? reversedTimeline[0].duration_days : undefined
     },
-    ...timeline.reverse().map((entry, index) => ({
+    ...reversedTimeline.map((entry, index) => ({
       id: entry.id,
       status: entry.to_status,
       date: entry.changed_date,
-      durationDays: index < timeline.length - 1 ? timeline[index + 1].duration_days : undefined
+      durationDays: index < reversedTimeline.length - 1 ? reversedTimeline[index + 1].duration_days : undefined
     }))
   ];
 
@@ -88,6 +90,35 @@ export function CandidateTimeline({ applicationId, appliedDate }: CandidateTimel
 
       {fullTimeline.length <= 1 ? (
         <p className="text-xs text-muted-foreground italic">No status changes recorded yet.</p>
+      ) : horizontal ? (
+        /* ── Horizontal layout ── */
+        <div className="flex items-center gap-0 overflow-x-auto">
+          {fullTimeline.map((entry, index) => {
+            const isLast = index === fullTimeline.length - 1;
+            const statusColor = getStatusColor(entry.status);
+            return (
+              <div key={entry.id} className="flex items-center shrink-0">
+                <div className="flex flex-col items-center gap-0.5">
+                  <div className={cn(
+                    'w-4 h-4 rounded-full border-2 border-background flex items-center justify-center',
+                    isLast ? 'ring-2 ring-primary ring-offset-1' : '',
+                    statusColor
+                  )}>
+                    <div className="w-1.5 h-1.5 rounded-full bg-white/40" />
+                  </div>
+                  <span className={cn('text-[10px] font-medium whitespace-nowrap', isLast ? 'text-foreground' : 'text-muted-foreground')}>
+                    {getStatusLabel(entry.status)}
+                  </span>
+                  <span className="text-[9px] text-muted-foreground">{formatDate(entry.date)}</span>
+                  {entry.durationDays != null && (
+                    <span className="text-[9px] text-muted-foreground">{entry.durationDays}d</span>
+                  )}
+                </div>
+                {!isLast && <div className="w-6 h-0.5 bg-border mx-1 mt-[-16px]" />}
+              </div>
+            );
+          })}
+        </div>
       ) : (
         <div className="relative">
           {fullTimeline.map((entry, index) => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Mail, Download, Sparkles, ExternalLink, FileText, Briefcase, Calendar, DollarSign, User, Code, GraduationCap, Clock, Target, History, UserCheck, Building, Tag, FileCheck, Award, AlertTriangle, CheckCircle2, Share2, Phone } from 'lucide-react';
+import { ArrowLeft, Mail, Download, Sparkles, ExternalLink, FileText, Briefcase, Calendar, DollarSign, User, Code, GraduationCap, Clock, Target, History, UserCheck, Building, Tag, FileCheck, Award, AlertTriangle, CheckCircle2, Share2, Phone, Home, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Candidate, pipelineStatusLabels, pipelineStatusColors, PipelineStatus, techInterviewLabels, techInterviewColors, TechInterviewResult, WorkExperience } from '@/data/mockData';
@@ -29,9 +29,25 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
   const [hasPlayedAnimation, setHasPlayedAnimation] = useState(false);
   const [fullData, setFullData] = useState<any>(null);
 
+  // Safe candidate retrieval with fallback
   const currentCandidate = candidates.find(c => c.id === candidate.id) || candidate;
 
+  // Validate candidate data exists
+  if (!currentCandidate || !currentCandidate.id) {
+    return (
+      <div className="h-full flex items-center justify-center p-8">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Candidate Not Found</h3>
+          <p className="text-sm text-muted-foreground mb-4">Unable to load candidate details.</p>
+          <Button onClick={onBack}>Go Back</Button>
+        </div>
+      </div>
+    );
+  }
+
   useEffect(() => {
+    if (!candidate?.id) return;
     azureDb.candidates.getFull(candidate.id).then(data => {
       if (data) setFullData(data);
     }).catch(err => console.error('Error loading full candidate data:', err));
@@ -220,12 +236,12 @@ export function CandidateProfileView({ candidate, onBack }: CandidateProfileView
 
 // ── AI Key Insights (2-column) ──
 function AIKeyInsights({ candidate }: { candidate: Candidate }) {
-  const strengths = candidate.matchAnalysis?.strengths?.length > 0
+  const strengths = candidate?.matchAnalysis?.strengths?.length > 0
     ? candidate.matchAnalysis.strengths
-    : candidate.strengths || [];
-  const risks = candidate.matchAnalysis?.weaknesses?.length > 0
+    : candidate?.strengths || [];
+  const risks = candidate?.matchAnalysis?.weaknesses?.length > 0
     ? candidate.matchAnalysis.weaknesses
-    : candidate.weaknesses || [];
+    : candidate?.weaknesses || [];
 
   if (strengths.length === 0 && risks.length === 0) return null;
 
@@ -269,15 +285,15 @@ function AIKeyInsights({ candidate }: { candidate: Candidate }) {
 
 // ── Skills Matrix ──
 function SkillsSection({ candidate }: { candidate: Candidate }) {
-  const skills = candidate.keySkills?.length > 0 ? candidate.keySkills : candidate.skills || [];
+  const skills = candidate?.keySkills?.length > 0 ? candidate.keySkills : candidate?.skills || [];
   if (skills.length === 0) return null;
 
   return (
     <section className="mb-6">
       <h3 className="text-sm font-semibold text-foreground mb-3">Skills</h3>
       <div className="flex flex-wrap gap-1.5">
-        {skills.map((skill: string) => (
-          <span key={skill} className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+        {skills.map((skill: string, idx: number) => (
+          <span key={`${skill}-${idx}`} className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
             {skill}
           </span>
         ))}
@@ -365,21 +381,24 @@ function EducationSection({ education, certifications, educationalBackground }: 
   certifications: any[];
   educationalBackground?: string;
 }) {
+  const safeEducation = Array.isArray(education) ? education : [];
+  const safeCertifications = Array.isArray(certifications) ? certifications : [];
+  
   return (
     <section className="mb-6">
-      {(education.length > 0 || educationalBackground) && (
+      {(safeEducation.length > 0 || educationalBackground) && (
         <div className="mb-3">
           <div className="flex items-center gap-1.5 mb-2">
             <GraduationCap className="w-4 h-4 text-primary" />
             <h3 className="text-sm font-semibold text-foreground">Education</h3>
           </div>
-          {education.length > 0 ? (
+          {safeEducation.length > 0 ? (
             <div className="space-y-1">
-              {education.map((edu: any, i: number) => (
+              {safeEducation.map((edu: any, i: number) => (
                 <p key={i} className="text-xs text-foreground">
-                  <span className="font-medium">{edu.degree}</span>
-                  <span className="text-muted-foreground"> • {edu.institution}</span>
-                  {edu.year && <span className="text-muted-foreground"> • {edu.year}</span>}
+                  <span className="font-medium">{edu?.degree || 'Degree'}</span>
+                  <span className="text-muted-foreground"> • {edu?.institution || 'Institution'}</span>
+                  {edu?.year && <span className="text-muted-foreground"> • {edu.year}</span>}
                 </p>
               ))}
             </div>
@@ -389,16 +408,16 @@ function EducationSection({ education, certifications, educationalBackground }: 
         </div>
       )}
 
-      {certifications.length > 0 && (
+      {safeCertifications.length > 0 && (
         <div>
           <div className="flex items-center gap-1.5 mb-2">
             <Award className="w-4 h-4 text-muted-foreground" />
             <h3 className="text-sm font-semibold text-foreground">Certifications</h3>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {certifications.map((cert: any, i: number) => (
+            {safeCertifications.map((cert: any, i: number) => (
               <span key={i} className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium bg-amber-50 border border-amber-200 text-amber-800">
-                {cert.name}{cert.year ? ` • ${cert.year}` : ''}
+                {cert?.name || 'Certification'}{cert?.year ? ` • ${cert.year}` : ''}
               </span>
             ))}
           </div>
@@ -411,13 +430,24 @@ function EducationSection({ education, certifications, educationalBackground }: 
 // ── Application Metadata Grid ──
 function ApplicationMetadata({ candidate }: { candidate: Candidate }) {
   const displayValue = (v: string | null | undefined) => v || 'Not provided';
+  
+  const formatDate = (dateStr: string | undefined) => {
+    if (!dateStr) return 'Not provided';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return 'Not provided';
+    }
+  };
 
   const items = [
-    { label: 'Applied Date', value: candidate.appliedDate ? new Date(candidate.appliedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not provided', icon: Calendar },
+    { label: 'Applied Date', value: formatDate(candidate.appliedDate), icon: Calendar },
     { label: 'Position Applied', value: displayValue(candidate.positionApplied), icon: Briefcase },
-    { label: 'Earliest Start Date', value: candidate.earliestStartDate ? new Date(candidate.earliestStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not provided', icon: Clock },
-    { label: 'Employment Type', value: displayValue(formatEmploymentType(candidate.preferredEmploymentType || '')), icon: FileText },
     { label: 'Expected Salary', value: displayValue(candidate.expectedSalary), icon: DollarSign },
+    { label: 'Earliest Start Date', value: formatDate(candidate.earliestStartDate), icon: Clock },
+    { label: 'Work Setup Preference', value: formatWorkSetup(candidate.workSetupPreference), icon: Home },
+    { label: 'Employment Status Preference', value: formatEmploymentStatus(candidate.employmentStatusPreference), icon: FileText },
+    { label: 'Relocation Willingness', value: formatRelocationWillingness(candidate.relocationWillingness), icon: Globe },
     { label: 'Current Company', value: displayValue(candidate.currentCompany), icon: Building },
   ];
 
@@ -428,6 +458,7 @@ function ApplicationMetadata({ candidate }: { candidate: Candidate }) {
         <div className="grid grid-cols-2 gap-x-6 gap-y-3">
           {items.map(item => {
             const Icon = item.icon;
+            if (!Icon) return null;
             return (
               <div key={item.label}>
                 <div className="flex items-center gap-1.5 mb-0.5">
@@ -446,57 +477,28 @@ function ApplicationMetadata({ candidate }: { candidate: Candidate }) {
 
 // ── Profile Tab ──
 function ProfileTab({ candidate, fullData }: { candidate: Candidate; fullData: any }) {
-  const education = fullData?.education || candidate.education || [];
-  const certifications = fullData?.certifications || candidate.certifications || [];
+  // Safe data extraction with fallbacks
+  const education = fullData?.education || candidate?.education || [];
+  const certifications = fullData?.certifications || candidate?.certifications || [];
   const workExperiences = fullData?.work_experiences || [];
 
   const mergedWorkExperiences = workExperiences.length > 0
     ? workExperiences.map((exp: any) => ({
-        company: exp.company_name,
-        position: exp.job_title,
-        duration: exp.duration,
-        summary: exp.description || '',
-        projects: Array.isArray(exp.key_projects) ? exp.key_projects : [],
+        company: exp?.company_name || '',
+        position: exp?.job_title || '',
+        duration: exp?.duration || '',
+        summary: exp?.description || '',
+        projects: Array.isArray(exp?.key_projects) ? exp.key_projects : [],
       }))
-    : candidate.workExperiences || [];
+    : candidate?.workExperiences || [];
 
   // Overall summary from match analysis
-  const overallSummary = candidate.matchAnalysis?.summary || candidate.overallSummary;
+  const overallSummary = candidate?.matchAnalysis?.summary || candidate?.overallSummary;
 
   return (
     <div className="max-w-4xl">
-      {/* Overall Summary */}
-      {overallSummary && (
-        <section className="mb-6">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">Overall Summary</h3>
-          </div>
-          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-            <p className="text-sm text-foreground leading-relaxed">{overallSummary}</p>
-          </div>
-        </section>
-      )}
-
-      {/* AI Insights 2-column */}
-      <AIKeyInsights candidate={candidate} />
-
-      {/* Positions Fit For */}
-      {candidate.positionsFitFor && candidate.positionsFitFor.length > 0 && (
-        <section className="mb-6">
-          <div className="flex items-center gap-1.5 mb-2">
-            <Target className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">Qualified For</h3>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {candidate.positionsFitFor.map((pos, i) => (
-              <span key={i} className="px-2.5 py-1 bg-card rounded-md border text-xs font-medium text-foreground">
-                {pos}
-              </span>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* Application Metadata */}
+      <ApplicationMetadata candidate={candidate} />
 
       {/* Internal Candidate */}
       {candidate.applicantType === 'internal' && (
@@ -521,11 +523,31 @@ function ProfileTab({ candidate, fullData }: { candidate: Candidate; fullData: a
         </section>
       )}
 
+      {/* Positions Fit For */}
+      {candidate.positionsFitFor && candidate.positionsFitFor.length > 0 && (
+        <section className="mb-6">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Target className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">Qualified For</h3>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {candidate.positionsFitFor.map((pos, i) => (
+              <span key={i} className="px-2.5 py-1 bg-card rounded-md border text-xs font-medium text-foreground">
+                {pos}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Skills */}
       <SkillsSection candidate={candidate} />
 
-      {/* Application Metadata */}
-      <ApplicationMetadata candidate={candidate} />
+      {/* Work Experience Timeline */}
+      <WorkExperienceTimeline
+        experiences={mergedWorkExperiences}
+        totalYears={candidate.experienceDetails?.totalYears || 0}
+      />
 
       {/* Education & Certs */}
       <EducationSection
@@ -534,11 +556,21 @@ function ProfileTab({ candidate, fullData }: { candidate: Candidate; fullData: a
         educationalBackground={candidate.educationalBackground}
       />
 
-      {/* Work Experience Timeline */}
-      <WorkExperienceTimeline
-        experiences={mergedWorkExperiences}
-        totalYears={candidate.experienceDetails?.totalYears || 0}
-      />
+      {/* AI Insights 2-column */}
+      <AIKeyInsights candidate={candidate} />
+
+      {/* Overall Summary */}
+      {overallSummary && (
+        <section className="mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">Overall Summary</h3>
+          </div>
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+            <p className="text-sm text-foreground leading-relaxed">{overallSummary}</p>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -549,6 +581,36 @@ function formatEmploymentType(value: string): string {
     regular: 'Regular', 'project-based': 'Project-Based', consultant: 'Consultant',
   };
   return labels[value] || value || 'Not provided';
+}
+
+function formatWorkSetup(value?: string): string {
+  const labels: Record<string, string> = {
+    'on-site': 'On-site',
+    'hybrid': 'Hybrid',
+    'remote': 'Remote',
+    'flexible': 'Flexible',
+  };
+  return value ? (labels[value] || value) : 'Not Provided';
+}
+
+function formatEmploymentStatus(value?: string): string {
+  const labels: Record<string, string> = {
+    'regular': 'Regular',
+    'contractual': 'Contractual',
+    'freelance': 'Freelance',
+    'part-time': 'Part-time',
+  };
+  return value ? (labels[value] || value) : 'Not Provided';
+}
+
+function formatRelocationWillingness(value?: string): string {
+  const labels: Record<string, string> = {
+    'yes': 'Yes',
+    'no': 'No',
+    'maybe': 'Maybe',
+    'na': 'N/A',
+  };
+  return value ? (labels[value] || value) : 'Not Provided';
 }
 
 // ── Match Analysis ──
@@ -564,8 +626,8 @@ function MatchAnalysis({ candidate, isActive, hasPlayed, onAnimationComplete }: 
   }, [isActive, hasPlayed, onAnimationComplete]);
 
   const shouldAnimate = isActive && !hasPlayed;
-  const strengths = candidate.matchAnalysis?.strengths?.length > 0 ? candidate.matchAnalysis.strengths : candidate.strengths || [];
-  const weaknesses = candidate.matchAnalysis?.weaknesses?.length > 0 ? candidate.matchAnalysis.weaknesses : candidate.weaknesses || [];
+  const strengths = candidate?.matchAnalysis?.strengths?.length > 0 ? candidate.matchAnalysis.strengths : candidate?.strengths || [];
+  const weaknesses = candidate?.matchAnalysis?.weaknesses?.length > 0 ? candidate.matchAnalysis.weaknesses : candidate?.weaknesses || [];
 
   return (
     <div className="max-w-4xl space-y-4">

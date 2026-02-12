@@ -24,6 +24,9 @@ export const azureDb = {
   // Initialize tables and seed data
   init: () => apiCall<{ success: boolean; message: string }>('/init', { method: 'POST' }),
   
+  // Run database migrations
+  migrate: () => apiCall<{ success: boolean; message: string }>('/migrate', { method: 'POST' }),
+  
   // Job Orders
   jobOrders: {
     list: () => apiCall<any[]>('/job-orders'),
@@ -124,5 +127,18 @@ export const azureDb = {
       return apiCall<any[]>(`/activity-log${q ? `?${q}` : ''}`);
     },
     create: (data: any) => apiCall<any>('/activity-log', { method: 'POST', body: JSON.stringify(data) }),
+  },
+
+  // Analytics
+  analytics: {
+    get: (params?: { department?: string; level?: string; start_date?: string; end_date?: string }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.department) searchParams.set('department', params.department);
+      if (params?.level) searchParams.set('level', params.level);
+      if (params?.start_date) searchParams.set('start_date', params.start_date);
+      if (params?.end_date) searchParams.set('end_date', params.end_date);
+      const q = searchParams.toString();
+      return apiCall<any>(`/analytics${q ? `?${q}` : ''}`);
+    },
   },
 };

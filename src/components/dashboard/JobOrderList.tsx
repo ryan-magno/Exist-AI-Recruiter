@@ -92,8 +92,8 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
       });
     }
 
-    // Return max 2 actions
-    return actions.slice(0, 2);
+    // Return max 3 actions (HR, Tech, Offer)
+    return actions.slice(0, 3);
   };
 
   const getActionStyles = (priority: SmartAction['priority']) => {

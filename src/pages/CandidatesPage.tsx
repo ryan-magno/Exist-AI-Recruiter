@@ -159,7 +159,7 @@ export default function CandidatesPage() {
             />
             <motion.div
               key="drawer-panel"
-              className="fixed top-0 right-0 bottom-0 w-1/2 min-w-[480px] bg-card z-50 shadow-2xl border-l overflow-auto"
+              className="fixed top-0 right-0 bottom-0 w-2/3 min-w-[640px] bg-card z-50 shadow-2xl border-l overflow-auto"
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}

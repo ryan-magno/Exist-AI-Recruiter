@@ -128,17 +128,13 @@ const ALLOWED_JOB_ORDER_COLUMNS = [
 
 const ALLOWED_CANDIDATE_COLUMNS = [
   'full_name', 'email', 'phone', 'applicant_type', 'skills', 'positions_fit_for',
-  'years_of_experience', 'educational_background', 'cv_url', 'cv_filename',
-  'availability', 'preferred_work_setup', 'expected_salary', 'earliest_start_date',
-  'uploaded_by', 'uploaded_by_user_id',
-  'linkedin', 'current_position', 'current_company', 'years_of_experience_text',
-  'overall_summary', 'strengths', 'weaknesses',
-  'qualification_score', 'preferred_employment_type',
+  'years_of_experience_text', 'preferred_work_setup', 'expected_salary', 'earliest_start_date',
+  'uploaded_by', 'linkedin', 'current_position', 'current_company',
+  'overall_summary', 'strengths', 'weaknesses', 'qualification_score', 'preferred_employment_type',
   'internal_upload_reason', 'internal_from_date', 'internal_to_date',
   'google_drive_file_id', 'google_drive_file_url',
-  'batch_id', 'batch_created_at',
-  'processing_status', 'processing_batch_id',
-  'notice_period'
+  'batch_id', 'batch_created_at', 'processing_status',
+  'notice_period', 'employment_status_preference', 'relocation_willingness'
 ];
 
 const ALLOWED_APPLICATION_COLUMNS = [
@@ -159,10 +155,52 @@ function validateColumns(body, allowedColumns) {
 }
 
 // =====================================================
-// INIT
+// INIT & MIGRATIONS
 // =====================================================
+async function runMigrations() {
+  try {
+    console.log('Running database migrations...');
+    
+    // Migration 1: Add HR form sync fields
+    await execute(`
+      ALTER TABLE candidates 
+        ADD COLUMN IF NOT EXISTS employment_status_preference text,
+        ADD COLUMN IF NOT EXISTS relocation_willingness text
+    `);
+    
+    await execute(`
+      ALTER TABLE hr_interviews 
+        ADD COLUMN IF NOT EXISTS earliest_start_date date
+    `);
+    
+    // Migration 2: Drop redundant/unused columns
+    await execute(`
+      ALTER TABLE candidates 
+        DROP COLUMN IF EXISTS years_of_experience,
+        DROP COLUMN IF EXISTS educational_background,
+        DROP COLUMN IF EXISTS cv_url,
+        DROP COLUMN IF EXISTS cv_filename,
+        DROP COLUMN IF EXISTS availability,
+        DROP COLUMN IF EXISTS processing_batch_id,
+        DROP COLUMN IF EXISTS processing_started_at,
+        DROP COLUMN IF EXISTS processing_completed_at,
+        DROP COLUMN IF EXISTS processing_index,
+        DROP COLUMN IF EXISTS uploaded_by_user_id
+    `);
+    
+    console.log('✅ Migrations completed successfully');
+    return { success: true, message: 'Migrations completed' };
+  } catch (error) {
+    console.error('❌ Migration error:', error);
+    throw error;
+  }
+}
+
 app.post('/init', async (req, res) => {
   try {
+    // Run migrations first
+    await runMigrations();
+    
     // Tables already created via schema.sql, just seed departments
     await execute(`
       INSERT INTO departments (name) VALUES 
@@ -170,9 +208,19 @@ app.post('/init', async (req, res) => {
       ('Human Resources'), ('Finance'), ('Operations'), ('Legal'), ('Customer Success')
       ON CONFLICT (name) DO NOTHING
     `);
-    res.json({ success: true, message: 'Tables initialized and data seeded' });
+    res.json({ success: true, message: 'Tables initialized, migrations run, and data seeded' });
   } catch (error) {
     console.error('Init error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/migrate', async (req, res) => {
+  try {
+    const result = await runMigrations();
+    res.json(result);
+  } catch (error) {
+    console.error('Migration error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -297,10 +345,10 @@ app.post('/candidates', async (req, res) => {
   try {
     const body = req.body;
     const result = await query(`
-      INSERT INTO candidates (full_name, email, phone, applicant_type, skills, years_of_experience, educational_background, availability, preferred_work_setup, expected_salary, cv_url, cv_filename, uploaded_by, processing_status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'completed')
+      INSERT INTO candidates (full_name, email, phone, applicant_type, skills, years_of_experience_text, preferred_work_setup, expected_salary, uploaded_by, processing_status, google_drive_file_id, google_drive_file_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'completed', $10, $11)
       RETURNING *
-    `, [body.full_name, body.email, body.phone, body.applicant_type || 'external', body.skills, body.years_of_experience, body.educational_background, body.availability, body.preferred_work_setup, body.expected_salary, body.cv_url, body.cv_filename, body.uploaded_by]);
+    `, [body.full_name, body.email, body.phone, body.applicant_type || 'external', body.skills, body.years_of_experience_text, body.preferred_work_setup, body.expected_salary, body.uploaded_by, body.google_drive_file_id, body.google_drive_file_url]);
     res.json(result[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -323,13 +371,12 @@ app.get('/candidates/processing-status', async (req, res) => {
     const batchId = req.query.batch_id;
     const since = req.query.since;
 
-    let sql = `SELECT id, full_name, processing_status, processing_batch_id, processing_started_at, 
-           processing_completed_at, cv_filename, applicant_type, created_at FROM candidates
+    let sql = `SELECT id, full_name, processing_status, applicant_type, created_at, batch_id, batch_created_at FROM candidates
            WHERE processing_status IN ('processing', 'completed')`;
     const params = [];
 
-    if (batchId) { params.push(batchId); sql += ` AND processing_batch_id = $${params.length}`; }
-    if (since) { params.push(since); sql += ` AND (processing_completed_at > $${params.length} OR processing_status = 'processing')`; }
+    if (batchId) { params.push(batchId); sql += ` AND batch_id = $${params.length}`; }
+    if (since) { params.push(since); sql += ` AND (batch_created_at > $${params.length} OR processing_status = 'processing')`; }
     sql += ' ORDER BY created_at DESC LIMIT 50';
 
     const rows = await query(sql, params);
@@ -424,7 +471,7 @@ app.get('/applications', async (req, res) => {
     const { job_order_id, candidate_id } = req.query;
 
     let sql = `
-      SELECT a.*, c.full_name as candidate_name, c.email as candidate_email, c.skills, c.years_of_experience,
+      SELECT a.*, c.full_name as candidate_name, c.email as candidate_email, c.skills, c.years_of_experience_text,
              c.linkedin, c.current_position, c.current_company, c.overall_summary, c.strengths, c.weaknesses, c.applicant_type,
              c.processing_status, c.qualification_score,
              j.jo_number, j.title as job_title
@@ -490,12 +537,41 @@ app.put('/applications/:id', async (req, res) => {
 
     const result = await query(`UPDATE candidate_job_applications SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`, values);
 
-    // Create timeline entry if status changed
+    // Create timeline entry if status changed, with duration_days calculation
     if (validatedBody.pipeline_status && validatedBody.pipeline_status !== fromStatus && candidateId) {
+      // Calculate duration_days from previous status change (or applied_date)
+      let durationDays = null;
+      try {
+        const prevEntry = await query(`
+          SELECT changed_date FROM candidate_timeline
+          WHERE application_id = $1 ORDER BY changed_date DESC LIMIT 1
+        `, [id]);
+        const sinceDate = prevEntry.length > 0
+          ? new Date(prevEntry[0].changed_date)
+          : (result[0].applied_date ? new Date(result[0].applied_date) : null);
+        if (sinceDate) {
+          durationDays = Math.max(0, Math.round((Date.now() - sinceDate.getTime()) / (1000 * 60 * 60 * 24)));
+        }
+      } catch (e) { console.error('Duration calc error:', e.message); }
+
       await execute(`
-        INSERT INTO candidate_timeline (application_id, candidate_id, from_status, to_status)
-        VALUES ($1, $2, $3, $4)
-      `, [id, candidateId, fromStatus, validatedBody.pipeline_status]);
+        INSERT INTO candidate_timeline (application_id, candidate_id, from_status, to_status, duration_days)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [id, candidateId, fromStatus, validatedBody.pipeline_status, durationDays]);
+    }
+
+    // Include duration_days in response for client-side activity logging
+    if (result.length > 0) {
+      // Fetch the latest duration from the timeline for the response
+      try {
+        const latestTimeline = await query(`
+          SELECT duration_days FROM candidate_timeline
+          WHERE application_id = $1 ORDER BY changed_date DESC LIMIT 1
+        `, [id]);
+        if (latestTimeline.length > 0) {
+          result[0]._duration_days = latestTimeline[0].duration_days;
+        }
+      } catch (e) { /* ignore */ }
     }
 
     res.json(result[0]);
@@ -600,17 +676,17 @@ app.post('/hr-interviews', async (req, res) => {
   try {
     const body = req.body;
     const result = await query(`
-      INSERT INTO hr_interviews (application_id, candidate_id, interview_date, interviewer_name, interview_mode, availability, expected_salary, preferred_work_setup, notice_period, communication_rating, motivation_rating, cultural_fit_rating, professionalism_rating, strengths, concerns, verdict, verdict_rationale)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      INSERT INTO hr_interviews (application_id, candidate_id, interview_date, interviewer_name, interview_mode, availability, expected_salary, earliest_start_date, preferred_work_setup, notice_period, communication_rating, motivation_rating, cultural_fit_rating, professionalism_rating, strengths, concerns, verdict, verdict_rationale)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       ON CONFLICT (application_id) DO UPDATE SET
         interview_date = EXCLUDED.interview_date, interviewer_name = EXCLUDED.interviewer_name, interview_mode = EXCLUDED.interview_mode,
-        availability = EXCLUDED.availability, expected_salary = EXCLUDED.expected_salary, preferred_work_setup = EXCLUDED.preferred_work_setup,
+        availability = EXCLUDED.availability, expected_salary = EXCLUDED.expected_salary, earliest_start_date = EXCLUDED.earliest_start_date, preferred_work_setup = EXCLUDED.preferred_work_setup,
         notice_period = EXCLUDED.notice_period, communication_rating = EXCLUDED.communication_rating, motivation_rating = EXCLUDED.motivation_rating,
         cultural_fit_rating = EXCLUDED.cultural_fit_rating, professionalism_rating = EXCLUDED.professionalism_rating,
         strengths = EXCLUDED.strengths, concerns = EXCLUDED.concerns, verdict = EXCLUDED.verdict, verdict_rationale = EXCLUDED.verdict_rationale,
         updated_at = now()
       RETURNING *
-    `, [body.application_id, body.candidate_id, body.interview_date, body.interviewer_name, body.interview_mode, body.availability, body.expected_salary, body.preferred_work_setup, body.notice_period, body.communication_rating, body.motivation_rating, body.cultural_fit_rating, body.professionalism_rating, body.strengths, body.concerns, body.verdict, body.verdict_rationale]);
+    `, [body.application_id, body.candidate_id, body.interview_date, body.interviewer_name, body.interview_mode, body.availability, body.expected_salary, body.earliest_start_date, body.preferred_work_setup, body.notice_period, body.communication_rating, body.motivation_rating, body.cultural_fit_rating, body.professionalism_rating, body.strengths, body.concerns, body.verdict, body.verdict_rationale]);
     res.json(result[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -811,17 +887,15 @@ app.post('/webhook-proxy', upload.array('files'), async (req, res) => {
       try {
         const result = await query(`
           INSERT INTO candidates (
-            full_name, applicant_type, uploaded_by, cv_filename,
-            processing_status, processing_batch_id, processing_started_at, processing_index
-          ) VALUES ($1, $2, $3, $4, 'processing', $5, now(), $6)
+            full_name, applicant_type, uploaded_by,
+            processing_status, batch_id, batch_created_at
+          ) VALUES ($1, $2, $3, 'processing', $4, now())
           RETURNING id
         `, [
           `Processing CV ${i + 1}...`,
           fileMeta.applicant_type || 'external',
           uploaderName,
-          fileMeta.filename || null,
-          batchId,
-          i
+          batchId
         ]);
         processingCandidates.push(result[0].id);
       } catch (err) {
@@ -947,16 +1021,26 @@ app.post('/webhook-callback', async (req, res) => {
 
       let candidateId = null;
 
-      // Strategy 1: Find by batch_id and index
-      if (metadata.batch_id !== undefined && metadata.index !== undefined) {
+      // Strategy 1: Find by batch_id and candidate_id from metadata
+      if (metadata.candidate_id) {
         const candidates = await query(`
           SELECT id FROM candidates 
-          WHERE processing_batch_id = $1 AND processing_index = $2 AND processing_status = 'processing'
-        `, [metadata.batch_id, metadata.index]);
+          WHERE id = $1 AND processing_status = 'processing'
+        `, [metadata.candidate_id]);
         if (candidates.length > 0) candidateId = candidates[0].id;
       }
 
-      // Strategy 2: Find by email
+      // Strategy 2: Find by batch_id
+      if (!candidateId && metadata.batch_id) {
+        const candidates = await query(`
+          SELECT id FROM candidates 
+          WHERE batch_id = $1 AND processing_status = 'processing'
+          ORDER BY created_at ASC LIMIT 1
+        `, [metadata.batch_id]);
+        if (candidates.length > 0) candidateId = candidates[0].id;
+      }
+
+      // Strategy 3: Find by email
       if (!candidateId && candidateInfo.email) {
         const candidates = await query(`
           SELECT id FROM candidates 
@@ -966,22 +1050,12 @@ app.post('/webhook-callback', async (req, res) => {
         if (candidates.length > 0) candidateId = candidates[0].id;
       }
 
-      // Strategy 3: Find by cv_filename
-      if (!candidateId && metadata.filename) {
-        const candidates = await query(`
-          SELECT id FROM candidates 
-          WHERE cv_filename = $1 AND processing_status = 'processing'
-          ORDER BY created_at DESC LIMIT 1
-        `, [metadata.filename]);
-        if (candidates.length > 0) candidateId = candidates[0].id;
-      }
-
       // Strategy 4: Most recent processing candidate
       if (!candidateId) {
         const candidates = await query(`
           SELECT id FROM candidates 
           WHERE processing_status = 'processing'
-          ORDER BY processing_started_at DESC LIMIT 1
+          ORDER BY batch_created_at DESC LIMIT 1
         `);
         if (candidates.length > 0) candidateId = candidates[0].id;
       }
@@ -994,8 +1068,8 @@ app.post('/webhook-callback', async (req, res) => {
             full_name, email, phone, applicant_type, skills, 
             linkedin, current_position, current_company, years_of_experience_text,
             overall_summary, strengths, weaknesses, qualification_score,
-            processing_status, processing_completed_at
-          ) VALUES ($1, $2, $3, 'external', $4, $5, $6, $7, $8, $9, $10, $11, $12, 'completed', now())
+            processing_status, batch_id, batch_created_at, uploaded_by
+          ) VALUES ($1, $2, $3, 'external', $4, $5, $6, $7, $8, $9, $10, $11, $12, 'completed', $13, now(), $14)
           RETURNING id
         `, [
           candidateInfo.full_name || 'Unknown', candidateInfo.email || null, candidateInfo.phone || null,
@@ -1003,7 +1077,7 @@ app.post('/webhook-callback', async (req, res) => {
           currentOcc?.title || null, currentOcc?.company || null,
           candidateInfo.years_of_experience || workHistory.total_experience || null,
           data.overall_summary || null, data.strengths || [], data.weaknesses || [],
-          data.qualification_score || null
+          data.qualification_score || null, metadata.batch_id || null, metadata.uploader_name || null
         ]);
         candidateId = result[0].id;
       } else {
@@ -1012,7 +1086,7 @@ app.post('/webhook-callback', async (req, res) => {
             full_name = COALESCE($1, full_name), email = COALESCE($2, email), phone = COALESCE($3, phone),
             skills = $4, linkedin = $5, current_position = $6, current_company = $7,
             years_of_experience_text = $8, overall_summary = $9, strengths = $10, weaknesses = $11,
-            qualification_score = $12, processing_status = 'completed', processing_completed_at = now(), updated_at = now()
+            qualification_score = $12, processing_status = 'completed', updated_at = now()
           WHERE id = $13
         `, [
           candidateInfo.full_name || null, candidateInfo.email || null, candidateInfo.phone || null,
@@ -1073,6 +1147,51 @@ app.post('/webhook-callback', async (req, res) => {
         } catch (err) {
           console.error("Error creating application from webhook callback:", err);
         }
+      }
+    }
+
+    // Log CV upload activity (one entry per batch)
+    // Collect unique batch info from processed dataItems
+    const batchMap = new Map();
+    for (const data of dataItems) {
+      if (!data.candidate_info) continue;
+      const batchId = data.metadata?.batch_id || 'unknown';
+      if (!batchMap.has(batchId)) {
+        batchMap.set(batchId, { count: 0, names: [], uploaderName: null, firstCandidateId: null });
+      }
+      const batch = batchMap.get(batchId);
+      batch.count++;
+      if (data.candidate_info.full_name) batch.names.push(data.candidate_info.full_name);
+      if (!batch.uploaderName) batch.uploaderName = data.metadata?.uploader_name || null;
+    }
+
+    // Also look up uploader from candidate rows if not in metadata
+    for (const [batchId, batch] of batchMap) {
+      if (!batch.uploaderName && batch.names.length > 0) {
+        try {
+          const uploaders = await query(`SELECT uploaded_by FROM candidates WHERE batch_id = $1 AND uploaded_by IS NOT NULL LIMIT 1`, [batchId]);
+          if (uploaders.length > 0) batch.uploaderName = uploaders[0].uploaded_by;
+        } catch { /* ignore */ }
+      }
+
+      // Get the first candidate id for entity_id
+      try {
+        const firstCandidate = await query(`SELECT id FROM candidates WHERE batch_id = $1 ORDER BY created_at ASC LIMIT 1`, [batchId]);
+        if (firstCandidate.length > 0) batch.firstCandidateId = firstCandidate[0].id;
+      } catch { /* ignore */ }
+
+      // Insert activity log entry
+      try {
+        await execute(`
+          INSERT INTO activity_log (activity_type, entity_type, entity_id, performed_by_name, details)
+          VALUES ('cv_uploaded', 'candidate', $1, $2, $3::jsonb)
+        `, [
+          batch.firstCandidateId || '00000000-0000-0000-0000-000000000000',
+          batch.uploaderName,
+          JSON.stringify({ count: batch.count, batch_id: batchId, candidate_names: batch.names })
+        ]);
+      } catch (err) {
+        console.error('Error logging CV upload activity:', err.message);
       }
     }
 
@@ -1168,6 +1287,324 @@ async function createCandidateFromWebhook(body) {
 
   return { candidate, application };
 }
+
+// =====================================================
+// ANALYTICS (aggregated server-side)
+// =====================================================
+app.get('/analytics', async (req, res) => {
+  try {
+    const { department, level, start_date, end_date } = req.query;
+
+    // Build dynamic WHERE fragments for filters
+    const joFilters = [];
+    const appFilters = [];
+    const params = [];
+    let paramIdx = 1;
+
+    if (department) {
+      joFilters.push(`jo.department_name = $${paramIdx}`);
+      appFilters.push(`jo.department_name = $${paramIdx}`);
+      params.push(department);
+      paramIdx++;
+    }
+    if (level) {
+      joFilters.push(`jo.level = $${paramIdx}`);
+      appFilters.push(`jo.level = $${paramIdx}`);
+      params.push(level);
+      paramIdx++;
+    }
+    if (start_date) {
+      appFilters.push(`a.applied_date >= $${paramIdx}::timestamptz`);
+      joFilters.push(`jo.created_at >= $${paramIdx}::timestamptz`);
+      params.push(start_date);
+      paramIdx++;
+    }
+    if (end_date) {
+      appFilters.push(`a.applied_date <= $${paramIdx}::timestamptz`);
+      joFilters.push(`jo.created_at <= $${paramIdx}::timestamptz`);
+      params.push(end_date);
+      paramIdx++;
+    }
+
+    const joWhere = joFilters.length > 0 ? ' AND ' + joFilters.join(' AND ') : '';
+    const appJoWhere = appFilters.length > 0 ? ' AND ' + appFilters.join(' AND ') : '';
+    // For queries joining application a + jo
+    const appJoin = `candidate_job_applications a JOIN job_orders jo ON a.job_order_id = jo.id`;
+
+    // Run all queries in parallel
+    const [
+      kpiRows,
+      pipelineRows,
+      deptRows,
+      levelRows,
+      sourceRows,
+      funnelRows,
+      agingRows,
+      timeToFillRows,
+      avgStageRows,
+      deptTurnaroundRows,
+      monthlyHiresRows,
+      monthlyAppsRows,
+      interviewVolumeRows,
+      hrVerdictRows,
+      techVerdictRows,
+      offerRows,
+      fillRateRows,
+      scoreDistRows,
+      workSetupRows,
+    ] = await Promise.all([
+      // 1. KPIs
+      query(`
+        SELECT
+          COUNT(DISTINCT a.id) FILTER (WHERE a.pipeline_status = 'hired') AS total_hired,
+          COUNT(DISTINCT a.id) FILTER (WHERE a.pipeline_status = 'hired'
+            AND a.status_changed_date >= date_trunc('month', NOW())) AS hired_this_month,
+          COUNT(DISTINCT jo.id) FILTER (WHERE jo.status IN ('open','pooling')) AS active_jobs,
+          COUNT(DISTINCT a.id) AS total_applications,
+          COUNT(DISTINCT a.candidate_id) AS unique_candidates,
+          COUNT(DISTINCT a.id) FILTER (WHERE a.pipeline_status NOT IN ('rejected','hired')) AS active_pipeline,
+          ROUND(AVG(EXTRACT(EPOCH FROM (a.status_changed_date - a.applied_date)) / 86400)
+            FILTER (WHERE a.pipeline_status = 'hired' AND a.status_changed_date IS NOT NULL AND a.applied_date IS NOT NULL))
+            AS avg_time_to_hire,
+          ROUND(AVG(a.match_score) FILTER (WHERE a.match_score IS NOT NULL)) AS avg_match_score
+        FROM ${appJoin}
+        WHERE 1=1 ${appJoWhere}
+      `, params),
+
+      // 2. Pipeline distribution
+      query(`
+        SELECT a.pipeline_status AS status, COUNT(*) AS count
+        FROM ${appJoin}
+        WHERE 1=1 ${appJoWhere}
+        GROUP BY a.pipeline_status ORDER BY count DESC
+      `, params),
+
+      // 3. Applications by department
+      query(`
+        SELECT jo.department_name AS department, COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE a.pipeline_status = 'hired') AS hired,
+          COUNT(*) FILTER (WHERE a.pipeline_status = 'rejected') AS rejected,
+          COUNT(*) FILTER (WHERE a.pipeline_status NOT IN ('hired','rejected')) AS active
+        FROM ${appJoin}
+        WHERE jo.department_name IS NOT NULL ${appJoWhere}
+        GROUP BY jo.department_name ORDER BY total DESC
+      `, params),
+
+      // 4. Applications by level
+      query(`
+        SELECT jo.level, COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE a.pipeline_status = 'hired') AS hired,
+          COUNT(*) FILTER (WHERE a.pipeline_status = 'rejected') AS rejected
+        FROM ${appJoin}
+        WHERE 1=1 ${appJoWhere}
+        GROUP BY jo.level ORDER BY jo.level
+      `, params),
+
+      // 5. Internal vs External
+      query(`
+        SELECT c.applicant_type AS source, COUNT(*) AS count,
+          ROUND(AVG(c.qualification_score) FILTER (WHERE c.qualification_score IS NOT NULL)) AS avg_score,
+          COUNT(*) FILTER (WHERE a.pipeline_status = 'hired') AS hired
+        FROM ${appJoin}
+          JOIN candidates c ON a.candidate_id = c.id
+        WHERE 1=1 ${appJoWhere}
+        GROUP BY c.applicant_type
+      `, params),
+
+      // 6. Funnel (conversion %, each stage)
+      query(`
+        SELECT
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE a.pipeline_status IN ('hr_interview','tech_interview','offer','hired')) AS reached_hr,
+          COUNT(*) FILTER (WHERE a.pipeline_status IN ('tech_interview','offer','hired')) AS reached_tech,
+          COUNT(*) FILTER (WHERE a.pipeline_status IN ('offer','hired')) AS reached_offer,
+          COUNT(*) FILTER (WHERE a.pipeline_status = 'hired') AS reached_hired
+        FROM ${appJoin}
+        WHERE 1=1 ${appJoWhere}
+      `, params),
+
+      // 7. Pipeline aging (current candidates: how long in current stage)
+      query(`
+        SELECT a.pipeline_status AS status,
+          ROUND(AVG(EXTRACT(EPOCH FROM (NOW() - a.status_changed_date)) / 86400)) AS avg_days,
+          MAX(EXTRACT(EPOCH FROM (NOW() - a.status_changed_date)) / 86400)::int AS max_days,
+          MIN(EXTRACT(EPOCH FROM (NOW() - a.status_changed_date)) / 86400)::int AS min_days,
+          COUNT(*) AS count
+        FROM ${appJoin}
+        WHERE a.pipeline_status NOT IN ('hired','rejected')
+          AND a.status_changed_date IS NOT NULL ${appJoWhere}
+        GROUP BY a.pipeline_status
+      `, params),
+
+      // 8. Time-to-fill per JO (hired candidates)
+      query(`
+        SELECT jo.id AS jo_id, jo.title AS jo_title, jo.department_name AS department,
+          jo.quantity, jo.hired_count,
+          ROUND(AVG(EXTRACT(EPOCH FROM (a.status_changed_date - a.applied_date)) / 86400)) AS avg_days_to_hire,
+          MIN(EXTRACT(EPOCH FROM (a.status_changed_date - a.applied_date)) / 86400)::int AS min_days,
+          MAX(EXTRACT(EPOCH FROM (a.status_changed_date - a.applied_date)) / 86400)::int AS max_days,
+          COUNT(*) AS hires
+        FROM ${appJoin}
+        WHERE a.pipeline_status = 'hired'
+          AND a.status_changed_date IS NOT NULL AND a.applied_date IS NOT NULL ${appJoWhere}
+        GROUP BY jo.id, jo.title, jo.department_name, jo.quantity, jo.hired_count
+        ORDER BY avg_days_to_hire DESC
+      `, params),
+
+      // 9. Avg time per stage (from timeline transitions)
+      query(`
+        SELECT ct.to_status AS stage,
+          ROUND(AVG(ct.duration_days) FILTER (WHERE ct.duration_days IS NOT NULL AND ct.duration_days > 0)) AS avg_duration,
+          MAX(ct.duration_days) FILTER (WHERE ct.duration_days IS NOT NULL) AS max_duration,
+          MIN(ct.duration_days) FILTER (WHERE ct.duration_days IS NOT NULL AND ct.duration_days > 0) AS min_duration,
+          COUNT(*) AS transitions
+        FROM candidate_timeline ct
+          JOIN ${appJoin} ON ct.application_id = a.id
+        WHERE 1=1 ${appJoWhere}
+        GROUP BY ct.to_status
+      `, params),
+
+      // 10. Department turnaround (avg time to hire per dept)
+      query(`
+        SELECT jo.department_name AS department,
+          ROUND(AVG(EXTRACT(EPOCH FROM (a.status_changed_date - a.applied_date)) / 86400)) AS avg_days,
+          COUNT(*) AS hires
+        FROM ${appJoin}
+        WHERE a.pipeline_status = 'hired'
+          AND a.status_changed_date IS NOT NULL AND a.applied_date IS NOT NULL
+          AND jo.department_name IS NOT NULL ${appJoWhere}
+        GROUP BY jo.department_name ORDER BY avg_days ASC
+      `, params),
+
+      // 11. Monthly hires trend (last 12 months)
+      query(`
+        SELECT to_char(date_trunc('month', a.status_changed_date), 'YYYY-MM') AS month,
+          COUNT(*) AS hires
+        FROM ${appJoin}
+        WHERE a.pipeline_status = 'hired'
+          AND a.status_changed_date >= NOW() - INTERVAL '12 months' ${appJoWhere}
+        GROUP BY month ORDER BY month
+      `, params),
+
+      // 12. Monthly applications trend (last 12 months)
+      query(`
+        SELECT to_char(date_trunc('month', a.applied_date), 'YYYY-MM') AS month,
+          COUNT(*) AS applications
+        FROM ${appJoin}
+        WHERE a.applied_date >= NOW() - INTERVAL '12 months' ${appJoWhere}
+        GROUP BY month ORDER BY month
+      `, params),
+
+      // 13. Interview volume by month
+      query(`
+        SELECT to_char(date_trunc('month', hi.interview_date), 'YYYY-MM') AS month,
+          'hr' AS type, COUNT(*) AS count
+        FROM hr_interviews hi
+          JOIN ${appJoin} ON hi.application_id = a.id
+        WHERE hi.interview_date IS NOT NULL ${appJoWhere}
+        GROUP BY month
+        UNION ALL
+        SELECT to_char(date_trunc('month', ti.interview_date), 'YYYY-MM') AS month,
+          'tech' AS type, COUNT(*) AS count
+        FROM tech_interviews ti
+          JOIN ${appJoin} ON ti.application_id = a.id
+        WHERE ti.interview_date IS NOT NULL ${appJoWhere}
+        GROUP BY month
+        ORDER BY month
+      `, params),
+
+      // 14. HR interview verdict distribution
+      query(`
+        SELECT hi.verdict, COUNT(*) AS count
+        FROM hr_interviews hi
+          JOIN ${appJoin} ON hi.application_id = a.id
+        WHERE hi.verdict IS NOT NULL ${appJoWhere}
+        GROUP BY hi.verdict
+      `, params),
+
+      // 15. Tech interview verdict distribution
+      query(`
+        SELECT ti.verdict, COUNT(*) AS count
+        FROM tech_interviews ti
+          JOIN ${appJoin} ON ti.application_id = a.id
+        WHERE ti.verdict IS NOT NULL ${appJoWhere}
+        GROUP BY ti.verdict
+      `, params),
+
+      // 16. Offer stats
+      query(`
+        SELECT o.status, COUNT(*) AS count
+        FROM offers o
+          JOIN ${appJoin} ON o.application_id = a.id
+        WHERE 1=1 ${appJoWhere}
+        GROUP BY o.status
+      `, params),
+
+      // 17. Fill rate per JO
+      query(`
+        SELECT jo.id, jo.title, jo.department_name AS department, jo.level,
+          jo.quantity, jo.hired_count, jo.status AS jo_status,
+          ROUND(jo.hired_count::numeric / NULLIF(jo.quantity, 0) * 100) AS fill_pct,
+          EXTRACT(EPOCH FROM (NOW() - jo.created_at)) / 86400 AS days_open
+        FROM job_orders jo
+        WHERE 1=1 ${joWhere}
+        ORDER BY fill_pct DESC NULLS LAST
+      `, params),
+
+      // 18. Score distribution (buckets)
+      query(`
+        SELECT
+          CASE
+            WHEN c.qualification_score >= 90 THEN '90-100'
+            WHEN c.qualification_score >= 80 THEN '80-89'
+            WHEN c.qualification_score >= 70 THEN '70-79'
+            WHEN c.qualification_score >= 60 THEN '60-69'
+            WHEN c.qualification_score >= 50 THEN '50-59'
+            ELSE 'Below 50'
+          END AS bucket,
+          COUNT(*) AS count
+        FROM ${appJoin}
+          JOIN candidates c ON a.candidate_id = c.id
+        WHERE c.qualification_score IS NOT NULL ${appJoWhere}
+        GROUP BY bucket ORDER BY bucket
+      `, params),
+
+      // 19. Work setup distribution
+      query(`
+        SELECT c.preferred_work_setup AS setup, COUNT(*) AS count
+        FROM ${appJoin}
+          JOIN candidates c ON a.candidate_id = c.id
+        WHERE c.preferred_work_setup IS NOT NULL ${appJoWhere}
+        GROUP BY c.preferred_work_setup
+      `, params),
+    ]);
+
+    res.json({
+      kpis: kpiRows[0] || {},
+      pipeline: pipelineRows,
+      byDepartment: deptRows,
+      byLevel: levelRows,
+      bySource: sourceRows,
+      funnel: funnelRows[0] || {},
+      aging: agingRows,
+      timeToFill: timeToFillRows,
+      avgStageDuration: avgStageRows,
+      deptTurnaround: deptTurnaroundRows,
+      monthlyHires: monthlyHiresRows,
+      monthlyApplications: monthlyAppsRows,
+      interviewVolume: interviewVolumeRows,
+      hrVerdicts: hrVerdictRows,
+      techVerdicts: techVerdictRows,
+      offers: offerRows,
+      fillRate: fillRateRows,
+      scoreDistribution: scoreDistRows,
+      workSetup: workSetupRows,
+    });
+  } catch (error) {
+    console.error('Analytics error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // =====================================================
 // HELPER: Get candidate with full details

@@ -136,6 +136,9 @@ export interface Candidate {
   positionsFitFor?: string[];
   education?: Array<{ degree: string; institution: string; year?: string }>;
   certifications?: Array<{ name: string; issuer?: string; year?: string }>;
+  workSetupPreference?: 'on-site' | 'hybrid' | 'remote' | 'flexible';
+  employmentStatusPreference?: 'regular' | 'contractual' | 'freelance' | 'part-time';
+  relocationWillingness?: 'yes' | 'no' | 'maybe' | 'na';
 }
 
 export interface JobOrder {

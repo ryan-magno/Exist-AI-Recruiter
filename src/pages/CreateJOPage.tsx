@@ -33,7 +33,7 @@ export default function CreateJOPage() {
     title: "",
     description: "",
     level: "" as Level | "",
-    quantity: 1,
+    quantity: 1 as number | '',
     requiredDate: "",
     department: "",
     employmentType: "" as EmploymentType | "",
@@ -71,7 +71,7 @@ export default function CreateJOPage() {
         title: formData.title,
         description: formData.description,
         level: formData.level as JobOrderInsert['level'],
-        quantity: formData.quantity,
+        quantity: Number(formData.quantity) || 1,
         required_date: formData.requiredDate || null,
         status: "open",
         department_name: formData.department,
@@ -261,8 +261,16 @@ export default function CreateJOPage() {
                 <Input
                   type="number"
                   min={1}
+                  step={1}
                   value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                  onKeyDown={(e) => { if (['.', 'e', 'E', '-', '+'].includes(e.key)) e.preventDefault(); }}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') { setFormData({ ...formData, quantity: '' }); return; }
+                    const parsed = parseInt(raw, 10);
+                    if (!isNaN(parsed) && parsed >= 0) setFormData({ ...formData, quantity: parsed });
+                  }}
+                  onBlur={() => { if (formData.quantity === '' || formData.quantity < 1) setFormData({ ...formData, quantity: 1 }); }}
                 />
               </div>
             </div>

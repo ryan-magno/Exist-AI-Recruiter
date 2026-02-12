@@ -28,7 +28,7 @@ export function EditJobOrderModal({ jobOrder, open, onClose, onSave }: EditJobOr
     title: '',
     description: '',
     level: '' as Level | '',
-    quantity: 1,
+    quantity: 1 as number | '',
     requiredDate: '',
     department: '',
     employmentType: '' as EmploymentType | '',
@@ -75,7 +75,7 @@ export function EditJobOrderModal({ jobOrder, open, onClose, onSave }: EditJobOr
       title: formData.title,
       description: formData.description,
       level: formData.level as Level,
-      quantity: formData.quantity,
+      quantity: Number(formData.quantity) || 1,
       requiredDate: formData.requiredDate,
       department: formData.department,
       employmentType: formData.employmentType as EmploymentType,
@@ -218,8 +218,16 @@ export function EditJobOrderModal({ jobOrder, open, onClose, onSave }: EditJobOr
               <Input
                 type="number"
                 min={1}
+                step={1}
                 value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                onKeyDown={(e) => { if (['.', 'e', 'E', '-', '+'].includes(e.key)) e.preventDefault(); }}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') { setFormData({ ...formData, quantity: '' }); return; }
+                  const parsed = parseInt(raw, 10);
+                  if (!isNaN(parsed) && parsed >= 0) setFormData({ ...formData, quantity: parsed });
+                }}
+                onBlur={() => { if (formData.quantity === '' || formData.quantity < 1) setFormData({ ...formData, quantity: 1 }); }}
               />
             </div>
           </div>

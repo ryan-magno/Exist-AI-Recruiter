@@ -6,6 +6,13 @@ import { azureDb } from '@/lib/azureDb';
 import { logActivity } from '@/lib/activityLogger';
 import { toast } from 'sonner';
 
+// Helper function to parse years from text like "1 year of experience" or "2.5 years"
+function parseExperienceYears(text: string | null | undefined): number {
+  if (!text) return 0;
+  const match = text.match(/(\d+\.?\d*)/);
+  return match ? parseFloat(match[1]) : 0;
+}
+
 // Legacy types for compatibility
 import { 
   Candidate as LegacyCandidate, 
@@ -49,9 +56,13 @@ async function ensureDbInit() {
   // Prevent concurrent init calls from racing — share a single in-flight promise
   if (!dbInitPromise) {
     dbInitPromise = azureDb.init()
-      .then(() => { dbInitialized = true; })
+      .then(() => { 
+        dbInitialized = true;
+        console.log('✅ Database initialized with migrations');
+      })
       .catch((err) => {
         dbInitPromise = null; // Allow retry on next call
+        console.error('❌ Database initialization failed:', err);
         throw err;
       });
   }
@@ -102,9 +113,9 @@ async function fetchLegacyCandidates(): Promise<LegacyCandidate[]> {
       statusChangedDate: app.status_changed_date?.split('T')[0] || new Date().toISOString().split('T')[0],
       techInterviewResult: dbTechResultToLegacy[app.tech_interview_result] || 'pending',
       skills: app.skills || candidate.skills || [],
-      experience: `${app.years_of_experience || candidate.years_of_experience || 0} years`,
+      experience: candidate.years_of_experience_text || '0 years',
       experienceDetails: {
-        totalYears: app.years_of_experience || candidate.years_of_experience || 0,
+        totalYears: parseExperienceYears(candidate.years_of_experience_text),
         breakdown: candidate.years_of_experience_text || ''
       },
       matchReasons: [],
@@ -145,6 +156,9 @@ async function fetchLegacyCandidates(): Promise<LegacyCandidate[]> {
       batchId: candidate.batch_id || undefined,
       batchCreatedAt: candidate.batch_created_at || undefined,
       positionsFitFor: candidate.positions_fit_for || [],
+      workSetupPreference: candidate.preferred_work_setup || undefined,
+      employmentStatusPreference: candidate.employment_status_preference || undefined,
+      relocationWillingness: candidate.relocation_willingness || undefined,
     };
   });
 }
@@ -299,7 +313,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     if (candidate.applicationId) {
       try {
-        await updateApplicationStatusMutation.mutateAsync({
+        const updateResult = await updateApplicationStatusMutation.mutateAsync({
           id: candidate.applicationId,
           status: dbStatus,
           previousStatus: previousDbStatus
@@ -321,7 +335,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         logActivity({
           activityType: 'pipeline_moved', entityType: 'application', entityId: candidate.applicationId,
-          details: { candidate_id: candidateId, candidate_name: candidate.name, from_status: previousStatus, to_status: status, verdict, verdict_source: verdictSource }
+          details: { candidate_id: candidateId, candidate_name: candidate.name, from_status: previousStatus, to_status: status, verdict, verdict_source: verdictSource, duration_days: (updateResult as any)?._duration_days ?? null }
         });
       } catch (error) {
         console.error('Error updating application status:', error);
