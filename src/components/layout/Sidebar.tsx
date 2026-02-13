@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Upload, Briefcase, FilePlus, Archive, Users, BarChart3, Bot, History } from 'lucide-react';
+import { Upload, Briefcase, FilePlus, Archive, Users, BarChart3, Bot, History, Droplets, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import existLogo from '@/assets/exist-logo.png';
 
@@ -10,6 +10,8 @@ const navItems = [
   { path: '/create-jo', label: 'Create JO', icon: FilePlus },
   { path: '/upload', label: 'Upload CV', icon: Upload },
   { path: '/archive', label: 'Archive', icon: Archive },
+  { path: '/talent-pool', label: 'Talent Pool', icon: Droplets },
+  { path: '/pooled-job-orders', label: 'Pooled JOs', icon: FolderOpen },
   { path: '/history', label: 'History', icon: History },
   { path: '/chatbot', label: 'AI Assistant', icon: Bot },
 ];

@@ -45,6 +45,7 @@ const dbPipelineToLegacy: Record<string, LegacyPipelineStatus> = {
   'hired': 'hired',
   'rejected': 'rejected',
   'withdrawn': 'rejected',
+  'pooled': 'pooled',
 };
 
 // Module-level flag to ensure azureDb.init() runs only once
@@ -96,7 +97,9 @@ async function fetchLegacyCandidates(): Promise<LegacyCandidate[]> {
     // Offers fetch failed, continue without
   }
 
-  return applicationsData.map((app: any) => {
+  return applicationsData
+    .filter((app: any) => app.pipeline_status !== 'pooled')
+    .map((app: any) => {
     const candidate = candidateMap.get(app.candidate_id) || {};
     
     let expectedSalary = candidate.expected_salary || '';
@@ -128,7 +131,7 @@ async function fetchLegacyCandidates(): Promise<LegacyCandidate[]> {
       remarks: app.remarks || '',
       techNotes: '',
       employmentType: 'full_time' as const,
-      positionApplied: app.job_title || (candidate.positions_fit_for?.[0]) || 'Not specified',
+      positionApplied: candidate.position_applied || app.job_title || 'Not specified',
       expectedSalary: expectedSalary,
       earliestStartDate: candidate.earliest_start_date || '',
       currentPosition: candidate.current_position || '',
@@ -156,6 +159,7 @@ async function fetchLegacyCandidates(): Promise<LegacyCandidate[]> {
       batchId: candidate.batch_id || undefined,
       batchCreatedAt: candidate.batch_created_at || undefined,
       positionsFitFor: candidate.positions_fit_for || [],
+      positionAppliedRaw: candidate.position_applied || undefined,
       workSetupPreference: candidate.preferred_work_setup || undefined,
       employmentStatusPreference: candidate.employment_status_preference || undefined,
       relocationWillingness: candidate.relocation_willingness || undefined,

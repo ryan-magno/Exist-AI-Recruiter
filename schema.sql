@@ -4,6 +4,7 @@
 
 -- Drop existing objects if they exist (safe re-run)
 DROP TABLE IF EXISTS activity_log CASCADE;
+DROP TABLE IF EXISTS pooled_candidates CASCADE;
 DROP TABLE IF EXISTS candidate_timeline CASCADE;
 DROP TABLE IF EXISTS offers CASCADE;
 DROP TABLE IF EXISTS tech_interviews CASCADE;
@@ -33,7 +34,7 @@ CREATE TYPE interview_verdict_enum AS ENUM ('pass', 'fail', 'conditional', 'pend
 CREATE TYPE job_level_enum AS ENUM ('L1', 'L2', 'L3', 'L4', 'L5');
 CREATE TYPE job_status_enum AS ENUM ('open', 'closed', 'on_hold', 'pooling', 'archived');
 CREATE TYPE offer_status_enum AS ENUM ('pending', 'accepted', 'rejected', 'withdrawn', 'expired');
-CREATE TYPE pipeline_status_enum AS ENUM ('hr_interview', 'tech_interview', 'offer', 'hired', 'rejected');
+CREATE TYPE pipeline_status_enum AS ENUM ('hr_interview', 'tech_interview', 'offer', 'hired', 'rejected', 'pooled');
 
 -- 2. CREATE TABLES
 CREATE TABLE activity_log (
@@ -70,7 +71,8 @@ CREATE TABLE candidates (
   phone text,
   applicant_type applicant_type_enum,
   skills text[],
-  positions_fit_for text[],
+  positions_fit_for jsonb,
+  position_applied text,
   years_of_experience_text text,
   current_position text,
   current_company text,
@@ -208,6 +210,32 @@ CREATE TABLE candidate_timeline (
   FOREIGN KEY (candidate_id) REFERENCES candidates(id) ON DELETE CASCADE
 );
 
+CREATE TABLE pooled_candidates (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  candidate_id uuid NOT NULL,
+  original_application_id uuid NOT NULL,
+  original_job_order_id uuid NOT NULL,
+  pooled_from_status pipeline_status_enum NOT NULL,
+  pool_reason text,
+  pool_notes text,
+  pooled_by text,
+  pooled_at timestamp with time zone NOT NULL DEFAULT now(),
+  disposition text DEFAULT 'available',
+  disposition_changed_at timestamp with time zone,
+  disposition_notes text,
+  new_application_id uuid,
+  new_job_order_id uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  PRIMARY KEY (id),
+  UNIQUE (original_application_id),
+  FOREIGN KEY (candidate_id) REFERENCES candidates(id) ON DELETE CASCADE,
+  FOREIGN KEY (original_application_id) REFERENCES candidate_job_applications(id) ON DELETE CASCADE,
+  FOREIGN KEY (original_job_order_id) REFERENCES job_orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (new_application_id) REFERENCES candidate_job_applications(id) ON DELETE SET NULL,
+  FOREIGN KEY (new_job_order_id) REFERENCES job_orders(id) ON DELETE SET NULL
+);
+
 CREATE TABLE hr_interviews (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   application_id uuid NOT NULL,
@@ -299,6 +327,11 @@ CREATE INDEX idx_job_orders_department_id ON job_orders (department_id);
 CREATE INDEX idx_job_orders_status ON job_orders (status);
 CREATE INDEX idx_offers_application_id ON offers (application_id);
 CREATE INDEX idx_offers_status ON offers (status);
+CREATE INDEX idx_pooled_candidate_id ON pooled_candidates (candidate_id);
+CREATE INDEX idx_pooled_original_application ON pooled_candidates (original_application_id);
+CREATE INDEX idx_pooled_original_jo ON pooled_candidates (original_job_order_id);
+CREATE INDEX idx_pooled_disposition ON pooled_candidates (disposition);
+CREATE INDEX idx_pooled_pooled_at ON pooled_candidates (pooled_at DESC);
 CREATE INDEX idx_tech_interviews_application_id ON tech_interviews (application_id);
 
 -- 4. CREATE TRIGGER FUNCTION
@@ -340,5 +373,10 @@ CREATE TRIGGER update_offers_updated_at
 
 CREATE TRIGGER update_tech_interviews_updated_at
   BEFORE UPDATE ON tech_interviews
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_pooled_candidates_updated_at
+  BEFORE UPDATE ON pooled_candidates
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();

@@ -129,6 +129,33 @@ export const azureDb = {
     create: (data: any) => apiCall<any>('/activity-log', { method: 'POST', body: JSON.stringify(data) }),
   },
 
+  // Pooled Candidates (Talent Pool)
+  pooledCandidates: {
+    list: (params?: { disposition?: string; job_order_id?: string; search?: string }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.disposition) searchParams.set('disposition', params.disposition);
+      if (params?.job_order_id) searchParams.set('job_order_id', params.job_order_id);
+      if (params?.search) searchParams.set('search', params.search);
+      const q = searchParams.toString();
+      return apiCall<any[]>(`/pooled-candidates${q ? `?${q}` : ''}`);
+    },
+    pool: (applicationId: string, data: { pool_reason?: string; pool_notes?: string; pooled_by?: string }) =>
+      apiCall<any>(`/applications/${applicationId}/pool`, { method: 'POST', body: JSON.stringify(data) }),
+    activate: (pooledId: string, data: { target_job_order_id: string; target_pipeline_status?: string }) =>
+      apiCall<any>(`/pooled-candidates/${pooledId}/activate`, { method: 'POST', body: JSON.stringify(data) }),
+    updateDisposition: (pooledId: string, data: { disposition: string; disposition_notes?: string }) =>
+      apiCall<any>(`/pooled-candidates/${pooledId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    bulkAction: (data: { ids: string[]; disposition: string; disposition_notes?: string }) =>
+      apiCall<any>('/pooled-candidates/bulk-action', { method: 'POST', body: JSON.stringify(data) }),
+  },
+
+  // Pooled Job Orders
+  pooledJobOrders: {
+    list: () => apiCall<any[]>('/job-orders/pooled'),
+    updateStatus: (id: string, status: string) =>
+      apiCall<any>(`/job-orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  },
+
   // Analytics
   analytics: {
     get: (params?: { department?: string; level?: string; start_date?: string; end_date?: string }) => {

@@ -1,8 +1,9 @@
 import { useState, useMemo, Fragment } from 'react';
-import { Mail, Phone, Briefcase, ChevronDown, ChevronUp, Clock, XCircle, Trash2 } from 'lucide-react';
+import { Mail, Phone, Briefcase, ChevronDown, ChevronUp, Clock, XCircle, Trash2, Droplets } from 'lucide-react';
 import { Candidate, PipelineStatus, pipelineStatusLabels } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
 import { EmailModal } from '@/components/modals/EmailModal';
+import { PoolCandidateModal } from '@/components/modals/PoolCandidateModal';
 import { CandidateTimeline } from '@/components/dashboard/CandidateTimeline';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -77,6 +78,7 @@ export function DashboardTableView({ candidates, onSelectCandidate }: DashboardT
   const { deleteCandidate, updateCandidatePipelineStatus } = useApp();
   const [emailCandidate, setEmailCandidate] = useState<Candidate | null>(null);
   const [rejectCandidate, setRejectCandidate] = useState<Candidate | null>(null);
+  const [poolCandidate, setPoolCandidate] = useState<Candidate | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [timelineCandidateId, setTimelineCandidateId] = useState<string | null>(null);
 
@@ -144,12 +146,12 @@ export function DashboardTableView({ candidates, onSelectCandidate }: DashboardT
                       <thead>
                         <tr className="bg-muted/40 border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                           <th className="px-2 py-2 w-11 text-center">Score</th>
-                          <th className="px-2 py-2 w-[28%]">Candidate</th>
-                          <th className="px-2 py-2 w-[24%]">Experience</th>
-                          <th className="px-2 py-2 w-[10%] text-center">Salary</th>
-                          <th className="px-2 py-2 w-[10%] text-center">Start</th>
-                          <th className="px-2 py-2 w-[10%] text-center">Aging</th>
-                          <th className="px-2 py-2 w-[100px] text-center">Actions</th>
+                          <th className="px-2 py-2 w-[22%]">Candidate</th>
+                          <th className="px-2 py-2 w-[15%]">Experience</th>
+                          <th className="px-2 py-2 w-[14%] text-center">Salary</th>
+                          <th className="px-2 py-2 w-[14%] text-center">Start</th>
+                          <th className="px-2 py-2 w-[14%] text-center">Aging</th>
+                          <th className="px-2 py-2 w-[130px] text-center">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
@@ -262,6 +264,15 @@ export function DashboardTableView({ candidates, onSelectCandidate }: DashboardT
                                     </button>
                                     {candidate.pipelineStatus !== 'rejected' && candidate.pipelineStatus !== 'hired' && (
                                       <button
+                                        title="Move to Pool"
+                                        className="p-1 rounded-full hover:bg-amber-50 transition-colors text-amber-400 hover:text-amber-600"
+                                        onClick={() => setPoolCandidate(candidate)}
+                                      >
+                                        <Droplets className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                    {candidate.pipelineStatus !== 'rejected' && candidate.pipelineStatus !== 'hired' && (
+                                      <button
                                         title="Reject"
                                         className="p-1 rounded-full hover:bg-red-50 transition-colors text-red-400 hover:text-red-600"
                                         onClick={() => setRejectCandidate(candidate)}
@@ -318,6 +329,17 @@ export function DashboardTableView({ candidates, onSelectCandidate }: DashboardT
 
       {/* Email Modal */}
       <EmailModal open={!!emailCandidate} onClose={() => setEmailCandidate(null)} candidate={emailCandidate} />
+
+      {/* Pool Candidate Modal */}
+      {poolCandidate?.applicationId && (
+        <PoolCandidateModal
+          applicationId={poolCandidate.applicationId}
+          candidateName={poolCandidate.name}
+          joTitle={poolCandidate.positionApplied}
+          open={!!poolCandidate}
+          onOpenChange={(open) => { if (!open) setPoolCandidate(null); }}
+        />
+      )}
 
       {/* Reject Dialog */}
       <AlertDialog open={!!rejectCandidate} onOpenChange={(open) => { if (!open) setRejectCandidate(null); }}>

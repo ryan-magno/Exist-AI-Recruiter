@@ -528,13 +528,29 @@ function ProfileTab({ candidate, fullData }: { candidate: Candidate; fullData: a
         <section className="mb-6">
           <div className="flex items-center gap-1.5 mb-2">
             <Target className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">Qualified For</h3>
+            <h3 className="text-sm font-semibold text-foreground">AI Recommended Positions</h3>
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="space-y-2">
             {candidate.positionsFitFor.map((pos, i) => (
-              <span key={i} className="px-2.5 py-1 bg-card rounded-md border text-xs font-medium text-foreground">
-                {pos}
-              </span>
+              <div key={i} className="flex items-center justify-between p-2.5 bg-card rounded-md border">
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-medium text-foreground">
+                    {typeof pos === 'string' ? pos : `${pos.jo_number} - ${pos.job_title}`}
+                  </span>
+                  {typeof pos !== 'string' && pos.match_reasoning && (
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{pos.match_reasoning}</p>
+                  )}
+                </div>
+                {typeof pos !== 'string' && pos.match_score != null && (
+                  <span className={`ml-2 shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    pos.match_score >= 80 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                    pos.match_score >= 60 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                    'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                  }`}>
+                    {pos.match_score}% match
+                  </span>
+                )}
+              </div>
             ))}
           </div>
         </section>

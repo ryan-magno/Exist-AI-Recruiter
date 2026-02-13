@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Calendar, Briefcase, Edit, XCircle, Sparkles, RefreshCw, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Building, Clock, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApp } from '@/context/AppContext';
+import { useUpdateJobOrderStatus } from '@/hooks/usePooledJobOrders';
 import { JobOrder, joStatusLabels, levelLabels, employmentTypeLabels } from '@/data/mockData';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -27,6 +29,7 @@ interface JobOrderDetailProps {
 export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
   const navigate = useNavigate();
   const { updateJobOrderStatus, updateJobOrder, isFindingMatches, setIsFindingMatches, setSelectedJoId, markJoAsFulfilled } = useApp();
+  const joStatusMutation = useUpdateJobOrderStatus();
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [showFulfilledDialog, setShowFulfilledDialog] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -95,16 +98,38 @@ export function JobOrderDetail({ jobOrder, matchCount }: JobOrderDetailProps) {
               <span className="text-sm font-medium text-muted-foreground">
                 {jobOrder.joNumber}
               </span>
-              <span className={cn(
-                'px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide border',
-                jobOrder.status === 'open' && 'bg-sky-100 text-sky-700 border-sky-300',
-                jobOrder.status === 'pooling' && 'bg-emerald-100 text-emerald-700 border-emerald-300',
-                jobOrder.status === 'on_hold' && 'bg-amber-100 text-amber-600 border-amber-300',
-                jobOrder.status === 'archived' && 'bg-slate-100 text-slate-600 border-slate-300',
-                jobOrder.status === 'closed' && 'bg-slate-100 text-slate-500 border-slate-300'
-              )}>
-                {joStatusLabels[jobOrder.status]}
-              </span>
+              <Select
+                value={jobOrder.status}
+                onValueChange={async (val) => {
+                  try {
+                    await joStatusMutation.mutateAsync({ id: jobOrder.id, status: val });
+                    updateJobOrderStatus(jobOrder.id, val as any);
+                    toast.success(`Status changed to ${joStatusLabels[val as keyof typeof joStatusLabels] || val}`);
+                  } catch (err: any) {
+                    toast.error(err.message || 'Failed to change status');
+                  }
+                }}
+              >
+                <SelectTrigger className="h-6 w-auto border-0 bg-transparent px-0 gap-1 text-[10px] font-semibold uppercase tracking-wide [&>svg]:w-3 [&>svg]:h-3">
+                  <span className={cn(
+                    'px-2 py-0.5 rounded-full border',
+                    jobOrder.status === 'open' && 'bg-sky-100 text-sky-700 border-sky-300',
+                    jobOrder.status === 'pooling' && 'bg-emerald-100 text-emerald-700 border-emerald-300',
+                    jobOrder.status === 'on_hold' && 'bg-amber-100 text-amber-600 border-amber-300',
+                    jobOrder.status === 'archived' && 'bg-slate-100 text-slate-600 border-slate-300',
+                    jobOrder.status === 'closed' && 'bg-slate-100 text-slate-500 border-slate-300'
+                  )}>
+                    {joStatusLabels[jobOrder.status]}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="pooling">Pooling</SelectItem>
+                  <SelectItem value="on_hold">On Hold</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
               <span className="text-sm font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
                 {jobOrder.hiredCount}/{jobOrder.quantity} Filled
               </span>

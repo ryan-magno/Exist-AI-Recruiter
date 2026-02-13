@@ -1,4 +1,4 @@
-export type PipelineStatus = 'hr_interview' | 'tech_interview' | 'offer' | 'hired' | 'rejected';
+export type PipelineStatus = 'hr_interview' | 'tech_interview' | 'offer' | 'hired' | 'rejected' | 'pooled';
 export type TechInterviewResult = 'pending' | 'pass' | 'fail' | 'conditional';
 export type EmploymentType = 'full_time' | 'part_time' | 'contract';
 export type Level = 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
@@ -133,7 +133,7 @@ export interface Candidate {
   preferredEmploymentType?: string;
   batchId?: string;
   batchCreatedAt?: string;
-  positionsFitFor?: string[];
+  positionsFitFor?: Array<{ jo_number: string; job_title: string; match_score: number; match_reasoning: string }>;
   education?: Array<{ degree: string; institution: string; year?: string }>;
   certifications?: Array<{ name: string; issuer?: string; year?: string }>;
   workSetupPreference?: 'on-site' | 'hybrid' | 'remote' | 'flexible';
@@ -189,7 +189,8 @@ export const pipelineStatusLabels: Record<PipelineStatus, string> = {
   'tech_interview': 'For Tech Interview',
   'offer': 'Offer',
   'hired': 'Hired',
-  'rejected': 'Rejected'
+  'rejected': 'Rejected',
+  'pooled': 'Pooled'
 };
 
 export const pipelineStatusColors: Record<PipelineStatus, string> = {
@@ -197,7 +198,8 @@ export const pipelineStatusColors: Record<PipelineStatus, string> = {
   'tech_interview': 'bg-violet-100 text-violet-700 border-violet-300',
   'offer': 'bg-emerald-100 text-emerald-700 border-emerald-300',
   'hired': 'bg-green-100 text-green-700 border-green-300',
-  'rejected': 'bg-red-100 text-red-700 border-red-300'
+  'rejected': 'bg-red-100 text-red-700 border-red-300',
+  'pooled': 'bg-amber-100 text-amber-700 border-amber-300'
 };
 
 export const joStatusLabels: Record<JobOrder['status'], string> = {

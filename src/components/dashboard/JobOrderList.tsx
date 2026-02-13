@@ -127,7 +127,7 @@ export function JobOrderList({ jobOrders }: JobOrderListProps) {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-auto">
+    <div className="flex flex-col">
       <div className="p-3 space-y-2">
         {jobOrders.map((jo, index) => {
           const agingDays = getAgingDays(jo.createdDate);

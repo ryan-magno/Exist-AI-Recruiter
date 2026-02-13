@@ -11,6 +11,8 @@ import CandidatesPage from "./pages/CandidatesPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import ChatbotPage from "./pages/ChatbotPage";
 import HistoryPage from "./pages/HistoryPage";
+import TalentPoolPage from "./pages/TalentPoolPage";
+import PooledJobOrdersPage from "./pages/PooledJobOrdersPage";
 import NotFound from "./pages/NotFound";
 
 // Reset scroll position on route change so navigating to a new page
@@ -40,6 +42,8 @@ const App = () => (
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/chatbot" element={<ChatbotPage />} />
           <Route path="/history" element={<HistoryPage />} />
+          <Route path="/talent-pool" element={<TalentPoolPage />} />
+          <Route path="/pooled-job-orders" element={<PooledJobOrdersPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AppLayout>

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { azureDb } from '@/lib/azureDb';
 
-export type PipelineStatus = 'hr_interview' | 'tech_interview' | 'offer' | 'hired' | 'rejected';
+export type PipelineStatus = 'hr_interview' | 'tech_interview' | 'offer' | 'hired' | 'rejected' | 'pooled';
 export type TechInterviewResult = 'pending' | 'pass' | 'fail' | 'conditional';
 
 export interface Application {

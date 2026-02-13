@@ -13,7 +13,8 @@ export interface Candidate {
   phone: string | null;
   applicant_type: 'internal' | 'external';
   skills: string[] | null;
-  positions_fit_for: string[] | null;
+  positions_fit_for: Array<{ jo_number: string; job_title: string; match_score: number; match_reasoning: string }> | null;
+  position_applied: string | null;
   years_of_experience_text: string | null;
   preferred_work_setup: string | null;
   preferred_employment_type: string | null;

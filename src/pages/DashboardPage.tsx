@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Users, Search, X, Filter, Building, Clock, LayoutGrid, List } from 'lucide-react';
+import { FileText, Users, Search, X, Filter, Building, Clock, LayoutGrid, List, Droplets, PauseCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useApp } from '@/context/AppContext';
@@ -33,6 +33,11 @@ export default function DashboardPage() {
   // Filter state for job orders
   const [joDepartmentFilter, setJoDepartmentFilter] = useState<string>('all');
   const [joAgingFilter, setJoAgingFilter] = useState<string>('all');
+
+  // Collapsible section state
+  const [openExpanded, setOpenExpanded] = useState(true);
+  const [onHoldExpanded, setOnHoldExpanded] = useState(true);
+  const [poolingExpanded, setPoolingExpanded] = useState(true);
 
   // Close candidate profile when a different JO is selected
   useEffect(() => {
@@ -83,6 +88,11 @@ export default function DashboardPage() {
       })
       .sort((a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime());
   }, [jobOrders, joDepartmentFilter, joAgingFilter]);
+
+  // Split JOs by status sections
+  const openJobOrders = useMemo(() => activeJobOrders.filter(jo => jo.status === 'open'), [activeJobOrders]);
+  const onHoldJobOrders = useMemo(() => activeJobOrders.filter(jo => jo.status === 'on_hold'), [activeJobOrders]);
+  const poolingJobOrders = useMemo(() => activeJobOrders.filter(jo => jo.status === 'pooling'), [activeJobOrders]);
 
   // Filter candidates
   const filteredMatches = useMemo(() => {
@@ -135,7 +145,7 @@ export default function DashboardPage() {
           <div>
             <h2 className="text-lg font-semibold text-foreground">Job Orders</h2>
             <p className="text-xs text-muted-foreground">
-              {activeJobOrders.length} active
+              {openJobOrders.length} open · {onHoldJobOrders.length} hold · {poolingJobOrders.length} pooling
             </p>
           </div>
         </div>
@@ -181,8 +191,59 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="flex-1 overflow-hidden">
-          <JobOrderList jobOrders={activeJobOrders} />
+        <div className="flex-1 overflow-auto">
+          {/* Open JOs */}
+          <button
+            onClick={() => setOpenExpanded(!openExpanded)}
+            className="w-full px-3 pt-3 pb-1 flex items-center justify-between hover:bg-muted/30 transition-colors"
+          >
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold text-emerald-600">
+              <FileText className="w-3 h-3" />
+              Open ({openJobOrders.length})
+            </div>
+            {openExpanded ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
+          </button>
+          {openExpanded && (
+            openJobOrders.length > 0 ? (
+              <JobOrderList jobOrders={openJobOrders} />
+            ) : (
+              <p className="px-3 pb-2 text-xs text-muted-foreground">No open job orders</p>
+            )
+          )}
+
+          {/* On Hold JOs */}
+          {onHoldJobOrders.length > 0 && (
+            <>
+              <button
+                onClick={() => setOnHoldExpanded(!onHoldExpanded)}
+                className="w-full px-3 pt-2 pb-1 border-t border-border mt-1 flex items-center justify-between hover:bg-muted/30 transition-colors"
+              >
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold text-blue-600">
+                  <PauseCircle className="w-3 h-3" />
+                  On Hold ({onHoldJobOrders.length})
+                </div>
+                {onHoldExpanded ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
+              </button>
+              {onHoldExpanded && <JobOrderList jobOrders={onHoldJobOrders} />}
+            </>
+          )}
+
+          {/* Pooling JOs */}
+          {poolingJobOrders.length > 0 && (
+            <>
+              <button
+                onClick={() => setPoolingExpanded(!poolingExpanded)}
+                className="w-full px-3 pt-2 pb-1 border-t border-border mt-1 flex items-center justify-between hover:bg-muted/30 transition-colors"
+              >
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold text-amber-600">
+                  <Droplets className="w-3 h-3" />
+                  Pooling ({poolingJobOrders.length})
+                </div>
+                {poolingExpanded ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
+              </button>
+              {poolingExpanded && <JobOrderList jobOrders={poolingJobOrders} />}
+            </>
+          )}
         </div>
       </div>
 
