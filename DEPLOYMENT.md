@@ -10,9 +10,9 @@
 1. [Architecture Overview](#architecture-overview)
 2. [Prerequisites](#prerequisites)
 3. [Security Warning](#security-warning)
-4. [Quick Start](#quick-start)
-5. [Environment Variables Reference](#environment-variables-reference)
-6. [Using an External Database](#using-an-external-database)
+4. [Database Setup](#database-setup)
+5. [Quick Start](#quick-start)
+6. [Environment Variables Reference](#environment-variables-reference)
 7. [Multi-User & Concurrency](#multi-user--concurrency)
 8. [Files Included in Docker Images](#files-included-in-docker-images)
 9. [Updating the Application](#updating-the-application)
@@ -76,9 +76,10 @@
 
 **Before you begin, you need:**
 
-1. A strong database password to replace the default in `.env`
-2. If using CV upload features: a **publicly reachable URL** for `WEBHOOK_CALLBACK_URL` so n8n can POST processed results back to the backend (e.g., `https://recruiter.yourcompany.com/webhook-callback`)
-3. The n8n webhook URLs are **already pre-configured** pointing to `workflow.exist.com.ph` — no action needed unless your n8n instance is hosted elsewhere
+1. **Database credentials** for the pre-configured PostgreSQL database (host, username, password, database name)
+2. A strong password if you're setting up authentication (the app has NO built-in auth)
+3. If using CV upload features: a **publicly reachable URL** for `WEBHOOK_CALLBACK_URL` so n8n can POST processed results back to the backend (e.g., `https://recruiter.yourcompany.com/webhook-callback`)
+4. The n8n webhook URLs are **already pre-configured** pointing to `workflow.exist.com.ph` — no action needed unless your n8n instance is hosted elsewhere
 
 ---
 
@@ -91,7 +92,54 @@
 - Place the application behind a **VPN**, **OAuth2 proxy** (e.g., oauth2-proxy), or **network-level access control**
 - Alternatively, use **Azure App Service Authentication**, **Cloudflare Access**, or a similar identity-aware proxy
 - At minimum, restrict access via firewall rules to trusted IP ranges
-- Change the default database password in `.env`
+- Ensure the database password is strong and follows your organization's security policies
+
+---
+
+## Database Setup
+
+The application connects to an **external PostgreSQL database** managed by your organization. The database should already be provisioned and accessible.
+
+### Database Requirements
+
+| Requirement | Minimum | Recommended |
+|-------------|---------|-------------|
+| PostgreSQL version | 12+ | 14+ or 16+ |
+| Storage | 10 GB | 50+ GB |
+| Max connections | 20 | 50+ |
+| SSL/TLS | Optional | Required for production |
+
+### Initial Schema Setup
+
+If the database is empty, you need to initialize the schema:
+
+```bash
+# Option 1: Using psql (from your local machine)
+psql -h your-postgres-server.database.azure.com \
+     -U recruiter \
+     -d recruiter_db \
+     -f schema.sql
+
+# Option 2: Using the backend container (after starting it)
+docker compose exec backend sh -c "PGPASSWORD=\$PGPASSWORD psql -h \$PGHOST -U \$PGUSER -d \$PGDATABASE -f schema.sql"
+
+# Option 3: Use the /init endpoint (starts the app and runs migrations)
+# Start the app, then:
+curl -X POST http://localhost/init
+```
+
+### Verifying Database Connection
+
+After configuring `.env` with your database credentials, test the connection:
+
+```bash
+# Start only the backend
+make up
+
+# Check health
+make health
+# Should return: {"status": "ok", "db": "connected", ...}
+```
 
 ---
 
@@ -105,22 +153,29 @@ cd Exist-AI-Recruiter
 # 2. Create your environment file from the template
 cp .env.example .env
 
-# 3. Edit .env — most values are already pre-configured
-#    You only MUST change:
-#    - PGPASSWORD          → use a strong password
+# 3. Edit .env with your database credentials and webhook URL
+#    Required changes:
+#    - PGHOST              → your PostgreSQL server hostname
+#    - PGUSER              → database username
+#    - PGPASSWORD          → database password
+#    - PGDATABASE          → database name
 #    - WEBHOOK_CALLBACK_URL → your server's public URL + /webhook-callback
 nano .env
 
-# 4. Build and start all containers
+# 4. Initialize database schema (if not already done)
+psql -h <PGHOST> -U <PGUSER> -d <PGDATABASE> -f schema.sql
+# OR use the /init endpoint after starting the app (see Database Setup section)
+
+# 5. Build and start all containers
 make up          # or: docker compose up -d --build
 
-# 5. Verify everything is running
+# 6. Verify everything is running
 make status      # or: docker compose ps
 
-# 6. Check backend health
+# 7. Check backend health
 make health      # or: curl http://localhost/health
 
-# 7. Open in browser
+# 8. Open in browser
 open http://localhost
 ```
 
@@ -130,9 +185,8 @@ open http://localhost
 
 ```
 NAME                              STATUS              PORTS
-exist-ai-recruiter-db-1           Up (healthy)        0.0.0.0:5432->5432/tcp
 exist-ai-recruiter-backend-1      Up (healthy)        3001/tcp
-exist-ai-recruiter-frontend-1     Up                  0.0.0.0:80->80/tcp
+exist-ai-recruiter-frontend-1     Up (healthy)        0.0.0.0:80->80/tcp
 ```
 
 **Expected output of `curl http://localhost/health`:**
@@ -152,10 +206,11 @@ exist-ai-recruiter-frontend-1     Up                  0.0.0.0:80->80/tcp
 ### Database
 
 | Variable     | Required | Default        | Description                                                                                  |
+| Variable     | Required | Default        | Description                                                                                  |
 |--------------|----------|----------------|----------------------------------------------------------------------------------------------|
-| `PGHOST`     | Yes      | `db`           | PostgreSQL hostname. Use `db` for the bundled container, or a real hostname for external DB   |
+| `PGHOST`     | Yes      | *(none)*       | PostgreSQL hostname (e.g., `your-server.postgres.database.azure.com`)                        |
 | `PGUSER`     | Yes      | `recruiter`    | PostgreSQL username                                                                          |
-| `PGPASSWORD` | Yes      | —              | PostgreSQL password. **Change the default!**                                                 |
+| `PGPASSWORD` | Yes      | *(none)*       | PostgreSQL password. **Use a strong password!**                                              |
 | `PGDATABASE` | Yes      | `recruiter_db` | PostgreSQL database name                                                                     |
 | `PGPORT`     | No       | `5432`         | PostgreSQL port                                                                              |
 
@@ -187,57 +242,6 @@ All n8n webhook URLs come **pre-configured** pointing to `workflow.exist.com.ph`
 | `VITE_N8N_CHAT_WEBHOOK_URL` | *(pre-configured)* | n8n chatbot webhook URL. Called directly from the browser.               |
 
 > **Important:** `VITE_*` variables are **build-time only** — they are baked into the JavaScript bundle during `docker compose build`. If you change them, you must rebuild the frontend: `docker compose up -d --build frontend`
-
----
-
-## Using an External Database
-
-To connect to an existing PostgreSQL server (e.g., Azure Database for PostgreSQL) instead of the bundled container:
-
-### 1. Update `.env`
-
-```env
-PGHOST=your-server.postgres.database.azure.com
-PGUSER=your_username
-PGPASSWORD=your_password
-PGDATABASE=your_database
-PGPORT=5432
-```
-
-### 2. Modify `docker-compose.yml`
-
-Comment out or remove the `db` service and update `backend.depends_on`:
-
-```yaml
-services:
-  # db:             # ← comment out or remove the entire db service
-  #   image: ...
-
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    restart: unless-stopped
-    # depends_on:   # ← remove or comment out depends_on
-    #   db:
-    #     condition: service_healthy
-    environment:
-      # ... same as before, PGHOST now points to external server
-```
-
-### 3. Initialize the schema
-
-If the external database is empty, run the schema manually:
-
-```bash
-psql -h your-server.postgres.database.azure.com -U your_username -d your_database -f schema.sql
-```
-
-### 4. Start without the db container
-
-```bash
-docker compose up -d --build backend frontend
-```
 
 ---
 
@@ -324,43 +328,39 @@ docker compose up -d --build backend    # backend only
 
 ## Data Persistence & Backups
 
-### Docker volume
+### Database Persistence
 
-Database data is stored in a named Docker volume `pgdata`. This persists across:
+The database is **externally managed** by your organization's infrastructure team. Data persistence, backup schedules, and disaster recovery are handled at the database level (Azure Backup, AWS RDS snapshots, etc.).
 
-- Container restarts (`docker compose restart`)
-- Rebuilds (`docker compose up -d --build`)
-- Stop/start cycles (`docker compose down` then `docker compose up -d`)
+### Application-Level Backup
 
-**Data is ONLY destroyed if you explicitly remove the volume:**
+If you need to create an ad-hoc backup:
 
 ```bash
-# ⚠️ THIS DELETES ALL DATA
-docker compose down -v
-```
-
-### Backup
-
-```bash
-# Full database dump
-docker compose exec db pg_dump -U recruiter recruiter_db > backup_$(date +%Y%m%d_%H%M%S).sql
+# Full database dump (direct connection)
+pg_dump -h <PGHOST> -U <PGUSER> -d <PGDATABASE> > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # Compressed
-docker compose exec db pg_dump -U recruiter recruiter_db | gzip > backup_$(date +%Y%m%d_%H%M%S).sql.gz
+pg_dump -h <PGHOST> -U <PGUSER> -d <PGDATABASE> | gzip > backup_$(date +%Y%m%d_%H%M%S).sql.gz
+
+# Using the Makefile (if db credentials are in .env)
+make backup
 ```
 
 ### Restore
 
 ```bash
-# Stop backend to avoid conflicts
+# Stop backend to avoid conflicts during restore
 docker compose stop backend
 
 # Restore from backup
-cat backup_20260213_120000.sql | docker compose exec -T db psql -U recruiter recruiter_db
+psql -h <PGHOST> -U <PGUSER> -d <PGDATABASE> < backup_20260213_120000.sql
 
 # Restart backend
 docker compose start backend
 ```
+
+> **Note:** Coordinate with your DBA team for production restores. They may have specific procedures for point-in-time recovery, snapshot restores, or replica promotion.
 
 ---
 
@@ -372,7 +372,6 @@ docker compose start backend
 docker compose logs -f              # all containers
 docker compose logs -f backend      # backend only
 docker compose logs -f frontend     # nginx only
-docker compose logs -f db           # database only
 docker compose logs --tail=100 backend  # last 100 lines
 ```
 
@@ -380,20 +379,21 @@ docker compose logs --tail=100 backend  # last 100 lines
 
 | Symptom | Likely Cause | Fix |
 |---------|-------------|-----|
-| Backend exits: "Missing required environment variable" | `.env` missing or incomplete | `cp .env.example .env` and fill in `PGPASSWORD` + `WEBHOOK_CALLBACK_URL` |
-| Backend: "DB connection failed" | Database not ready or wrong credentials | Check `PGHOST`, `PGUSER`, `PGPASSWORD`; ensure `db` container is healthy |
+| Backend exits: "Missing required environment variable" | `.env` missing or incomplete | `cp .env.example .env` and fill in all `PG*` variables + `WEBHOOK_CALLBACK_URL` |
+| Backend: "DB connection failed" | Database unreachable or wrong credentials | Check `PGHOST`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`; verify network connectivity; check firewall rules |
 | Blank page in browser | Build-time env vars not set at build time | Check `VITE_API_URL`; rebuild: `docker compose up -d --build frontend` |
 | CV upload works but candidates never appear | `WEBHOOK_CALLBACK_URL` not reachable by n8n | Set to a publicly accessible URL; check firewall rules |
 | Chat not responding | `VITE_N8N_CHAT_WEBHOOK_URL` wrong or n8n down | Verify webhook URL; check n8n service status |
 | Port 80 connection refused | Frontend container not running | `docker compose up -d frontend`; check `docker compose logs frontend` |
-| Database data lost after restart | Used `docker compose down -v` | Never use `-v` unless you intend to delete data |
 
 ### Entering containers for debugging
 
 ```bash
 docker compose exec backend sh           # backend shell
-docker compose exec db psql -U recruiter recruiter_db   # database shell
 docker compose exec frontend sh          # nginx shell
+
+# To connect to the database directly
+psql -h <PGHOST> -U <PGUSER> -d <PGDATABASE>
 ```
 
 ---
@@ -470,7 +470,7 @@ A `Makefile` is included for common operations. Run `make help` for a full list.
 
 ```bash
 make up                 # Build + start all services
-make down               # Stop all services (data preserved)
+make down               # Stop all services
 make restart-backend    # Restart backend only (env var changes)
 make rebuild-frontend   # Rebuild frontend (VITE_* changes)
 make logs               # Tail all logs
@@ -478,23 +478,24 @@ make logs-backend       # Tail backend logs only
 make health             # Check /health endpoint
 make status             # Show container status
 make stats              # Live resource usage
+make init-schema        # Initialize DB schema (run once on empty DB)
 make backup             # Timestamped DB backup → backups/
 make restore FILE=...   # Restore from backup
-make db-shell           # psql shell into database
+make db-shell           # psql shell to external database
 make shell-backend      # sh into backend container
-make clean              # Stop + remove images (data kept)
-make nuke               # ⚠️ DESTROY everything incl. data
+make clean              # Stop + remove images
+make nuke               # ⚠️ DESTROY local volumes (DB not affected)
 ```
 
 Or use `docker compose` directly:
 
 ```bash
 docker compose up -d --build          # Start everything (build fresh)
-docker compose down                   # Stop everything (data preserved)
+docker compose down                   # Stop everything
 docker compose restart backend        # Restart a single service
 docker compose stats                  # View resource usage
 docker compose up -d --build frontend # Rebuild after VITE_* change
-docker compose down -v                # ⚠️ RESET — deletes ALL data
+docker compose down -v                # Remove local volumes (DB not affected)
 ```
 
 ---
@@ -508,13 +509,12 @@ The following security and reliability measures are already configured out of th
 | **Non-root containers** | Backend runs as `appuser:1001`, frontend as `nginx` user |
 | **PID 1 signal handling** | Backend uses `tini` init for proper SIGTERM forwarding |
 | **Graceful shutdown** | Backend drains in-flight requests + closes DB pool before exit |
-| **Health checks** | All 3 services have Docker health checks |
-| **Network isolation** | DB is only reachable from backend (separate Docker networks) |
+| **Health checks** | Both services have Docker health checks |
+| **Network isolation** | Frontend and backend on separate Docker networks |
 | **Resource limits** | CPU + memory caps on all services prevent runaway resource usage |
 | **Log rotation** | JSON file logging with max-size (10MB) and max-file (3-5) |
 | **Security headers** | nginx adds X-Frame-Options, X-Content-Type-Options, CSP, etc. |
 | **Server tokens hidden** | nginx `server_tokens off` hides version info |
-| **DB port not exposed** | PostgreSQL port 5432 is internal-only by default |
 | **Gzip compression** | Enabled for text/JS/CSS/JSON/SVG |
 | **Static asset caching** | 1-year cache with immutable headers |
 
@@ -522,13 +522,16 @@ The following security and reliability measures are already configured out of th
 
 ## Go-Live Checklist
 
-- [ ] Changed default `PGPASSWORD` to a strong password
+- [ ] Database schema initialized (ran `schema.sql` or `/init` endpoint)
+- [ ] All database credentials configured in `.env` (`PGHOST`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`)
+- [ ] Database is accessible from the application server (network/firewall rules)
 - [ ] Set `WEBHOOK_CALLBACK_URL` to the server's public URL + `/webhook-callback`
 - [ ] Verified n8n webhook URLs are correct (pre-configured to `workflow.exist.com.ph`)
-- [ ] Placed the application behind VPN / auth proxy / firewall
-- [ ] Set up SSL/TLS termination (see section above)
+- [ ] Placed the application behind VPN / auth proxy / firewall (NO BUILT-IN AUTH)
+- [ ] Set up SSL/TLS termination (see SSL section above)
 - [ ] Tested CV upload → processing → candidate appearing end-to-end
-- [ ] Set up a database backup schedule (`make backup` or cron)
+- [ ] Coordinated database backup strategy with DBA team
 - [ ] Verified the server has outbound HTTPS access to `workflow.exist.com.ph`
-- [ ] Confirmed `make health` returns `{"status": "ok"}`
-- [ ] Verified `make status` shows all containers as `Up (healthy)`
+- [ ] Confirmed `make health` returns `{"status": "ok", "db": "connected"}`
+- [ ] Verified `make status` shows both containers as `Up (healthy)`
+- [ ] Load tested with expected concurrent user count

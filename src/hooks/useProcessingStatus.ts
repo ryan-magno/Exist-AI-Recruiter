@@ -10,12 +10,10 @@ export interface ProcessingCandidate {
   id: string;
   full_name: string;
   processing_status: 'processing' | 'completed' | 'failed';
-  processing_batch_id: string | null;
-  processing_started_at: string | null;
-  processing_completed_at: string | null;
-  cv_filename: string | null;
-  applicant_type: string;
+  applicant_type: string | null;
   created_at: string;
+  batch_id: string | null;
+  batch_created_at: string | null;
 }
 
 export interface ProcessingStatusResponse {

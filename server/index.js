@@ -160,6 +160,7 @@ const ALLOWED_APPLICATION_COLUMNS = [
 ];
 
 function validateColumns(body, allowedColumns) {
+  if (!body || typeof body !== 'object') return {};
   const validated = {};
   for (const [key, value] of Object.entries(body)) {
     if (allowedColumns.includes(key)) {
@@ -478,7 +479,7 @@ app.get('/candidates/processing-status', async (req, res) => {
     const statusCounts = await query(`
       SELECT processing_status, COUNT(*) as count FROM candidates 
       WHERE processing_status IN ('processing', 'completed')
-      ${batchId ? `AND processing_batch_id = $1` : ''}
+      ${batchId ? `AND batch_id = $1` : ''}
       GROUP BY processing_status
     `, batchId ? [batchId] : []);
 
@@ -494,7 +495,7 @@ app.get('/candidates/processing-status', async (req, res) => {
 // Cleanup stale processing
 app.post('/candidates/cleanup', async (req, res) => {
   try {
-    await execute(`UPDATE candidates SET processing_status = 'failed' WHERE processing_status = 'processing' AND processing_started_at < now() - interval '10 minutes'`);
+    await execute(`UPDATE candidates SET processing_status = 'failed' WHERE processing_status = 'processing' AND created_at < now() - interval '10 minutes'`);
     const deleted = await query(`DELETE FROM candidates WHERE processing_status = 'failed' AND full_name LIKE 'Processing CV%' RETURNING id`);
     res.json({ success: true, deleted: deleted.length });
   } catch (error) {
@@ -1620,8 +1621,8 @@ async function createCandidateFromWebhook(body) {
       full_name, email, phone, applicant_type, skills, 
       linkedin, current_position, current_company, years_of_experience_text,
       overall_summary, strengths, weaknesses, qualification_score,
-      uploaded_by, processing_status, processing_completed_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'completed', now())
+      uploaded_by, processing_status
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'completed')
     RETURNING *
   `, [
     candidateInfo.full_name || 'Unknown', candidateInfo.email || null, candidateInfo.phone || null,
@@ -2020,6 +2021,9 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({ error: 'File too large. Maximum size is 10MB per file.' });
+  }
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });

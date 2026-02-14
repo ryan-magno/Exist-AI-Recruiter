@@ -5,61 +5,17 @@
 #   cp .env.example .env   # then edit with real values
 #   docker compose up -d --build
 #
-# To use an external database instead of the bundled one:
-#   1. Update PGHOST, PGUSER, PGPASSWORD, PGDATABASE in .env
-#   2. Comment out or remove the "db" service below
-#   3. Remove "db" from backend's "depends_on"
+# The database is managed externally by your organization.
+# Configure connection details in .env file.
 # ==============================================
 
 services:
-  # ---------- PostgreSQL ----------
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${PGUSER:-recruiter}
-      POSTGRES_PASSWORD: ${PGPASSWORD:-change_me_strong_password}
-      POSTGRES_DB: ${PGDATABASE:-recruiter_db}
-    # Port 5432 NOT exposed to host by default (security).
-    # Uncomment the line below only for local development / debugging:
-    # ports:
-    #   - "5432:5432"
-    expose:
-      - "5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${PGUSER:-recruiter} -d ${PGDATABASE:-recruiter_db}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 128M
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - backend-net
-
   # ---------- Backend (Express API) ----------
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
       PGHOST: ${PGHOST:-db}
       PGUSER: ${PGUSER:-recruiter}
@@ -128,7 +84,3 @@ networks:
     driver: bridge
   frontend-net:
     driver: bridge
-
-volumes:
-  pgdata:
-    driver: local

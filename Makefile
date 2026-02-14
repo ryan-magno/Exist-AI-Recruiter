@@ -46,8 +46,8 @@ logs-backend: ## Tail backend logs only
 logs-frontend: ## Tail frontend/nginx logs only
 	docker compose logs -f frontend
 
-logs-db: ## Tail database logs only
-	docker compose logs -f db
+logs-frontend: ## Tail frontend/nginx logs only
+	docker compose logs -f frontend
 
 status: ## Show container status
 	docker compose ps
@@ -58,26 +58,35 @@ health: ## Check backend health endpoint
 stats: ## Show live resource usage
 	docker compose stats
 
-# ---------- Database ----------
+# ---------- Database (External) ----------
 
-backup: ## Create a timestamped database backup
+backup: ## Create a timestamped database backup (requires .env with DB credentials)
 	@mkdir -p backups
-	docker compose exec db pg_dump -U $${PGUSER:-recruiter} $${PGDATABASE:-recruiter_db} | gzip > backups/backup_$$(date +%Y%m%d_%H%M%S).sql.gz
+	@echo "Creating backup from external database..."
+	@PGPASSWORD=$${PGPASSWORD} pg_dump -h $${PGHOST} -U $${PGUSER} -d $${PGDATABASE} | gzip > backups/backup_$$(date +%Y%m%d_%H%M%S).sql.gz
 	@echo "Backup saved to backups/"
 	@ls -lh backups/ | tail -1
 
-restore: ## Restore from latest backup (usage: make restore FILE=backups/backup_xxx.sql.gz)
+restore: ## Restore from backup (usage: make restore FILE=backups/backup_xxx.sql.gz)
 ifndef FILE
 	@echo "Usage: make restore FILE=backups/backup_20260214_120000.sql.gz"
 	@exit 1
 endif
+	@echo "Stopping backend..."
 	docker compose stop backend
-	gunzip -c $(FILE) | docker compose exec -T db psql -U $${PGUSER:-recruiter} $${PGDATABASE:-recruiter_db}
+	@echo "Restoring to external database..."
+	@gunzip -c $(FILE) | PGPASSWORD=$${PGPASSWORD} psql -h $${PGHOST} -U $${PGUSER} -d $${PGDATABASE}
+	@echo "Restarting backend..."
 	docker compose start backend
 	@echo "Restore complete."
 
-db-shell: ## Open a psql shell to the database
-	docker compose exec db psql -U $${PGUSER:-recruiter} $${PGDATABASE:-recruiter_db}
+db-shell: ## Open a psql shell to the external database
+	@PGPASSWORD=$${PGPASSWORD} psql -h $${PGHOST} -U $${PGUSER} -d $${PGDATABASE}
+
+init-schema: ## Initialize database schema (run once on empty database)
+	@echo "Initializing schema on external database..."
+	@PGPASSWORD=$${PGPASSWORD} psql -h $${PGHOST} -U $${PGUSER} -d $${PGDATABASE} -f schema.sql
+	@echo "Schema initialized. Now run: make up"
 
 # ---------- Debugging ----------
 
@@ -89,10 +98,11 @@ shell-frontend: ## Open a shell inside the frontend container
 
 # ---------- Cleanup ----------
 
-clean: ## Stop everything and remove images (DATA PRESERVED)
+clean: ## Stop everything and remove images
 	docker compose down --rmi all
 
-nuke: ## ⚠️  DESTROY everything including database data
-	@echo "⚠️  This will DELETE ALL DATA. Press Ctrl+C to cancel."
+nuke: ## ⚠️  DESTROY everything including local volumes (external DB not affected)
+	@echo "⚠️  This will DELETE local volumes. External database is NOT affected."
+	@echo "   Press Ctrl+C to cancel..."
 	@sleep 5
 	docker compose down -v --rmi all
