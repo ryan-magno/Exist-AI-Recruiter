@@ -299,6 +299,21 @@ app.post('/migrate', async (req, res) => {
 });
 
 // =====================================================
+// JOB TITLES (for Apply at Exist form)
+// =====================================================
+app.get('/job-titles', async (req, res) => {
+  try {
+    const rows = await query(
+      "SELECT DISTINCT title, level FROM public.job_orders WHERE status IS NULL OR status != 'closed' ORDER BY title, level"
+    );
+    const titles = rows.map(r => r.level ? `${r.title} (${r.level})` : r.title);
+    res.json({ titles });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =====================================================
 // JOB ORDERS
 // =====================================================
 app.get('/job-orders', async (req, res) => {
@@ -2018,16 +2033,31 @@ async function start() {
     console.log(`   Health check: http://localhost:${PORT}/health`);
   });
 
-  // Graceful shutdown
+  // Graceful shutdown — stops accepting new connections, drains in-flight requests, closes DB pool
+  let isShuttingDown = false;
   const shutdown = async (signal) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
     console.log(`\n${signal} received. Shutting down gracefully...`);
-    server.close(() => {
-      pool.end().then(() => {
-        console.log('Database pool closed.');
+
+    // Stop accepting new connections
+    server.close(async () => {
+      console.log('HTTP server closed. Draining database pool...');
+      try {
+        await pool.end();
+        console.log('Database pool closed. Exiting.');
         process.exit(0);
-      });
+      } catch (err) {
+        console.error('Error closing pool:', err.message);
+        process.exit(1);
+      }
     });
-    setTimeout(() => process.exit(1), 10000);
+
+    // Force shutdown after 15s if drain takes too long
+    setTimeout(() => {
+      console.error('Graceful shutdown timed out after 15s. Forcing exit.');
+      process.exit(1);
+    }, 15000).unref();
   };
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));

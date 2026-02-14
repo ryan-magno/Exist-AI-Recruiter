@@ -1,0 +1,38 @@
+# ==============================================
+# Exist AI Recruiter — Backend (Express API)
+# ==============================================
+
+FROM node:20-alpine
+
+# Install tini for proper PID 1 signal handling (graceful shutdown)
+RUN apk add --no-cache tini wget
+
+WORKDIR /app
+
+# Copy server dependency manifest
+COPY server/package.json server/package-lock.json* ./
+
+# Install production dependencies only
+RUN npm ci --production
+
+# Copy server code
+COPY server/index.js ./index.js
+
+# Copy schema + migration files (used by auto-migration on startup)
+COPY schema.sql ./schema.sql
+COPY migrations/ ./migrations/
+
+# Don't run as root
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -S appuser -u 1001 -G appgroup
+USER appuser
+
+EXPOSE 3001
+
+# Health check — uses the /health endpoint
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
+
+# Use tini as PID 1 to properly forward signals
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "index.js"]

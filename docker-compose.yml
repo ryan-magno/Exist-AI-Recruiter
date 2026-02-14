@@ -1,0 +1,134 @@
+# ==============================================
+# Exist AI Recruiter — Docker Compose
+# ==============================================
+# Usage:
+#   cp .env.example .env   # then edit with real values
+#   docker compose up -d --build
+#
+# To use an external database instead of the bundled one:
+#   1. Update PGHOST, PGUSER, PGPASSWORD, PGDATABASE in .env
+#   2. Comment out or remove the "db" service below
+#   3. Remove "db" from backend's "depends_on"
+# ==============================================
+
+services:
+  # ---------- PostgreSQL ----------
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PGUSER:-recruiter}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-change_me_strong_password}
+      POSTGRES_DB: ${PGDATABASE:-recruiter_db}
+    # Port 5432 NOT exposed to host by default (security).
+    # Uncomment the line below only for local development / debugging:
+    # ports:
+    #   - "5432:5432"
+    expose:
+      - "5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER:-recruiter} -d ${PGDATABASE:-recruiter_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - backend-net
+
+  # ---------- Backend (Express API) ----------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: ${PGHOST:-db}
+      PGUSER: ${PGUSER:-recruiter}
+      PGPASSWORD: ${PGPASSWORD:-change_me_strong_password}
+      PGDATABASE: ${PGDATABASE:-recruiter_db}
+      PGPORT: ${PGPORT:-5432}
+      API_PORT: ${API_PORT:-3001}
+      NODE_ENV: production
+      N8N_CV_WEBHOOK_URL: ${N8N_CV_WEBHOOK_URL}
+      N8N_JO_WEBHOOK_URL: ${N8N_JO_WEBHOOK_URL:-}
+      N8N_EMAIL_WEBHOOK_URL: ${N8N_EMAIL_WEBHOOK_URL:-}
+      WEBHOOK_CALLBACK_URL: ${WEBHOOK_CALLBACK_URL}
+    # Not exposed to the host — only accessible via nginx
+    expose:
+      - "3001"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - backend-net
+      - frontend-net
+
+  # ---------- Frontend (nginx + SPA) ----------
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        # Build-time variables baked into the JS bundle
+        VITE_API_URL: ${VITE_API_URL:-}
+        VITE_N8N_CHAT_WEBHOOK_URL: ${VITE_N8N_CHAT_WEBHOOK_URL:-}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - frontend-net
+
+networks:
+  backend-net:
+    driver: bridge
+  frontend-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+    driver: local

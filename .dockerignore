@@ -1,0 +1,55 @@
+# Version control
+.git
+.gitignore
+
+# Dependencies (rebuilt inside the image)
+node_modules
+server/node_modules
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Build output (rebuilt inside the image)
+dist
+
+# Lock files not needed (we use package-lock.json)
+bun.lockb
+
+# Dev / test files
+src/test
+vitest.config.ts
+eslint.config.js
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Mock / seed data
+mockData
+seed.sql
+migration-hr-fields.sql
+schema-multi-schema.sql
+
+# Workflows & scripts (not needed at runtime)
+n8n-workflows
+scripts
+
+# Docker files (no need to copy into themselves)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# IDE / editor
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Documentation
+DEPLOYMENT.md
+README.md
