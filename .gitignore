@@ -18,6 +18,9 @@ dist-ssr
 .env.production
 .env.staging
 
+# n8n workflow exports
+n8n-workflows/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -28,3 +31,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
